@@ -1,0 +1,770 @@
+/* src/index.css - GURUKULAM Master Specification Typography & Styling System */
+
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700;800;900&family=Playfair+Display:wght@700;800;900&family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Suravaram&family=Lora:ital,wght@0,500;0,600;1,500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-parchment: #F9F5EB;
+  --color-parchment-deep: #F4ECE1;
+  --color-parchment-mottled: #EBE0CF;
+
+  --color-charcoal-deep: #140C08;
+  --color-charcoal-warm: #2A1E18;
+
+  --color-burnt-umber: #8C3A27;
+  --color-terracotta-start: #9C442B;
+  --color-terracotta-end: #732D1B;
+  --color-antique-gold: #C5A059;
+
+  --font-serif: 'Playfair Display', 'Cinzel', serif;
+  --font-sans: 'Plus Jakarta Sans', sans-serif;
+  --font-telugu: 'Suravaram', serif;
+}
+
+:root {
+  /* Visual Palette & Custom Properties */
+  --bg-parchment-base: #F9F5EB;
+  --bg-parchment-deep: #F4ECE1;
+  --bg-parchment-mottled: #EBE0CF;
+
+  --text-primary: #140C08; /* Deep Black Charcoal */
+  --text-secondary: #2A1E18; /* Warm Rich Charcoal Body */
+
+  --accent-burnt-umber: #8C3A27;
+  --accent-terracotta-start: #9C442B;
+  --accent-terracotta-end: #732D1B;
+  --accent-antique-gold: #C5A059;
+
+  --border-parchment-card: #D5C3B0;
+
+  --font-heading: 'Playfair Display', 'Cinzel', serif;
+  --font-body: 'Plus Jakarta Sans', sans-serif;
+}
+
+/* Reset & Smooth Scroll */
+html {
+  scroll-behavior: smooth;
+  box-sizing: border-box;
+  font-family: var(--font-body);
+  font-size: 16px;
+  color: var(--text-secondary);
+  background-color: var(--bg-parchment-base);
+  overflow-x: hidden;
+}
+
+*, *:before, *:after {
+  box-sizing: inherit;
+}
+
+/* Base Body Surface */
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  background-color: var(--bg-parchment-base);
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  color: #2A1E18 !important;
+  line-height: 1.7;
+}
+
+/* High-Contrast Bold Headings */
+h1, h2, h3, .section-title, .font-serif-header {
+  font-family: 'Playfair Display', 'Cinzel', serif !important;
+  color: #140C08 !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.01em;
+}
+
+.font-sans-body, .font-editorial-body {
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  color: #2A1E18 !important;
+  font-weight: 500;
+  line-height: 1.7;
+}
+
+/* HIGH-VISIBILITY EYEBROW BADGE / HIGHLIGHT CLASS */
+.eyebrow-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  padding: 4px 16px !important;
+  background: linear-gradient(135deg, rgba(140, 58, 39, 0.12) 0%, rgba(197, 160, 89, 0.22) 100%) !important;
+  border: 1px solid rgba(140, 58, 39, 0.4) !important;
+  border-radius: 9999px !important;
+  color: #8C3A27 !important;
+  font-family: 'Playfair Display', serif !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.14em !important;
+  text-transform: uppercase !important;
+  box-shadow: 0 2px 8px rgba(140, 58, 39, 0.1) !important;
+  margin-bottom: 8px !important;
+}
+
+/* MENTOR'S NOTE HEADING STYLING */
+.mentors-note-heading-line1 {
+  font-family: 'Suravaram', serif !important;
+  font-style: italic !important;
+  font-size: clamp(1.4rem, 2.2vw, 1.85rem) !important;
+  font-weight: 700 !important;
+  color: #140C08 !important;
+  letter-spacing: 0.02em !important;
+}
+
+.mentors-note-heading-line2 {
+  font-family: 'Suravaram', serif !important;
+  font-style: italic !important;
+  font-size: clamp(1.4rem, 2.2vw, 1.95rem) !important;
+  font-weight: 700 !important;
+  color: #140C08 !important;
+  line-height: 1.4 !important;
+}
+
+/* MENTOR'S NOTE TELUGU POEM STYLING */
+.mentors-note-text {
+  font-family: 'Suravaram', serif !important;
+  font-size: clamp(1.45rem, 2.3vw, 1.85rem) !important;
+  font-weight: 700 !important;
+  line-height: 1.5 !important;
+  color: #6b2d18 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+  padding: 0 !important;
+  margin-top: 16px !important;
+  margin-bottom: 16px !important;
+}
+
+/* MENTOR'S NOTE TAGLINE STYLING */
+.mentors-note-tagline {
+  font-family: 'Suravaram', serif !important;
+  font-style: italic !important;
+  font-size: clamp(1.2rem, 1.95vw, 1.75rem) !important;
+  font-weight: 700 !important;
+  line-height: 1.5 !important;
+  color: #990000 !important;
+  margin-top: 12px !important;
+  margin-bottom: 16px !important;
+  white-space: nowrap !important;
+  overflow: visible !important;
+}
+
+.mentors-note-tagline-highlight {
+  font-family: 'Suravaram', serif !important;
+  font-style: italic !important;
+  font-size: clamp(1.45rem, 2.4vw, 2.1rem) !important;
+  font-weight: 700 !important;
+  color: #990000 !important;
+  display: block !important;
+  margin-top: 6px !important;
+  white-space: nowrap !important;
+  overflow: visible !important;
+}
+
+/* PARENT TOOLBAR WRAPPER */
+.filter-toolbar-wrapper {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 12px !important;
+  width: 100% !important;
+}
+
+/* COMPACT SEARCH INPUT WRAPPER */
+.search-input-wrapper {
+  flex-shrink: 0 !important;
+  width: 220px !important;
+}
+
+.search-input-wrapper input {
+  width: 100% !important;
+  font-size: 12px !important;
+  padding: 6px 12px 6px 32px !important;
+}
+
+/* FLEXIBLE CATEGORY PILLS CONTAINER */
+.category-filters-container {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+  white-space: nowrap !important;
+  flex-grow: 1 !important;
+  scroll-behavior: smooth !important;
+  padding-bottom: 2px !important;
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}
+
+.category-filters-container::-webkit-scrollbar {
+  display: none !important;
+}
+
+/* COMPACT CATEGORY PILL STYLING */
+.category-filter-pill {
+  flex-shrink: 0 !important;
+  white-space: nowrap !important;
+  font-family: 'Playfair Display', 'Cinzel', serif !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.3px !important;
+  padding: 5px 10px !important;
+  border-radius: 16px !important;
+  text-transform: uppercase !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+}
+
+/* CARD FEATURED IMAGE WRAPPER */
+.card-image-wrapper {
+  width: 100% !important;
+  height: 180px !important;
+  overflow: hidden !important;
+  border-radius: 12px 12px 0 0 !important;
+  position: relative !important;
+  background-color: #F4ECE1 !important;
+}
+
+.card-image-wrapper img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  object-position: center !important;
+  transition: transform 0.5s ease !important;
+}
+
+.card-parchment-3d:hover .card-image-wrapper img {
+  transform: scale(1.05) !important;
+}
+
+/* COMPACT PAGINATION STYLING */
+.compact-pagination {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 16px !important;
+  margin-top: 40px !important;
+  margin-bottom: 20px !important;
+}
+
+.pagination-btn {
+  background: #FAF5EE !important;
+  border: 1px solid #8B3A1A !important;
+  color: #8B3A1A !important;
+  padding: 8px 18px !important;
+  border-radius: 20px !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+}
+
+.pagination-btn:disabled {
+  opacity: 0.4 !important;
+  cursor: not-allowed !important;
+  border-color: #D9CBBE !important;
+  color: #8C7A6B !important;
+}
+
+.pagination-btn:hover:not(:disabled) {
+  background: #8B3A1A !important;
+  color: #FFFFFF !important;
+}
+
+.page-indicator {
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  color: #2B2B2B !important;
+  font-family: 'Playfair Display', serif !important;
+}
+
+/* GLOBAL TELUGU SCRIPT FONT OVERRIDE */
+[lang="te"], .telugu-script {
+  font-family: 'Suravaram', serif !important;
+}
+
+/* COMPLETE NAVIGATION CSS FIX */
+.navbar-container {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  width: 100% !important;
+  max-width: 1440px !important;
+  padding: 10px 24px !important;
+  margin: 0 auto !important;
+}
+
+.nav-links-wrapper {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-evenly !important;
+  flex-grow: 1 !important;
+  margin: 0 16px !important;
+  gap: clamp(8px, 1.2vw, 20px) !important;
+  white-space: nowrap !important;
+}
+
+.nav-link {
+  white-space: nowrap !important;
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-size: clamp(12px, 1vw, 15px) !important;
+  font-weight: 700 !important;
+  color: #1A0F0B !important;
+  text-decoration: none !important;
+  letter-spacing: 0.03em !important;
+  text-transform: uppercase;
+}
+
+.single-line-title {
+  white-space: nowrap !important;
+}
+
+.navbar-logo-img {
+  height: 68px !important;
+  width: auto;
+  object-fit: contain;
+  mix-blend-mode: multiply !important;
+  filter: drop-shadow(0 2px 4px rgba(44, 34, 30, 0.18)) contrast(1.08) brightness(0.98) !important;
+  background: transparent !important;
+  border: none !important;
+  display: block;
+}
+
+.philosophy-hero-section,
+.about-top-section,
+.about-hero-container {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+.philosophy-grid-container {
+  background: transparent !important;
+  box-shadow: none !important;
+  max-width: 1400px !important;
+  margin: 0 auto !important;
+  padding: 20px 20px !important;
+  text-align: center !important;
+}
+
+/* UNIVERSAL CARD SWAP & MOTION SPEED OVERRIDE */
+.pillar-card,
+.pedagogical-card,
+.philosophy-card,
+[class*="animated-card"],
+[class*="pillar-card"] {
+  flex: 1 !important;
+  background: linear-gradient(180deg, #FFFDF8 0%, #F7F0E3 100%) !important;
+  border: 1px solid #D5C3B0 !important;
+  border-radius: 12px !important;
+  padding: 20px 16px !important;
+  box-shadow: 0 6px 16px rgba(60, 40, 25, 0.06) !important;
+  text-align: center !important;
+  transition: transform 1.2s cubic-bezier(0.2, 0.8, 0.2, 1), 
+              opacity 0.9s ease-out, 
+              border-color 0.8s ease !important;
+}
+
+.pillar-card:hover,
+.pedagogical-card:hover,
+.philosophy-card:hover,
+[class*="animated-card"]:hover {
+  transform: translateY(-4px) !important;
+  border-color: #8C3A27 !important;
+  box-shadow: 0 10px 24px rgba(60, 40, 25, 0.12) !important;
+}
+
+.pillar-title {
+  font-family: 'Playfair Display', serif !important;
+  font-size: 16px !important;
+  font-weight: 700 !important;
+  color: #8C3A27 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.08em !important;
+  margin-bottom: 8px !important;
+}
+
+.pillar-desc {
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-size: 13.5px !important;
+  line-height: 1.5 !important;
+  color: #2A1E18 !important;
+}
+
+.about-top-heading-single-line {
+  white-space: nowrap !important;
+  font-family: 'Playfair Display', serif !important;
+  font-size: clamp(1.6rem, 2.2vw, 2.6rem) !important;
+  font-weight: 800 !important;
+  color: #140C08 !important;
+  text-align: center !important;
+  margin-bottom: 8px !important;
+}
+
+/* RESTORE ORIGINAL SLOW SMOOTH VIRTUAL TRACK DISTANCES FOR SCROLL ANIMATIONS */
+.pedagogical-section-wrapper,
+.animated-card-section,
+[class*="animated-card-section"] {
+  position: relative !important;
+  height: 300vh !important;
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  box-sizing: border-box !important;
+}
+
+.pedagogical-continuum-section {
+  position: relative !important;
+  height: 480vh !important;
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  box-sizing: border-box !important;
+}
+
+.pedagogical-continuum-section .pedagogical-card,
+.pedagogical-continuum-section [class*="card"] {
+  transition: transform 1.5s cubic-bezier(0.2, 0.8, 0.2, 1), 
+              opacity 1.1s ease-out, 
+              border-color 0.8s ease !important;
+}
+
+.pedagogical-continuum-section,
+.philosophy-hero-section,
+.pedagogical-stage-wrapper,
+.pedagogical-image-single,
+.pedagogical-image-spread,
+.pillar-card,
+.pedagogical-card,
+.philosophy-card,
+[class*="card"] {
+  will-change: transform, opacity !important;
+  backface-visibility: hidden !important;
+  -webkit-backface-visibility: hidden !important;
+  transform-style: preserve-3d !important;
+}
+
+/* RESTORE FULL 100VH STICKY VIEWPORT STAGE FOR PERFECT VERTICAL CENTERING & STABLE SECTION BORDERS */
+.pedagogical-sticky-stage,
+.animated-card-stage,
+.scroll-stage-viewport,
+.pedagogical-sticky-viewport {
+  position: sticky !important;
+  top: 0 !important;
+  height: 100vh !important;
+  width: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  align-items: center !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+  padding: 70px 20px 20px 20px !important;
+}
+
+.animated-card-divider,
+.pedagogical-divider-line {
+  margin-top: 16px !important;
+  margin-bottom: 0 !important;
+  width: 100% !important;
+}
+
+.pedagogical-stage-wrapper {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100% !important;
+  margin-top: 12px !important;
+  transition: transform 1.2s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.9s ease-out !important;
+}
+
+.pedagogical-stage {
+  min-height: auto !important;
+  height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: space-between !important;
+  padding-bottom: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+.pedagogical-image-single {
+  max-height: 460px !important;
+  max-width: 360px !important;
+  transition: transform 1.2s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.9s ease-out !important;
+}
+
+.pedagogical-image-spread {
+  max-height: 300px !important;
+  max-width: 260px !important;
+  transition: transform 1.2s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.9s ease-out !important;
+}
+
+.editorial-portrait-frame {
+  position: relative;
+  border: 1px solid #8C3A27 !important;
+  padding: 8px;
+  background: #FFFDF8;
+  box-shadow: 0 10px 25px -5px rgba(60, 40, 25, 0.15);
+  border-radius: 4px;
+}
+
+.editorial-portrait-img {
+  width: 100%;
+  height: auto;
+  object-fit: cover;
+  display: block;
+}
+
+.about-blend-image {
+  mix-blend-mode: multiply !important;
+  filter: contrast(1.08) brightness(0.98);
+  -webkit-mask-image: radial-gradient(ellipse 85% 85% at 50% 50%, rgba(0,0,0,1) 60%, rgba(0,0,0,0) 100%);
+  mask-image: radial-gradient(ellipse 85% 85% at 50% 50%, rgba(0,0,0,1) 60%, rgba(0,0,0,0) 100%);
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* BEGIN YOUR JOURNEY BANNER ULTRA-SMOOTH PARCHMENT BLEND IMAGE STYLING */
+.journey-banner-blend-image {
+  width: 100% !important;
+  max-width: 100% !important;
+  height: auto !important;
+  mix-blend-mode: multiply !important;
+  filter: contrast(1.05) saturate(1.02) brightness(0.99) !important;
+
+  -webkit-mask-image: 
+    radial-gradient(ellipse 80% 75% at 50% 50%, rgba(0,0,0,1) 40%, rgba(0,0,0,0.85) 60%, rgba(0,0,0,0.4) 80%, rgba(0,0,0,0) 100%),
+    linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 15%, rgba(0,0,0,1) 85%, rgba(0,0,0,0) 100%),
+    linear-gradient(to right, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 10%, rgba(0,0,0,1) 90%, rgba(0,0,0,0) 100%) !important;
+
+  mask-image: 
+    radial-gradient(ellipse 80% 75% at 50% 50%, rgba(0,0,0,1) 40%, rgba(0,0,0,0.85) 60%, rgba(0,0,0,0.4) 80%, rgba(0,0,0,0) 100%),
+    linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 15%, rgba(0,0,0,1) 85%, rgba(0,0,0,0) 100%),
+    linear-gradient(to right, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 10%, rgba(0,0,0,1) 90%, rgba(0,0,0,0) 100%) !important;
+
+  -webkit-mask-composite: source-in, intersect !important;
+  mask-composite: intersect !important;
+
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  display: block !important;
+  margin: 0 auto !important;
+}
+
+.section-mottled-parchment {
+  background-color: #F4ECE1;
+  background-image: 
+    radial-gradient(circle at 10% 20%, rgba(140, 58, 39, 0.08) 0%, transparent 45%),
+    linear-gradient(135deg, #EBE0CF 0%, #F4ECE1 40%, #F9F5EB 100%),
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='paperNoise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0.5 0 0 0 0.1  0 0.45 0 0 0.08  0 0 0 0.35 0 0.06  0 0 0 0.08 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23paperNoise)'/%3E%3C/svg%3E");
+  background-attachment: scroll;
+}
+
+.section-clean-parchment {
+  background-color: #F9F5EB;
+  background-image: radial-gradient(circle at 50% 50%, #FCF9F2 0%, #F4ECE1 100%);
+}
+
+.hero-image-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 720px;
+  min-height: 400px;
+  overflow: visible;
+}
+
+.hero-blend-image {
+  width: 100% !important;
+  max-width: 720px !important;
+  height: auto !important;
+  transform: scale(1.18);
+  transform-origin: center center;
+
+  mix-blend-mode: multiply !important;
+  filter: contrast(1.08) saturate(1.05) brightness(0.98);
+
+  -webkit-mask-image: 
+    radial-gradient(ellipse 85% 75% at 50% 50%, rgba(0,0,0,1) 40%, rgba(0,0,0,0.8) 65%, rgba(0,0,0,0) 100%),
+    linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 12%, rgba(0,0,0,1) 88%, rgba(0,0,0,0) 100%),
+    linear-gradient(to right, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 10%, rgba(0,0,0,1) 90%, rgba(0,0,0,0) 100%) !important;
+  
+  mask-image: 
+    radial-gradient(ellipse 85% 75% at 50% 50%, rgba(0,0,0,1) 40%, rgba(0,0,0,0.8) 65%, rgba(0,0,0,0) 100%),
+    linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 12%, rgba(0,0,0,1) 88%, rgba(0,0,0,0) 100%),
+    linear-gradient(to right, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 10%, rgba(0,0,0,1) 90%, rgba(0,0,0,0) 100%) !important;
+
+  -webkit-mask-composite: source-in, intersect !important;
+  mask-composite: intersect !important;
+
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.card-parchment-3d {
+  background: linear-gradient(180deg, #FFFDF8 0%, #F7F0E3 100%);
+  border: 1px solid var(--border-parchment-card);
+  border-radius: 14px;
+  box-shadow: 
+    0 10px 25px -5px rgba(60, 40, 25, 0.12),
+    0 4px 10px -2px rgba(60, 40, 25, 0.08),
+    inset 0 1px 0 rgba(255, 255, 25, 0.85);
+  transition: all 0.3s cubic-bezier(0.165, 0.84, 0.44, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.card-parchment-3d:hover {
+  transform: translateY(-4px);
+  border-color: var(--accent-burnt-umber);
+  box-shadow: 
+    0 18px 36px -6px rgba(60, 40, 25, 0.18),
+    0 8px 16px -3px rgba(60, 40, 25, 0.1),
+    inset 0 1px 0 rgba(255, 255, 25, 0.95);
+}
+
+.badge-terracotta-circle {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #A65233 0%, #7A331B 100%);
+  border: 2px solid #D5C3B0;
+  box-shadow: 0 4px 10px rgba(122, 51, 27, 0.25), inset 0 1px 0 rgba(255, 255, 25, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #FFFFFF;
+  margin: 0 auto;
+}
+
+.btn-terracotta-pill {
+  background: linear-gradient(180deg, #9C442B 0%, #732D1B 100%);
+  color: #FFFFFF;
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.04em;
+  padding: 0.75rem 1.8rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 25, 0.25);
+  box-shadow: 0 4px 12px rgba(115, 45, 27, 0.3), inset 0 1px 0 rgba(255, 255, 25, 0.35);
+  cursor: pointer;
+  transition: all 0.25s ease-out;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  text-decoration: none;
+  text-transform: uppercase;
+  font-size: 0.85rem;
+}
+
+.btn-terracotta-pill:hover {
+  background: linear-gradient(180deg, #AF4C31 0%, #873520 100%);
+  box-shadow: 0 6px 18px rgba(115, 45, 27, 0.45), inset 0 1px 0 rgba(255, 255, 25, 0.5);
+  transform: translateY(-2px);
+  color: #FFFFFF;
+}
+
+.btn-terracotta-outline-pill {
+  background: transparent;
+  color: #140C08;
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.04em;
+  padding: 0.75rem 1.8rem;
+  border-radius: 9999px;
+  border: 1.5px solid var(--accent-burnt-umber);
+  cursor: pointer;
+  transition: all 0.25s ease-out;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  text-decoration: none;
+  text-transform: uppercase;
+  font-size: 0.85rem;
+}
+
+.btn-terracotta-outline-pill:hover {
+  background: rgba(140, 58, 39, 0.08);
+  color: var(--accent-burnt-umber);
+}
+
+.manuscript-link {
+  position: relative;
+  transition: color 0.25s ease-out;
+  color: #140C08;
+}
+.manuscript-link:hover {
+  color: var(--accent-burnt-umber) !important;
+}
+
+.manuscript-link::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 100%;
+  height: 1.5px;
+  background: var(--accent-burnt-umber);
+  transform: scaleX(0);
+  transform-origin: center;
+  transition: transform 0.25s ease-out;
+}
+.manuscript-link:hover::after {
+  transform: scaleX(1);
+}
+
+.manuscript-input {
+  width: 100%;
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 2px solid #140C08 !important;
+  border-radius: 0 !important;
+  padding: 0.75rem 0.25rem !important;
+  color: #140C08 !important;
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-weight: 600 !important;
+  font-size: 0.95rem !important;
+  outline: none !important;
+  transition: border-color 0.25s ease, background-color 0.25s ease !important;
+}
+.manuscript-input:focus {
+  border-bottom-color: var(--accent-burnt-umber) !important;
+  background: rgba(255, 253, 249, 0.4) !important;
+}
+.manuscript-input::placeholder {
+  color: rgba(20, 12, 8, 0.5);
+  font-style: italic;
+  font-weight: 400;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
