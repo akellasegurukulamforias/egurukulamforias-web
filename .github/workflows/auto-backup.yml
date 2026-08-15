@@ -1,0 +1,23 @@
+name: Auto Backup on Push
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  create-backup-tag:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Create and Push Backup Tag
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          BACKUP_TAG="backup-auto-$(date +'%Y%m%d-%H%M%S')"
+          git tag -a "$BACKUP_TAG" -m "Automated backup before/at push"
+          git push origin "$BACKUP_TAG"
