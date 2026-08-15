@@ -6,29 +6,36 @@ export default function DesktopViewPrompt() {
   const [showGuide, setShowGuide] = useState(false);
 
   useEffect(() => {
-    const checkMobile = () => {
-      // Strictly detect actual mobile hardware / User Agent (Android, iOS, mobile devices)
-      const userAgent = navigator.userAgent || navigator.vendor || window.opera;
-      const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
-      
-      // Explicitly check for desktop Operating Systems (Windows, Mac, Linux/Unix)
-      const isDesktopOS = /Windows|Macintosh|Mac OS X|Linux x86_64|Linux i686/i.test(userAgent) && !/Android/i.test(userAgent);
+    // 1. If user already dismissed it during this session, NEVER show it again!
+    if (sessionStorage.getItem('desktopPromptDismissed') === 'true') {
+      return;
+    }
 
-      // ONLY show prompt on GENUINE mobile devices with screen width < 1024px
-      // NEVER trigger on Desktop Chrome/Edge/Firefox even when resized
-      if (isMobileUA && !isDesktopOS && window.innerWidth < 1024) {
-        setShowPrompt(true);
-      } else {
-        setShowPrompt(false);
-      }
-    };
+    // 2. Strictly detect actual mobile hardware / User Agent (Android, iOS, mobile devices)
+    const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+    const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
+    
+    // Explicitly check for desktop Operating Systems (Windows, Mac, Linux/Unix)
+    const isDesktopOS = /Windows|Macintosh|Mac OS X|Linux x86_64|Linux i686/i.test(userAgent) && !/Android/i.test(userAgent);
 
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
+    // ONLY trigger ONCE on genuine mobile devices with screen width < 1024px
+    if (isMobileUA && !isDesktopOS && window.innerWidth < 1024) {
+      const timer = setTimeout(() => {
+        if (sessionStorage.getItem('desktopPromptDismissed') !== 'true') {
+          setShowPrompt(true);
+        }
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
   }, []);
 
   const handleDismiss = () => {
+    // Save dismissal in sessionStorage so it NEVER pops up again while scrolling or navigating
+    try {
+      sessionStorage.setItem('desktopPromptDismissed', 'true');
+    } catch (e) {
+      // Fallback if sessionStorage is blocked
+    }
     setShowPrompt(false);
   };
 
