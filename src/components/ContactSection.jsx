@@ -1,21 +1,46 @@
 import React, { useState } from 'react';
 import { Send, CheckCircle, Phone, MessageSquare } from 'lucide-react';
+import { sanitizePayload, isSpamBot, isRateLimited } from '../utils/sanitize';
 
 export function ContactSection() {
   const [formData, setFormData] = useState({
     name: '',
     mobile: '',
     email: '',
-    message: ''
+    message: '',
+    hp_trap: '' // Hidden honeypot field
   });
   const [status, setStatus] = useState('idle'); // 'idle' | 'loading' | 'success' | 'error'
 
-  // EXACT GOOGLE APPS SCRIPT WEB APP URL
-  const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxUPhQTk-s9O6Qx0ad9iJxOC23l9lE86czYz_Uaoa0Bcli1x8-COBdZzkMV4mwkz5Kp/exec";
+  // GOOGLE APPS SCRIPT WEB APP URL
+  const GOOGLE_SCRIPT_URL = 
+    (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_APPS_SCRIPT_URL) ||
+    "https://script.google.com/macros/s/AKfycbxUPhQTk-s9O6Qx0ad9iJxOC23l9lE86czYz_Uaoa0Bcli1x8-COBdZzkMV4mwkz5Kp/exec";
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // 1. Anti-Spam Honeypot Verification
+    if (isSpamBot(formData.hp_trap)) {
+      setStatus('success');
+      return;
+    }
+
+    // 2. Client-Side Rate Limiting (3-Second Cooldown)
+    if (isRateLimited('ContactForm', 3000)) {
+      return;
+    }
+
     setStatus('loading');
+
+    // 3. Input Sanitization
+    const sanitizedPayload = sanitizePayload({
+      formType: "contact",
+      name: formData.name,
+      mobile: formData.mobile,
+      email: formData.email,
+      message: formData.message
+    });
 
     try {
       await fetch(GOOGLE_SCRIPT_URL, {
@@ -24,11 +49,11 @@ export function ContactSection() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(sanitizedPayload),
       });
 
       setStatus('success');
-      setFormData({ name: '', mobile: '', email: '', message: '' });
+      setFormData({ name: '', mobile: '', email: '', message: '', hp_trap: '' });
     } catch (err) {
       console.error("Form Submission Error:", err);
       setStatus('error');
@@ -58,6 +83,21 @@ export function ContactSection() {
           {/* Left Column: Form */}
           <div className="lg:col-span-7 card-parchment-3d p-6 sm:p-8 space-y-6">
             <form onSubmit={handleSubmit} className="contact-form space-y-5">
+              
+              {/* Honeypot Trap Field */}
+              <div className="hidden opacity-0 pointer-events-none absolute -left-[9999px]" aria-hidden="true">
+                <label htmlFor="contact_hp_trap">Do not fill this field</label>
+                <input 
+                  type="text" 
+                  id="contact_hp_trap" 
+                  name="contact_hp_trap" 
+                  tabIndex="-1" 
+                  autoComplete="off"
+                  value={formData.hp_trap}
+                  onChange={(e) => setFormData({ ...formData, hp_trap: e.target.value })}
+                />
+              </div>
+
               <div className="form-group space-y-1">
                 <label htmlFor="name" className="block text-xs font-serif font-bold uppercase tracking-wider text-[#8C3A27]">
                   Name *
@@ -157,7 +197,7 @@ export function ContactSection() {
           {/* Right Column: Map & Socials */}
           <div className="contact-info-col lg:col-span-5 space-y-6">
             
-            {/* Map Container with Exact Provided iFrame Embed URL */}
+            {/* Map Container */}
             <div className="map-container card-parchment-3d p-2 overflow-hidden shadow-md">
               <iframe
                 src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d18126.807006177834!2d78.53201005!3d17.372420499999997!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3bcb98fa75cb13b7%3A0x5097a35e82510f1d!2s9GCH%2BX66%20Akella's%20Residence%2C%208-97%2C%20Road%20No%204%2C%20Vikas%20Nagar%2C%20Moosa%20Ram%20Bagh%2C%20Dilsukhnagar%2C%20Hyderabad%2C%20Telangana%20500060!5e1!3m2!1sen!2sin!4v1786442564374!5m2!1sen!2sin"

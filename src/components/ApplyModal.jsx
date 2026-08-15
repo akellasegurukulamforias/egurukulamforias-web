@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Send, CheckCircle, X } from 'lucide-react';
+import { sanitizePayload, isSpamBot, isRateLimited } from '../utils/sanitize';
 
 export function ApplyModal({ isOpen, onClose }) {
   const [formData, setFormData] = useState({
@@ -10,18 +11,45 @@ export function ApplyModal({ isOpen, onClose }) {
     program: 'Mentorship programs',
     prepStage: 'Beginner (Starting Fresh)',
     education: 'Graduation Complete (B.Tech / B.A / B.Sc / B.Com)',
-    statement: ''
+    statement: '',
+    hp_trap: '' // Hidden honeypot trap field
   });
   const [status, setStatus] = useState('idle'); // 'idle' | 'loading' | 'success' | 'error'
 
-  // EXACT "APPLY NOW" GOOGLE APPS SCRIPT WEB APP URL
-  const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzCzYSOuJNf83JN__A1JeG8FXgZW-j3izLZNi3Eb32DilTqrscdyawKaLyLfB3edVtD/exec";
+  // GOOGLE APPS SCRIPT WEB APP URL (Using VITE env var with fallback)
+  const GOOGLE_SCRIPT_URL = 
+    (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_APPLY_SCRIPT_URL) ||
+    "https://script.google.com/macros/s/AKfycbzCzYSOuJNf83JN__A1JeG8FXgZW-j3izLZNi3Eb32DilTqrscdyawKaLyLfB3edVtD/exec";
 
   if (!isOpen) return null;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // 1. Anti-Spam Honeypot Verification (Silently reject bot submissions)
+    if (isSpamBot(formData.hp_trap)) {
+      setStatus('success');
+      return;
+    }
+
+    // 2. Client-Side Rate Limiting (3-Second Cooldown between submits)
+    if (isRateLimited('ApplyModalForm', 3000)) {
+      return;
+    }
+
     setStatus('loading');
+
+    // 3. Input Sanitization
+    const sanitizedPayload = sanitizePayload({
+      fullName: formData.fullName,
+      email: formData.email,
+      phone: formData.phone,
+      city: formData.city,
+      program: formData.program,
+      prepStage: formData.prepStage,
+      education: formData.education,
+      statement: formData.statement
+    });
 
     try {
       await fetch(GOOGLE_SCRIPT_URL, {
@@ -30,7 +58,7 @@ export function ApplyModal({ isOpen, onClose }) {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(sanitizedPayload),
       });
 
       setStatus('success');
@@ -42,7 +70,8 @@ export function ApplyModal({ isOpen, onClose }) {
         program: 'Mentorship programs',
         prepStage: 'Beginner (Starting Fresh)',
         education: 'Graduation Complete (B.Tech / B.A / B.Sc / B.Com)',
-        statement: ''
+        statement: '',
+        hp_trap: ''
       });
     } catch (err) {
       console.error("Application Submission Error:", err);
@@ -83,6 +112,20 @@ export function ApplyModal({ isOpen, onClose }) {
 
         <form className="apply-form space-y-6" onSubmit={handleSubmit}>
           
+          {/* Honeypot Trap Field for Bot Prevention */}
+          <div className="hidden opacity-0 pointer-events-none absolute -left-[9999px]" aria-hidden="true">
+            <label htmlFor="hp_trap">Do not fill this field</label>
+            <input 
+              type="text" 
+              id="hp_trap" 
+              name="hp_trap" 
+              tabIndex="-1" 
+              autoComplete="off"
+              value={formData.hp_trap}
+              onChange={(e) => setFormData({ ...formData, hp_trap: e.target.value })}
+            />
+          </div>
+
           {/* SECTION 1: Personal Details */}
           <div className="form-section space-y-4">
             <h3 className="font-serif-header text-lg font-bold text-[#8C3A27] border-b border-[#D5C3B0] pb-1">

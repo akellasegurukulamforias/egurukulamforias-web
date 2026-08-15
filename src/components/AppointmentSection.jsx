@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Send, CheckCircle, Phone, MessageSquare, MapPin, Mail, ExternalLink, Calendar, Clock } from 'lucide-react';
+import { sanitizePayload, isSpamBot, isRateLimited } from '../utils/sanitize';
 
 export function AppointmentSection() {
   // LEFT FORM: Program Enquiry / Personal Details / Admissions
@@ -10,7 +11,8 @@ export function AppointmentSection() {
     address: '',
     program: 'Mentorship programs',
     prepStage: 'Not Started',
-    message: ''
+    message: '',
+    hp_trap: '' // Honeypot trap
   });
   const [enquiryStatus, setEnquiryStatus] = useState('idle'); // 'idle' | 'loading' | 'success' | 'error'
 
@@ -25,7 +27,8 @@ export function AppointmentSection() {
     message: '',
     appointmentDate: '',
     appointmentTime: '10:00 AM - 11:00 AM',
-    appointmentMode: 'Online Video Session (Whatsapp/Google Meet)'
+    appointmentMode: 'Online Video Session (Whatsapp/Google Meet)',
+    hp_trap: '' // Honeypot trap
   });
   const [appointmentStatus, setAppointmentStatus] = useState('idle'); // 'idle' | 'loading' | 'success' | 'error'
 
@@ -39,9 +42,21 @@ export function AppointmentSection() {
   // 1. Admission / Program Enquiry Form Submission Handler
   const handleEnquirySubmit = async (e) => {
     e.preventDefault();
+
+    // Anti-Spam Honeypot Verification
+    if (isSpamBot(enquiryForm.hp_trap)) {
+      setEnquiryStatus('success');
+      return;
+    }
+
+    // Rate Limiting (3-Second Cooldown)
+    if (isRateLimited('EnquiryForm', 3000)) {
+      return;
+    }
+
     setEnquiryStatus('loading');
 
-    const payload = {
+    const sanitizedPayload = sanitizePayload({
       formType: "admissions",
       fullName: enquiryForm.fullName,
       email: enquiryForm.email,
@@ -50,14 +65,14 @@ export function AppointmentSection() {
       program: enquiryForm.program,
       prepStage: enquiryForm.prepStage,
       message: enquiryForm.message
-    };
+    });
 
     try {
       await fetch(GOOGLE_SCRIPT_URL, {
         method: "POST",
         mode: "no-cors",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(sanitizedPayload),
       });
       setEnquiryStatus('success');
       setEnquiryForm({
@@ -67,7 +82,8 @@ export function AppointmentSection() {
         address: '',
         program: 'Mentorship programs',
         prepStage: 'Not Started',
-        message: ''
+        message: '',
+        hp_trap: ''
       });
     } catch (err) {
       console.error("Admissions Form Submission Error:", err);
@@ -78,9 +94,21 @@ export function AppointmentSection() {
   // 2. Book An Appointment Form Submission Handler
   const handleAppointmentSubmit = async (e) => {
     e.preventDefault();
+
+    // Anti-Spam Honeypot Verification
+    if (isSpamBot(appointmentForm.hp_trap)) {
+      setAppointmentStatus('success');
+      return;
+    }
+
+    // Rate Limiting (3-Second Cooldown)
+    if (isRateLimited('AppointmentForm', 3000)) {
+      return;
+    }
+
     setAppointmentStatus('loading');
 
-    const payload = {
+    const sanitizedPayload = sanitizePayload({
       formType: "appointment",
       fullName: appointmentForm.name,
       contactNumber: appointmentForm.mobile,
@@ -92,14 +120,14 @@ export function AppointmentSection() {
       timeSlot: appointmentForm.appointmentTime,
       mode: appointmentForm.appointmentMode,
       message: appointmentForm.message
-    };
+    });
 
     try {
       await fetch(GOOGLE_SCRIPT_URL, {
         method: "POST",
         mode: "no-cors",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(sanitizedPayload),
       });
       setAppointmentStatus('success');
       setAppointmentForm({
@@ -112,7 +140,8 @@ export function AppointmentSection() {
         message: '',
         appointmentDate: '',
         appointmentTime: '10:00 AM - 11:00 AM',
-        appointmentMode: 'Online Video Session (Whatsapp/Google Meet)'
+        appointmentMode: 'Online Video Session (Whatsapp/Google Meet)',
+        hp_trap: ''
       });
     } catch (err) {
       console.error("Appointment Form Submission Error:", err);

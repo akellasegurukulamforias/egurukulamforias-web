@@ -7,13 +7,18 @@ dist
 build
 .next
 .out
+*.zip
 
 # Local Environment Variables
 .env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.*
+!.env.example
+
+# Security Keys & Certificates
+*.pem
+*.key
+*.p12
+*.pfx
 
 # System Files
 .DS_Store
