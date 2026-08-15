@@ -8,7 +8,7 @@ export function AppointmentSection() {
     email: '',
     phone: '',
     address: '',
-    program: 'Integrated Pathway (Prelims + Mains)',
+    program: 'Mentorship programs',
     prepStage: 'Not Started',
     message: ''
   });
@@ -65,7 +65,7 @@ export function AppointmentSection() {
         email: '',
         phone: '',
         address: '',
-        program: 'Integrated Pathway (Prelims + Mains)',
+        program: 'Mentorship programs',
         prepStage: 'Not Started',
         message: ''
       });
@@ -224,15 +224,13 @@ export function AppointmentSection() {
                     required
                     className="manuscript-input w-full cursor-pointer font-sans font-semibold text-xs"
                   >
-                    <option value="Integrated Pathway (Prelims + Mains)">Integrated Pathway (Prelims + Mains)</option>
-                    <option value="Prelims Precision Track">Prelims Precision Track</option>
-                    <option value="Mains Analytical Track">Mains Analytical Track</option>
-                    <option value="Optional Mentorship (Telugu & Public Admin)">Optional Mentorship (Telugu &amp; Public Admin)</option>
-                    <option value="Visionary Mentorship (Akella Raghavendra Sir)">Visionary Mentorship (Akella Raghavendra Sir)</option>
-                    <option value="Undergraduate Foundation Program">Undergraduate Foundation Program</option>
-                    <option value="Sadhana Test Series">Sadhana Test Series</option>
-                    <option value="Groups & State PSC Programs (APPSC / TGPSC)">Groups &amp; State PSC Programs (APPSC / TGPSC)</option>
-                    <option value="Perspective & Books Series">Perspective &amp; Books Series</option>
+                    <option value="Mentorship programs">Mentorship programs</option>
+                    <option value="APPSC / TGPSC Orientation">APPSC / TGPSC Orientation</option>
+                    <option value="IAS Workshops">IAS Workshops</option>
+                    <option value="Specialist & Perspective Programs">Specialist &amp; Perspective Programs</option>
+                    <option value="Subject-specific courses">Subject-specific courses</option>
+                    <option value="Other recorded courses">Other recorded courses</option>
+                    <option value="Books/Materials">Books/Materials</option>
                   </select>
                 </div>
 

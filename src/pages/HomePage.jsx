@@ -87,6 +87,8 @@ export default function HomePage({ navigate }) {
                   <img 
                     src="/images/akella_raghavendra.png" 
                     alt="Akella Raghavendra Sir"
+                    loading="lazy"
+                    decoding="async"
                     className="editorial-portrait-img aspect-[4/5]"
                     onError={() => setPortraitError(true)}
                   />

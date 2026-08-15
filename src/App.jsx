@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Header from './components/Header';
 import Footer from './components/Footer';
+import DesktopViewPrompt from './components/DesktopViewPrompt';
 
 // Pages
 import HomePage from './pages/HomePage';
@@ -66,6 +67,9 @@ export default function App() {
 
   return (
     <div className="min-h-screen flex flex-col foxing-vignette bg-[#F3EBD9] text-[#2C221E] selection:bg-[#8C3A27] selection:text-[#FCFAF6]">
+      {/* Desktop Mode Recommendation Popup for Mobile Users */}
+      <DesktopViewPrompt />
+
       {/* Top Sticky Header Bar */}
       <Header currentPath={currentPath} navigate={navigate} />
 

@@ -147,11 +147,11 @@ export default function AspirantJourney({ navigate }) {
   };
 
   return (
-    <div ref={containerRef} className="relative h-[500vh]">
+    <div ref={containerRef} className="relative h-[250vh] md:h-[500vh]">
       
       {/* Sticky Viewport Container */}
       <div 
-        className="sticky top-0 h-screen w-full overflow-hidden flex flex-col justify-between pt-24 pb-4 relative transition-colors duration-700"
+        className="sticky top-0 h-screen w-full overflow-hidden flex flex-col justify-between pt-16 md:pt-24 pb-3 relative transition-colors duration-700"
         style={{ background: getSkyBackground() }}
       >
         
@@ -260,36 +260,26 @@ export default function AspirantJourney({ navigate }) {
             {/* 5. VEHICLES DRIVING ALONG THE ROAD WITH GLOWING HEADLIGHT BEAMS */}
             {/* Vehicle 1: Car / SUV driving rightward at x: 520, y: 645 */}
             <g transform="translate(520, 645)">
-              {/* Headlight Beam Cone */}
               <polygon points="25,-6 130,-22 130,12 25,6" fill="url(#headlightBeam)" />
-              {/* Car Body Silhouette */}
               <path d="M -22 2 L 22 2 L 18 -8 L 8 -16 L -10 -16 L -16 -8 Z" fill={isNight ? "#0B1321" : "#3A281A"} />
-              {/* Wheels */}
               <circle cx="-10" cy="4" r="4.5" fill="#0A0E17" />
               <circle cx="10" cy="4" r="4.5" fill="#0A0E17" />
-              {/* Headlight Lamp */}
               <circle cx="22" cy="-2" r="3" fill="#FFF8E7" className={isNight ? "shadow-[0_0_10px_#FFF8E7]" : ""} />
-              {/* Taillight */}
               <circle cx="-22" cy="-4" r="2.5" fill="#EF4444" className={isNight ? "animate-pulse" : ""} />
             </g>
 
             {/* Vehicle 2: Auto-Rickshaw / Mini-Van driving rightward at x: 760, y: 625 */}
             <g transform="translate(760, 625)">
-              {/* Headlight Beam Cone */}
               <polygon points="18,-4 95,-16 95,10 18,4" fill="url(#headlightBeam)" />
-              {/* Rickshaw Silhouette */}
               <path d="M -16 2 L 16 2 L 14 -12 L -8 -14 L -16 -6 Z" fill={isNight ? "#0C1524" : "#4A3525"} />
               <circle cx="-8" cy="4" r="3.5" fill="#0A0E17" />
               <circle cx="8" cy="4" r="3.5" fill="#0A0E17" />
-              {/* Golden Headlight */}
               <circle cx="16" cy="-4" r="3" fill="#FFD700" />
             </g>
 
             {/* Vehicle 3: Motorcycle / Scooter at x: 250, y: 675 */}
             <g transform="translate(250, 675)">
-              {/* Headlight Beam */}
               <polygon points="12,-3 80,-14 80,8 12,3" fill="url(#headlightBeam)" />
-              {/* Bike & Rider Silhouette */}
               <path d="M -10 2 L 10 2 L 6 -6 L 1 -14 L -5 -8 Z" fill={isNight ? "#080F1B" : "#2E1F14"} />
               <circle cx="-5" cy="4" r="3" fill="#0A0E17" />
               <circle cx="6" cy="4" r="3" fill="#0A0E17" />
@@ -377,21 +367,21 @@ export default function AspirantJourney({ navigate }) {
         </div>
 
         {/* 1. TOP HEADLINE: ANIMATED EXACTLY LIKE THE GLOWING CELESTIAL MILESTONES */}
-        <div className="text-center z-20 pointer-events-none relative mb-2 px-4">
+        <div className="text-center z-20 pointer-events-none relative mb-1 px-4">
           <div 
-            className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full border text-xs font-serif font-extrabold tracking-widest uppercase mb-2 transition-all duration-700 ${
+            className={`inline-flex items-center gap-2 px-3.5 py-1 sm:px-4 sm:py-1.5 rounded-full border text-[11px] sm:text-xs font-serif font-extrabold tracking-widest uppercase mb-1 transition-all duration-700 ${
               isNight 
                 ? 'bg-[#FFD700]/20 border-[#FFD700]/50 text-[#FFD700] backdrop-blur-md shadow-[0_0_22px_rgba(255,215,0,0.8)] animate-pulse' 
                 : 'bg-[#5C4028]/15 border-[#5C4028]/30 text-[#4A3019]'
             }`}
           >
-            <Compass className={`w-4 h-4 ${isNight ? 'text-[#FFD700]' : 'text-[#4A3019]'}`} />
+            <Compass className={`w-3.5 h-3.5 ${isNight ? 'text-[#FFD700]' : 'text-[#4A3019]'}`} />
             <span>PATHWAY TO GOVERNANCE</span>
             <Sparkles className={`w-3.5 h-3.5 ${isNight ? 'text-[#FFD700] animate-spin' : 'hidden'}`} />
           </div>
 
           <h2 
-            className={`font-serif-header text-3xl sm:text-4xl lg:text-5xl font-extrabold transition-all duration-700 tracking-tight ${
+            className={`font-serif-header text-2xl sm:text-4xl lg:text-5xl font-extrabold transition-all duration-700 tracking-tight ${
               isNight 
                 ? 'scale-105 text-[#FFD700] drop-shadow-[0_0_28px_rgba(255,215,0,0.95)] animate-pulse' 
                 : 'scale-100 text-[#2C1A0E]'
@@ -409,7 +399,7 @@ export default function AspirantJourney({ navigate }) {
         <div className="relative w-full flex-1 flex flex-col md:flex-row items-end justify-between px-0 md:px-4">
           
           {/* TELESCOPE CANVAS CONTAINER */}
-          <div className="absolute left-0 bottom-0 w-full md:w-[54%] h-full flex items-end justify-start z-10 pointer-events-none ml-0 pl-0 mb-0 pb-0 border-none shadow-none">
+          <div className="absolute left-0 bottom-0 w-full md:w-[54%] h-[38vh] md:h-full flex items-end justify-start z-10 pointer-events-none">
             <canvas 
               ref={canvasRef} 
               className="w-full h-full object-contain pointer-events-none"
@@ -419,7 +409,7 @@ export default function AspirantJourney({ navigate }) {
           {/* Spacer */}
           <div className="hidden md:block w-[50%]" />
 
-          {/* 3. GLOWING CELESTIAL MILESTONES */}
+          {/* 3. GLOWING CELESTIAL MILESTONES (DESKTOP) */}
           <div className="relative w-full md:w-[50%] z-20 pr-4 lg:pr-8 hidden md:block pt-12 pb-12 self-start">
             <svg viewBox="0 0 950 300" fill="none" className="w-full h-auto overflow-visible">
               
@@ -496,12 +486,13 @@ export default function AspirantJourney({ navigate }) {
                           x="0" 
                           y="-22" 
                           textAnchor="middle" 
-                          fill={isNight ? "#FFD700" : "#140C08"} 
+                          fill={isNight ? "#FFD700" : "#8C3A27"} 
                           fontSize="17" 
                           fontFamily="Cinzel, Georgia, serif" 
                           fontWeight="900"
                           letterSpacing="0.08em"
-                          className="transition-colors group-hover:fill-[#FFD700] drop-shadow-md"
+                          className="transition-colors group-hover:fill-[#FFD700] drop-shadow-md text-gold-header"
+                          style={{ fill: isNight ? '#FFD700' : '#8C3A27' }}
                         >
                           {step.headline}
                         </text>
@@ -530,7 +521,8 @@ export default function AspirantJourney({ navigate }) {
                           fontFamily="Cinzel, Georgia, serif" 
                           fontWeight="900"
                           letterSpacing="0.08em"
-                          className="transition-colors group-hover:fill-[#FFD700] drop-shadow-md"
+                          className="transition-colors group-hover:fill-[#FFD700] drop-shadow-md text-gold-header"
+                          style={{ fill: isNight ? '#FFD700' : '#140C08' }}
                         >
                           {step.headline}
                         </text>
@@ -556,31 +548,63 @@ export default function AspirantJourney({ navigate }) {
             </svg>
           </div>
 
-          {/* Mobile Fallback View */}
-          <div className="md:hidden relative max-w-sm mx-auto pl-8 border-l-2 border-dashed border-[#FFD700]/60 space-y-6 text-left py-4 z-20">
-            {STEPS.map((step, idx) => (
-              <div key={idx} className="relative group">
-                <div className="absolute -left-[45px] top-0 w-9 h-9 rounded-full bg-[#FFD700] border-2 border-[#0F172A] flex items-center justify-center text-[#0F172A] font-serif font-extrabold text-xs shadow-md">
-                  {step.num}
+          {/* Mobile Celestial Constellation Pathway (RIGHT-ALIGNED, WELL BELOW MOON WITH ZERO INTERSECTION, ZERO EDGE CLIPPING) */}
+          <div className="md:hidden relative w-full pr-10 pl-4 space-y-3 text-right py-2 z-20 flex flex-col items-end mt-16 sm:mt-20">
+            
+            {/* Vertical Constellation Line on the Right */}
+            <div className="absolute right-4 top-1 bottom-1 w-0.5 border-r-2 border-dashed border-[#FFD700]/70 pointer-events-none" />
+
+            {STEPS.map((step, idx) => {
+              const nodeProgressTrigger = idx / (STEPS.length - 1);
+              const isActive = isLensPhase || frameProgress >= nodeProgressTrigger;
+
+              return (
+                <div key={idx} className="relative flex items-center justify-end gap-3 transition-all duration-300 w-full pr-6">
+                  
+                  {/* Milestone Text (RIGHT ALIGNED, BRIGHT GOLD HEADLINE, BRIGHT WHITE TAGLINE) */}
+                  <div className="space-y-0.5 text-right">
+                    <h4 
+                      className="font-serif-header text-xs font-extrabold uppercase tracking-widest text-gold-header"
+                      style={{
+                        color: '#FFD700',
+                        textShadow: '0 2px 6px rgba(0, 0, 0, 0.98), 0 0 12px rgba(255, 215, 0, 0.9)'
+                      }}
+                    >
+                      {step.headline}
+                    </h4>
+                    <p 
+                      className="text-[11px] font-serif font-bold leading-snug"
+                      style={{
+                        color: '#FFFDF8',
+                        textShadow: '0 1px 4px rgba(0, 0, 0, 0.95)'
+                      }}
+                    >
+                      {step.tagline}
+                    </p>
+                  </div>
+
+                  {/* Step Badge Node on the Right (FULLY INSIDE VIEWPORT) */}
+                  <div 
+                    className={`absolute -right-[22px] top-0.5 w-6 h-6 rounded-full flex items-center justify-center font-serif font-extrabold text-[10px] shrink-0 transition-all duration-300 ${
+                      isActive
+                        ? 'bg-[#FFD700] text-[#0F172A] shadow-[0_0_16px_rgba(255,215,0,0.95)] scale-110 border-2 border-white'
+                        : 'bg-[#FFD700]/80 text-[#0F172A] border-2 border-white'
+                    }`}
+                  >
+                    {step.num}
+                  </div>
+
                 </div>
-                <div className="space-y-0.5">
-                  <h4 className="font-serif-header text-base font-extrabold text-[#FFD700] uppercase tracking-wider">
-                    {step.headline}
-                  </h4>
-                  <p className="text-xs font-serif font-bold text-[#FFF8E7]">
-                    {step.tagline}
-                  </p>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
         </div>
 
         {/* BOTTOM CONTROLS ROW: Left Progress Bar & Right Bottom Interactive CTA Button */}
-        <div className="pb-4 px-6 sm:px-10 max-w-7xl mx-auto w-full z-30 flex items-center justify-between gap-4 relative">
+        <div className="pb-3 px-4 sm:px-10 max-w-7xl mx-auto w-full z-30 flex flex-col sm:flex-row items-center justify-between gap-3 relative">
           {/* Progress Bar */}
-          <div className="w-48 sm:w-64 h-1 bg-white/20 rounded-full overflow-hidden shrink-0">
+          <div className="w-full sm:w-64 h-1.5 bg-white/20 rounded-full overflow-hidden shrink-0">
             <div 
               className="h-full bg-gradient-to-r from-[#8C3A27] via-[#D97706] to-[#FFD700] transition-all duration-150"
               style={{ width: `${frameProgress * 100}%` }}
@@ -590,12 +614,12 @@ export default function AspirantJourney({ navigate }) {
           {/* Right Bottom CTA Badge Button */}
           <button
             onClick={() => navigate ? navigate('/apply') : (window.location.href = '/apply')}
-            className="btn-terracotta-pill py-2.5 px-6 sm:py-3 sm:px-8 shadow-2xl hover:scale-105 transition-all duration-300 border-2 border-[#FFE8B3]/50 cursor-pointer shrink-0"
+            className="btn-terracotta-pill py-2.5 px-5 sm:py-3 sm:px-8 shadow-2xl hover:scale-105 transition-all duration-300 border-2 border-[#FFE8B3]/50 cursor-pointer w-full sm:w-auto justify-center"
           >
-            <span className="btn-label font-bold tracking-wider text-xs sm:text-sm">
-              BEGIN YOUR JOURNEY WITH US
+            <span className="btn-label font-bold tracking-wider text-xs sm:text-sm whitespace-nowrap">
+              BEGIN YOUR JOURNEY
             </span>
-            <ArrowRight className="w-4 h-4 ml-1" />
+            <ArrowRight className="w-4 h-4 ml-1 shrink-0" />
           </button>
         </div>
 

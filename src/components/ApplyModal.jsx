@@ -7,7 +7,7 @@ export function ApplyModal({ isOpen, onClose }) {
     email: '',
     phone: '',
     city: '',
-    program: 'Integrated Pathway (Prelims + Mains)',
+    program: 'Mentorship programs',
     prepStage: 'Beginner (Starting Fresh)',
     education: 'Graduation Complete (B.Tech / B.A / B.Sc / B.Com)',
     statement: ''
@@ -39,7 +39,7 @@ export function ApplyModal({ isOpen, onClose }) {
         email: '',
         phone: '',
         city: '',
-        program: 'Integrated Pathway (Prelims + Mains)',
+        program: 'Mentorship programs',
         prepStage: 'Beginner (Starting Fresh)',
         education: 'Graduation Complete (B.Tech / B.A / B.Sc / B.Com)',
         statement: ''
@@ -172,13 +172,13 @@ export function ApplyModal({ isOpen, onClose }) {
                 required
                 className="manuscript-input w-full cursor-pointer font-semibold"
               >
-                <option value="Integrated Pathway (Prelims + Mains)">Integrated Pathway (Prelims + Mains)</option>
-                <option value="Prelims Precision Track">Prelims Precision Track</option>
-                <option value="Mains Analytical Track">Mains Analytical Track</option>
-                <option value="Optional Mentorship">Optional Mentorship</option>
-                <option value="Visionary Mentorship (Akella Sir)">Visionary Mentorship (Akella Sir)</option>
-                <option value="Undergraduate Foundation">Undergraduate Foundation</option>
-                <option value="Sadhana Test Series">Sadhana Test Series</option>
+                <option value="Mentorship programs">Mentorship programs</option>
+                <option value="APPSC / TGPSC Orientation">APPSC / TGPSC Orientation</option>
+                <option value="IAS Workshops">IAS Workshops</option>
+                <option value="Specialist & Perspective Programs">Specialist &amp; Perspective Programs</option>
+                <option value="Subject-specific courses">Subject-specific courses</option>
+                <option value="Other recorded courses">Other recorded courses</option>
+                <option value="Books/Materials">Books/Materials</option>
               </select>
             </div>
 

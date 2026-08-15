@@ -15,7 +15,15 @@ import {
   Tag,
   GraduationCap,
   ExternalLink,
-  Award
+  Award,
+  Compass,
+  Zap,
+  Target,
+  ShieldCheck,
+  UserCheck,
+  TrendingUp,
+  Layers,
+  ChevronRight
 } from 'lucide-react';
 import coursesData from '../data/courses.json';
 
@@ -23,6 +31,7 @@ export default function ProgramsPage({ navigate }) {
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCourse, setSelectedCourse] = useState(null);
+  const [activeTier, setActiveTier] = useState(0);
 
   // Available Category Filter Pills
   const categories = [
@@ -49,57 +58,466 @@ export default function ProgramsPage({ navigate }) {
   return (
     <div className="space-y-0 relative">
       
-      {/* 1. HEADER BANNER */}
-      <section className="section-mottled-parchment py-12 md:py-16 text-center px-4 sm:px-6 lg:px-8 border-b border-[#D5C3B0]/40">
-        <div className="max-w-4xl mx-auto space-y-4">
+      {/* 1. UNIFIED HERO & MENTORSHIP SHOWCASE (EXPANDED WIDTH & EXACT USER COPY) */}
+      <section className="section-clean-parchment pt-8 pb-10 sm:pt-10 sm:pb-14 px-4 sm:px-6 lg:px-8 border-b border-[#D5C3B0]/40 bg-gradient-to-b from-[#FAF6EE] via-[#F4ECE1]/80 to-[#FAF6EE]">
+        <div className="max-w-7xl lg:max-w-[90rem] mx-auto space-y-7 text-center">
+          
+          {/* Unified Section Header */}
+          <div className="max-w-4xl mx-auto space-y-2.5">
+            <h1 className="font-serif-header text-3xl sm:text-4xl lg:text-5xl font-extrabold text-[#221814] leading-tight sm:whitespace-nowrap">
+              The e-Gurukulam Mentorship Spectrum
+            </h1>
+            <p className="font-serif italic text-base sm:text-lg text-[#8C3A27] font-bold sm:whitespace-nowrap">
+              From complete guidance to complete ownership.
+            </p>
+            <p className="text-xs sm:text-sm text-[#3D3028] font-sans font-medium max-w-3xl mx-auto leading-relaxed">
+              Three thoughtfully designed mentorship levels that evolve with your preparation, capability, and confidence. Choose the level of guidance that best fits your journey.
+            </p>
+          </div>
 
-          <h1 className="font-serif-header text-4xl sm:text-5xl lg:text-6xl font-extrabold text-[#221814]">
-            Programs Offered
-          </h1>
+          {/* LUXURY INTERACTIVE SEGMENTED TAB SELECTOR (STRICT SINGLE LINE) */}
+          <div className="flex items-center justify-center gap-2 max-w-3xl sm:max-w-4xl mx-auto p-1.5 bg-[#EFE6D7] rounded-2xl border border-[#C5A059]/40 shadow-inner">
+            {[
+              { id: 0, label: "01. Guided Path (99%)", icon: Compass },
+              { id: 1, label: "02. Guided Learning (75%)", icon: Target },
+              { id: 2, label: "03. Strategic Partnership (50%)", icon: Award }
+            ].map((tab) => {
+              const Icon = tab.icon;
+              const isSelected = activeTier === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTier(tab.id)}
+                  className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 px-3 sm:px-4 rounded-xl font-serif text-xs sm:text-sm font-bold whitespace-nowrap transition-all duration-300 cursor-pointer ${
+                    isSelected
+                      ? 'bg-[#8C3A27] text-white shadow-lg scale-105 border border-[#FFD700]/30'
+                      : 'text-[#5C4028] hover:text-[#140C08] hover:bg-[#FAF6EE]/80'
+                  }`}
+                >
+                  <Icon className={`w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0 ${isSelected ? 'text-[#FFD700]' : 'text-[#8C3A27]'}`} />
+                  <span className="hidden sm:inline whitespace-nowrap">{tab.label}</span>
+                  <span className="sm:hidden whitespace-nowrap">{tab.label.split('.')[0]}. Tier {tab.id + 1}</span>
+                </button>
+              );
+            })}
+          </div>
 
-          <p className="font-serif italic text-base sm:text-lg text-[#3D3028] font-semibold max-w-3xl mx-auto">
-            Structured Civil Services preparation, specialised guidance, and transformative programmes designed to take an aspirant from preparation to public service.
-          </p>
-        </div>
-      </section>
-
-      {/* 2. SANKALPA SIDDHI FIELDWORK SPECIAL ANNOUNCEMENT BANNER */}
-      <section className="section-clean-parchment py-8 px-4 sm:px-6 lg:px-8 border-b border-[#D5C3B0]/40 bg-[#FAF6EE]">
-        <div className="max-w-7xl mx-auto">
-          <div className="card-parchment-3d p-6 sm:p-8 md:p-10 border-2 border-[#8C3A27]/30 bg-gradient-to-br from-[#FAF6EE] via-[#F4ECE1] to-[#FAF6EE] space-y-6 relative overflow-hidden text-left shadow-lg">
+          {/* 3 PROGRESSIVE MODELS CARDS GRID (HIGH-CONTRAST VISIBLE TYPOGRAPHY & COMPACT HEIGHT) */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left items-stretch pt-2">
             
-            {/* Background Accent Emblem */}
-            <div className="absolute -right-8 -bottom-8 opacity-5 pointer-events-none">
-              <Award className="w-64 h-64 text-[#8C3A27]" />
-            </div>
+            {/* MODEL 1: 99% MENTOR - 1% MENTEE */}
+            <div 
+              onClick={() => setActiveTier(0)}
+              className={`card-parchment-3d p-5 flex flex-col justify-between rounded-2xl transition-all duration-300 relative overflow-hidden group cursor-pointer ${
+                activeTier === 0
+                  ? 'border-2 border-[#8C3A27] bg-[#FFFDF8] shadow-xl scale-[1.01] ring-2 ring-[#8C3A27]/10'
+                  : 'border-2 border-[#D5C3B0]/60 bg-[#FFFDF8]/90 hover:border-[#8C3A27]/60 shadow-md'
+              }`}
+            >
+              {/* Background Watermark Percentage */}
+              <span className="absolute -right-2 -top-4 text-7xl font-serif font-black text-[#8C3A27]/10 select-none pointer-events-none">
+                99%
+              </span>
 
-            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative z-10">
-              
-              <div className="space-y-3 max-w-3xl">
+              <div className="space-y-3 relative z-10">
                 
-                <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#8C3A27] text-white text-[11px] font-serif font-extrabold uppercase tracking-widest shadow-xs">
-                  <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                  <span>SPECIAL FIELDWORK OPPORTUNITY FOR E-GURUKULAM ASPIRANTS</span>
+                {/* Header Title & Sub-tagline */}
+                <div className="border-b border-[#D5C3B0]/60 pb-2.5">
+                  <h3 className="font-serif-header text-xl font-extrabold text-[#140C08] group-hover:text-[#8C3A27] transition-colors leading-tight">
+                    99% Mentor – 1% Mentee
+                  </h3>
+                  <span className="text-xs font-serif font-extrabold text-[#8C3A27] bg-[#8C3A27]/10 px-2.5 py-0.5 rounded-md border border-[#8C3A27]/30 inline-block mt-1.5 shadow-xs">
+                    The Guided Path
+                  </span>
                 </div>
 
-                <h2 className="font-serif-header text-2xl sm:text-3xl font-extrabold text-[#221814] leading-snug">
-                  Sankalpa Siddhi (సంకల్ప సిద్ధి) | Nurturing Talent in Government Schools
-                </h2>
+                {/* Micro Ratio Bar */}
+                <div className="space-y-1 bg-[#FAF6EE] p-2.5 rounded-xl border border-[#D5C3B0]/60">
+                  <div className="flex justify-between text-xs font-serif font-extrabold text-[#140C08]">
+                    <span>Mentor Guidance: 99%</span>
+                    <span>Mentee Execution: 1%</span>
+                  </div>
+                  <div className="w-full h-2 bg-[#E8DEC9] rounded-full overflow-hidden flex">
+                    <div className="h-full bg-gradient-to-r from-[#8C3A27] to-[#C5A059] w-[99%]"></div>
+                    <div className="h-full bg-[#140C08] w-[1%]"></div>
+                  </div>
+                </div>
 
-                <p className="text-xs sm:text-sm text-[#3D3028] font-sans font-medium leading-relaxed">
-                  Aspirants enrolled in e-Gurukulam programs get an exclusive opportunity to participate in practical, ground-level fieldwork through <strong>Sankalpa Siddhi</strong>—a transformative initiative nurturing talent in government schools. This hands-on experience provides invaluable real-world public policy and governance insights directly beneficial for UPSC IAS Mains &amp; Personality Test preparation!
+                {/* Ideal For Badge */}
+                <div className="text-xs font-sans bg-[#F4ECE1] p-2.5 rounded-xl border border-[#D5C3B0]/60 space-y-0.5">
+                  <strong className="font-serif text-[#8C3A27] font-extrabold text-xs uppercase tracking-wider block">Ideal for:</strong>
+                  <span className="font-bold text-[#140C08] block leading-snug">Aspirants seeking end-to-end direction.</span>
+                </div>
+
+                {/* Summary Box */}
+                <p className="text-xs sm:text-sm text-[#140C08] font-medium leading-relaxed bg-[#FAF6EE] p-2.5 rounded-xl border border-[#D5C3B0]/60">
+                  Everything is designed, structured, and provided by the mentor. The mentee’s responsibility is simple: follow the plan with discipline and consistency.
                 </p>
+
+                {/* Key Deliverables List */}
+                <div className="space-y-1.5 pt-0.5">
+                  <strong className="font-serif text-xs font-extrabold text-[#8C3A27] uppercase tracking-wider block border-b border-[#D5C3B0]/50 pb-1">
+                    Key Deliverables:
+                  </strong>
+                  <ul className="space-y-1 text-xs font-semibold text-[#140C08]">
+                    <li className="flex items-center gap-1.5">
+                      <CheckCircle className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                      <span>Complete study roadmap</span>
+                    </li>
+                    <li className="flex items-center gap-1.5">
+                      <CheckCircle className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                      <span>Classes and learning schedule</span>
+                    </li>
+                    <li className="flex items-center gap-1.5">
+                      <CheckCircle className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                      <span>Study materials and resources</span>
+                    </li>
+                    <li className="flex items-center gap-1.5">
+                      <CheckCircle className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                      <span>Revision strategy</span>
+                    </li>
+                    <li className="flex items-center gap-1.5">
+                      <CheckCircle className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                      <span>Tests and evaluation</span>
+                    </li>
+                    <li className="flex items-center gap-1.5">
+                      <CheckCircle className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                      <span>Daily/weekly direction</span>
+                    </li>
+                    <li className="flex items-center gap-1.5">
+                      <CheckCircle className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                      <span>Continuous monitoring and guidance</span>
+                    </li>
+                  </ul>
+                </div>
+
+                {/* Philosophy Footer Note */}
+                <div className="p-2 rounded-xl bg-[#8C3A27]/10 border border-[#8C3A27]/25 text-center">
+                  <p className="font-serif italic font-extrabold text-xs text-[#8C3A27]">
+                    “Your mentor builds the path. You simply follow it.”
+                  </p>
+                </div>
 
               </div>
 
-              <div className="flex-shrink-0 w-full md:w-auto">
+              {/* Bottom Action */}
+              <div className="pt-3 border-t border-[#D5C3B0]/50 mt-3 relative z-10">
+                <button
+                  onClick={(e) => { e.stopPropagation(); navigate('/contact'); }}
+                  className={`w-full text-xs py-2.5 justify-center font-bold transition-all rounded-full flex items-center gap-1.5 ${
+                    activeTier === 0
+                      ? 'btn-terracotta-pill shadow-md'
+                      : 'bg-[#FAF6EE] hover:bg-[#8C3A27] text-[#8C3A27] hover:text-white border border-[#8C3A27]/30'
+                  }`}
+                >
+                  <span>Select Guided Path</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
+            {/* MODEL 2: 75% MENTOR - 25% MENTEE */}
+            <div 
+              onClick={() => setActiveTier(1)}
+              className={`card-parchment-3d p-5 flex flex-col justify-between rounded-2xl transition-all duration-300 relative overflow-hidden group cursor-pointer ${
+                activeTier === 1
+                  ? 'border-2 border-[#8C3A27] bg-[#FFFDF8] shadow-xl scale-[1.01] ring-2 ring-[#8C3A27]/10'
+                  : 'border-2 border-[#D5C3B0]/60 bg-[#FFFDF8]/90 hover:border-[#8C3A27]/60 shadow-md'
+              }`}
+            >
+              {/* Background Watermark Percentage */}
+              <span className="absolute -right-2 -top-4 text-7xl font-serif font-black text-[#C5A059]/15 select-none pointer-events-none">
+                75%
+              </span>
+
+              <div className="space-y-3 relative z-10">
+                
+                {/* Header Title & Sub-tagline */}
+                <div className="border-b border-[#D5C3B0]/60 pb-2.5">
+                  <h3 className="font-serif-header text-xl font-extrabold text-[#140C08] group-hover:text-[#8C3A27] transition-colors leading-tight">
+                    75% Mentor – 25% Mentee
+                  </h3>
+                  <span className="text-xs font-serif font-extrabold text-[#8C3A27] bg-[#8C3A27]/10 px-2.5 py-0.5 rounded-md border border-[#8C3A27]/30 inline-block mt-1.5 shadow-xs">
+                    The Guided Learning
+                  </span>
+                </div>
+
+                {/* Micro Ratio Bar */}
+                <div className="space-y-1 bg-[#FAF6EE] p-2.5 rounded-xl border border-[#D5C3B0]/60">
+                  <div className="flex justify-between text-xs font-serif font-extrabold text-[#140C08]">
+                    <span>Mentor Leadership: 75%</span>
+                    <span>Mentee Execution: 25%</span>
+                  </div>
+                  <div className="w-full h-2 bg-[#E8DEC9] rounded-full overflow-hidden flex">
+                    <div className="h-full bg-gradient-to-r from-[#8C3A27] to-[#C5A059] w-[75%]"></div>
+                    <div className="h-full bg-[#140C08] w-[25%]"></div>
+                  </div>
+                </div>
+
+                {/* Ideal For Badge */}
+                <div className="text-xs font-sans bg-[#F4ECE1] p-2.5 rounded-xl border border-[#D5C3B0]/60 space-y-0.5">
+                  <strong className="font-serif text-[#8C3A27] font-extrabold text-xs uppercase tracking-wider block">Ideal for:</strong>
+                  <span className="font-bold text-[#140C08] block leading-snug">Aspirants seeking structured learning with ownership.</span>
+                </div>
+
+                {/* Summary Box */}
+                <p className="text-xs sm:text-sm text-[#140C08] font-medium leading-relaxed bg-[#FAF6EE] p-2.5 rounded-xl border border-[#D5C3B0]/60">
+                  The mentor takes the lead in teaching, planning, and directing the preparation, while the mentee takes responsibility for absorbing, organizing, revising, and executing the learning independently.
+                </p>
+
+                {/* Key Deliverables List */}
+                <div className="space-y-1.5 pt-0.5">
+                  <strong className="font-serif text-xs font-extrabold text-[#8C3A27] uppercase tracking-wider block border-b border-[#D5C3B0]/50 pb-1">
+                    Key Deliverables:
+                  </strong>
+                  <ul className="space-y-1 text-xs font-semibold text-[#140C08]">
+                    <li className="flex items-center gap-1.5">
+                      <CheckCircle className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                      <span>Structured classes with clear direction</span>
+                    </li>
+                    <li className="flex items-center gap-1.5">
+                      <CheckCircle className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                      <span>Mentor-designed preparation strategy</span>
+                    </li>
+                    <li className="flex items-center gap-1.5">
+                      <CheckCircle className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                      <span>Topic-wise and subject-wise guidance</span>
+                    </li>
+                    <li className="flex items-center gap-1.5">
+                      <CheckCircle className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                      <span>Clear instructions on what to study &amp; approach</span>
+                    </li>
+                    <li className="flex items-center gap-1.5">
+                      <CheckCircle className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                      <span>Mentee-driven note-making &amp; consolidation</span>
+                    </li>
+                    <li className="flex items-center gap-1.5">
+                      <CheckCircle className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                      <span>Independent revision and practice</span>
+                    </li>
+                    <li className="flex items-center gap-1.5">
+                      <CheckCircle className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                      <span>Regular guidance, feedback, &amp; course correction</span>
+                    </li>
+                  </ul>
+                </div>
+
+                {/* Philosophy Footer Note */}
+                <div className="p-2 rounded-xl bg-[#8C3A27]/10 border border-[#8C3A27]/25 text-center">
+                  <p className="font-serif italic font-extrabold text-xs text-[#8C3A27]">
+                    “The mentor provides the knowledge &amp; direction. The mentee transforms it into preparation.”
+                  </p>
+                </div>
+
+              </div>
+
+              {/* Bottom Action */}
+              <div className="pt-3 border-t border-[#D5C3B0]/50 mt-3 relative z-10">
+                <button
+                  onClick={(e) => { e.stopPropagation(); navigate('/contact'); }}
+                  className={`w-full text-xs py-2.5 justify-center font-bold transition-all rounded-full flex items-center gap-1.5 ${
+                    activeTier === 1
+                      ? 'btn-terracotta-pill shadow-md'
+                      : 'bg-[#FAF6EE] hover:bg-[#8C3A27] text-[#8C3A27] hover:text-white border border-[#8C3A27]/30'
+                  }`}
+                >
+                  <span>Select Guided Learning</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
+            {/* MODEL 3: 50% MENTOR - 50% MENTEE */}
+            <div 
+              onClick={() => setActiveTier(2)}
+              className={`card-parchment-3d p-5 flex flex-col justify-between rounded-2xl transition-all duration-300 relative overflow-hidden group cursor-pointer ${
+                activeTier === 2
+                  ? 'border-2 border-[#8C3A27] bg-[#FFFDF8] shadow-xl scale-[1.01] ring-2 ring-[#8C3A27]/10'
+                  : 'border-2 border-[#D5C3B0]/60 bg-[#FFFDF8]/90 hover:border-[#8C3A27]/60 shadow-md'
+              }`}
+            >
+              {/* Background Watermark Percentage */}
+              <span className="absolute -right-2 -top-4 text-7xl font-serif font-black text-[#140C08]/10 select-none pointer-events-none">
+                50%
+              </span>
+
+              <div className="space-y-3 relative z-10">
+                
+                {/* Header Title & Sub-tagline */}
+                <div className="border-b border-[#D5C3B0]/60 pb-2.5">
+                  <h3 className="font-serif-header text-xl font-extrabold text-[#140C08] group-hover:text-[#8C3A27] transition-colors leading-tight">
+                    50% Mentor – 50% Mentee
+                  </h3>
+                  <span className="text-xs font-serif font-extrabold text-[#8C3A27] bg-[#8C3A27]/10 px-2.5 py-0.5 rounded-md border border-[#8C3A27]/30 inline-block mt-1.5 shadow-xs">
+                    The Strategic Partnership
+                  </span>
+                </div>
+
+                {/* Micro Ratio Bar */}
+                <div className="space-y-1 bg-[#FAF6EE] p-2.5 rounded-xl border border-[#D5C3B0]/60">
+                  <div className="flex justify-between text-xs font-serif font-extrabold text-[#140C08]">
+                    <span>Mentor Collaboration: 50%</span>
+                    <span>Mentee Partnership: 50%</span>
+                  </div>
+                  <div className="w-full h-2 bg-[#E8DEC9] rounded-full overflow-hidden flex">
+                    <div className="h-full bg-[#8C3A27] w-[50%]"></div>
+                    <div className="h-full bg-[#140C08] w-[50%]"></div>
+                  </div>
+                </div>
+
+                {/* Ideal For Badge */}
+                <div className="text-xs font-sans bg-[#F4ECE1] p-2.5 rounded-xl border border-[#D5C3B0]/60 space-y-0.5">
+                  <strong className="font-serif text-[#8C3A27] font-extrabold text-xs uppercase tracking-wider block">Ideal for:</strong>
+                  <span className="font-bold text-[#140C08] block leading-snug">Aspirants seeking strategic guidance with independence.</span>
+                </div>
+
+                {/* Summary Box */}
+                <p className="text-xs sm:text-sm text-[#140C08] font-medium leading-relaxed bg-[#FAF6EE] p-2.5 rounded-xl border border-[#D5C3B0]/60">
+                  No classes. No study materials. The mentor provides the strategy, direction, clarity, and corrections; the mentee takes complete ownership of preparation and execution.
+                </p>
+
+                {/* Key Deliverables List */}
+                <div className="space-y-1.5 pt-0.5">
+                  <strong className="font-serif text-xs font-extrabold text-[#8C3A27] uppercase tracking-wider block border-b border-[#D5C3B0]/50 pb-1">
+                    Key Deliverables:
+                  </strong>
+                  <ul className="space-y-1 text-xs font-semibold text-[#140C08]">
+                    <li className="flex items-center gap-1.5">
+                      <CheckCircle className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                      <span>Personalised preparation strategy</span>
+                    </li>
+                    <li className="flex items-center gap-1.5">
+                      <CheckCircle className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                      <span>Complete roadmap and direction</span>
+                    </li>
+                    <li className="flex items-center gap-1.5">
+                      <CheckCircle className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                      <span>Subject-wise guidance</span>
+                    </li>
+                    <li className="flex items-center gap-1.5">
+                      <CheckCircle className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                      <span>Resource selection guidance</span>
+                    </li>
+                    <li className="flex items-center gap-1.5">
+                      <CheckCircle className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                      <span>Revision and test strategy</span>
+                    </li>
+                    <li className="flex items-center gap-1.5">
+                      <CheckCircle className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                      <span>Performance analysis</span>
+                    </li>
+                    <li className="flex items-center gap-1.5">
+                      <CheckCircle className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                      <span>Continuous mentoring and course correction</span>
+                    </li>
+                  </ul>
+                </div>
+
+                {/* Philosophy Footer Note */}
+                <div className="p-2 rounded-xl bg-[#8C3A27]/10 border border-[#8C3A27]/25 text-center">
+                  <p className="font-serif italic font-extrabold text-xs text-[#8C3A27]">
+                    “The mentor provides the direction. The mentee owns the journey.”
+                  </p>
+                </div>
+
+              </div>
+
+              {/* Bottom Action */}
+              <div className="pt-3 border-t border-[#D5C3B0]/50 mt-3 relative z-10">
+                <button
+                  onClick={(e) => { e.stopPropagation(); navigate('/contact'); }}
+                  className={`w-full text-xs py-2.5 justify-center font-bold transition-all rounded-full flex items-center gap-1.5 ${
+                    activeTier === 2
+                      ? 'btn-terracotta-pill shadow-md'
+                      : 'bg-[#FAF6EE] hover:bg-[#8C3A27] text-[#8C3A27] hover:text-white border border-[#8C3A27]/30'
+                  }`}
+                >
+                  <span>Select Strategic Partnership</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
+          </div>
+
+          {/* Campaign CTA Diagnostic Bar (COMPACT & SLEEK) */}
+          <div className="card-parchment-3d p-4 sm:p-5 border-2 border-[#8C3A27]/40 bg-[#FAF6EE] flex flex-col sm:flex-row items-center justify-between gap-4 text-left shadow-md">
+            <div className="space-y-0.5 max-w-2xl">
+              <h4 className="font-serif-header text-base sm:text-lg font-extrabold text-[#221814]">
+                Unsure Which Mentorship Tier Fits Your Preparation Standing?
+              </h4>
+              <p className="text-xs sm:text-sm text-[#3D3028] font-sans font-medium">
+                Book a direct 1-on-1 guidance session with Akella Raghavendra Sir.
+              </p>
+            </div>
+            <button
+              onClick={() => navigate('/contact')}
+              className="btn-terracotta-pill text-xs py-3 px-6 font-serif font-bold whitespace-nowrap shrink-0 shadow-md hover:shadow-lg transition-all"
+            >
+              <span>BOOK AN APPOINTMENT →</span>
+            </button>
+          </div>
+
+        </div>
+      </section>
+
+      {/* 3. SANKALPA SIDDHI FIELDWORK SPECIAL ANNOUNCEMENT BANNER (ELEGANT PARCHMENT EDITORIAL) */}
+      <section className="section-clean-parchment py-10 px-4 sm:px-6 lg:px-8 border-b border-[#D5C3B0]/40 bg-gradient-to-b from-[#FAF6EE] to-[#F4ECE1]">
+        <div className="max-w-7xl mx-auto">
+          <div className="card-parchment-3d p-6 sm:p-8 md:p-10 border-2 border-[#8C3A27]/40 bg-[#FFFDF8] rounded-3xl space-y-6 relative overflow-hidden text-left shadow-xl">
+            
+            {/* Background Emblem */}
+            <div className="absolute -right-6 -bottom-6 opacity-5 pointer-events-none">
+              <Award className="w-72 h-72 text-[#8C3A27]" />
+            </div>
+
+            <div className="space-y-5 relative z-10">
+              
+              {/* Header & Badges */}
+              <div className="space-y-3">
+                <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#8C3A27]/10 border border-[#8C3A27]/30 text-[#8C3A27] text-xs font-serif font-extrabold uppercase tracking-widest shadow-xs">
+                  <Sparkles className="w-3.5 h-3.5 text-[#8C3A27]" />
+                  <span>SPECIAL GOVERNANCE FIELDWORK OPPORTUNITY</span>
+                </div>
+
+                <h2 className="font-serif-header text-2xl sm:text-3xl md:text-4xl font-extrabold text-[#221814] leading-tight">
+                  Sankalpa Siddhi <span className="text-[#8C3A27] font-semibold">(సంకల్ప సిద్ధి)</span>
+                  <span className="block text-base sm:text-xl font-serif text-[#3D3028] font-bold mt-1">
+                    Nurturing Talent in Government Schools
+                  </span>
+                </h2>
+              </div>
+
+              {/* Full-Width Description Paragraphs (Zero Wasted Space) */}
+              <div className="space-y-2.5 text-xs sm:text-sm text-[#3D3028] font-sans font-medium leading-relaxed">
+                <p>
+                  An exclusive e-Gurukulam initiative that gives aspirants an opportunity to actively engage with government schools: interacting with students, understanding their learning needs, identifying grassroots challenges, and contributing to meaningful educational interventions.
+                </p>
+                <p>
+                  This hands-on experience helps aspirants connect classroom concepts with the realities of public education, developing a deeper understanding of governance, social issues, implementation challenges, leadership, and public service. These real-world experiences provide valuable insights for UPSC IAS Mains and authentic perspectives for the Interview and DAF.
+                </p>
+              </div>
+
+              {/* Unified Footer Bar with Badges & CTA Button */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-3 border-t border-[#D5C3B0]/50">
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="text-[11px] font-serif font-bold text-[#8C3A27] bg-[#8C3A27]/10 px-3 py-1.5 rounded-lg border border-[#8C3A27]/25 flex items-center gap-1.5 shadow-xs">
+                    <CheckCircle className="w-3.5 h-3.5 text-emerald-700" />
+                    <span>Practical Public Policy Fieldwork</span>
+                  </span>
+                  <span className="text-[11px] font-serif font-bold text-[#8C3A27] bg-[#8C3A27]/10 px-3 py-1.5 rounded-lg border border-[#8C3A27]/25 flex items-center gap-1.5 shadow-xs">
+                    <CheckCircle className="w-3.5 h-3.5 text-emerald-700" />
+                    <span>Direct UPSC DAF &amp; Interview Enhancement</span>
+                  </span>
+                </div>
+
                 <a
                   href="https://www.sankalpasiddi.com/"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="btn-terracotta-pill text-xs py-3.5 px-6 w-full md:w-auto justify-center font-serif font-bold shadow-md hover:shadow-xl transition-all flex items-center gap-2"
+                  className="btn-terracotta-pill text-xs py-3 px-7 w-full sm:w-auto justify-center font-serif font-bold shadow-md hover:shadow-xl transition-all flex items-center gap-2 shrink-0 cursor-pointer"
                 >
-                  <span>Learn More About Sankalpa Siddhi</span>
+                  <span>EXPLORE SANKALPA SIDDHI</span>
                   <ExternalLink className="w-4 h-4" />
                 </a>
               </div>
@@ -110,7 +528,7 @@ export default function ProgramsPage({ navigate }) {
         </div>
       </section>
 
-      {/* 3. SEARCH & CATEGORY FILTER BAR — SINGLE UNIFIED ROW WITH ZERO CLIPPING */}
+      {/* 4. SEARCH & CATEGORY FILTER BAR — SINGLE UNIFIED ROW WITH ZERO CLIPPING */}
       <section className="section-clean-parchment py-3 px-4 sm:px-6 lg:px-8 border-b border-[#D5C3B0]/30 sticky top-[73px] z-30 bg-[#FBF7F0]/95 backdrop-blur-md shadow-xs">
         <div className="max-w-7xl mx-auto flex items-center gap-2 sm:gap-3 w-full overflow-hidden">
           
@@ -154,7 +572,7 @@ export default function ProgramsPage({ navigate }) {
         </div>
       </section>
 
-      {/* 4. COURSES CATALOG GRID */}
+      {/* 5. COURSES CATALOG GRID */}
       <section className="section-clean-parchment py-12 px-4 sm:px-6 lg:px-8 border-b border-[#D5C3B0]/30">
         <div className="max-w-7xl mx-auto space-y-8">
           
@@ -183,6 +601,8 @@ export default function ProgramsPage({ navigate }) {
                       <img 
                         src={course.imageUrl} 
                         alt={course.title}
+                        loading="lazy"
+                        decoding="async"
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                         onError={(e) => {
                           e.target.onerror = null;
@@ -276,7 +696,7 @@ export default function ProgramsPage({ navigate }) {
       {/* GLOWING GHEE LAMP / FLAME DIVIDER */}
       <SectionDivider />
 
-      {/* 5. BOTTOM SECTION — PUBLIC GOVERNANCE & KNOWLEDGE */}
+      {/* 6. BOTTOM SECTION — PUBLIC GOVERNANCE & KNOWLEDGE */}
       <section className="section-mottled-parchment py-12 md:py-16 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
@@ -321,7 +741,7 @@ export default function ProgramsPage({ navigate }) {
         </div>
       </section>
 
-      {/* 6. FULL COURSE DETAILS IN-SITE MODAL DRAWER */}
+      {/* 7. FULL COURSE DETAILS IN-SITE MODAL DRAWER */}
       {selectedCourse && (
         <div 
           className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 md:p-10 bg-black/70 backdrop-blur-xs transition-opacity animate-fade-in"
@@ -374,6 +794,8 @@ export default function ProgramsPage({ navigate }) {
                 <img 
                   src={selectedCourse.imageUrl} 
                   alt={selectedCourse.title}
+                  loading="lazy"
+                  decoding="async"
                   className="w-full max-h-72 object-contain bg-[#221814]"
                   onError={(e) => {
                     e.target.onerror = null;

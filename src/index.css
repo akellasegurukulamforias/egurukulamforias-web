@@ -70,9 +70,13 @@ body {
 /* High-Contrast Bold Headings */
 h1, h2, h3, .section-title, .font-serif-header {
   font-family: 'Playfair Display', 'Cinzel', serif !important;
-  color: #140C08 !important;
+  color: #140C08;
   font-weight: 800 !important;
   letter-spacing: -0.01em;
+}
+
+.text-gold-header {
+  color: #FFD700 !important;
 }
 
 .font-sans-body, .font-editorial-body {
@@ -293,18 +297,26 @@ h1, h2, h3, .section-title, .font-serif-header {
   justify-content: space-between !important;
   width: 100% !important;
   max-width: 1440px !important;
-  padding: 10px 24px !important;
+  padding: 8px 16px !important;
   margin: 0 auto !important;
 }
 
-.nav-links-wrapper {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: space-evenly !important;
-  flex-grow: 1 !important;
-  margin: 0 16px !important;
-  gap: clamp(8px, 1.2vw, 20px) !important;
-  white-space: nowrap !important;
+@media (min-width: 1024px) {
+  .nav-links-wrapper {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-evenly !important;
+    flex-grow: 1 !important;
+    margin: 0 16px !important;
+    gap: clamp(8px, 1.2vw, 20px) !important;
+    white-space: nowrap !important;
+  }
+}
+
+@media (max-width: 1023px) {
+  .nav-links-wrapper {
+    display: none !important;
+  }
 }
 
 .nav-link {
@@ -331,6 +343,12 @@ h1, h2, h3, .section-title, .font-serif-header {
   background: transparent !important;
   border: none !important;
   display: block;
+}
+
+@media (max-width: 767px) {
+  .navbar-logo-img {
+    height: 48px !important;
+  }
 }
 
 .philosophy-hero-section,

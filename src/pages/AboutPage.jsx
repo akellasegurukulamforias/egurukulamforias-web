@@ -34,6 +34,8 @@ export default function AboutPage({ navigate }) {
                   <img 
                     src="/images/akella_raghavendra.png" 
                     alt="Akella Raghavendra Sir"
+                    loading="lazy"
+                    decoding="async"
                     className="editorial-portrait-img aspect-[4/5]"
                     onError={() => setPortraitError(true)}
                   />
@@ -393,6 +395,8 @@ export default function AboutPage({ navigate }) {
             <img 
               src={beginYourJourneyImg} 
               alt="Begin Your Journey With Us - e-Gurukulam IAS Academy"
+              loading="lazy"
+              decoding="async"
               className="journey-banner-blend-image"
             />
 

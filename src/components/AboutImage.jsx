@@ -17,6 +17,8 @@ export function AboutImage({ baseName, alt, className = "", containerClassName =
       <img
         src={sources[sourceIndex]}
         alt={alt}
+        loading="lazy"
+        decoding="async"
         onError={handleError}
         className={`about-blend-image object-contain ${className}`}
       />
