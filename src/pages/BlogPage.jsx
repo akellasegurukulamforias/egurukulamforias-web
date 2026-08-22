@@ -4,135 +4,192 @@ import {
   BookOpen, 
   Award, 
   Shield,
-  Sparkles
+  Sparkles,
+  FileText,
+  Calendar,
+  Tag,
+  Loader2
 } from 'lucide-react';
+import { useCMSData } from '../hooks/useCMSData';
+import { createSlug, getDirectImageUrl } from './CurrentAffairsReader';
+import { SectionDivider } from '../components/Artworks';
 
 export default function BlogPage({ navigate }) {
   const CURRENT_AFFAIRS_URL = "https://www.iasmentoring.com/current_affairs.html";
+  const { data, loading } = useCMSData();
 
   return (
     <div className="space-y-0 relative min-h-screen bg-[#FFFDF8]">
       
       {/* 1. HERO SECTION */}
-      <section className="section-mottled-parchment py-16 md:py-24 text-center px-4 sm:px-6 lg:px-8 border-b border-[#D5C3B0]/40">
-        <div className="max-w-4xl mx-auto space-y-6">
+      <section className="section-mottled-parchment py-16 md:py-20 text-center px-4 sm:px-6 lg:px-8 border-b border-[#D5C3B0]/40">
+        <div className="max-w-4xl mx-auto space-y-3">
           
           <h1 className="font-serif-header text-4xl sm:text-5xl lg:text-6xl font-extrabold text-[#221814] leading-tight">
             Daily Current Affairs &amp; Analysis
           </h1>
 
-          <div className="space-y-2">
-            <p className="font-serif italic text-lg sm:text-xl text-[#3D3028] font-bold max-w-2xl mx-auto">
-              “Understand What Is Happening Around You.”
-            </p>
-            <p className="text-xs sm:text-sm text-[#3D3028] font-sans font-medium max-w-xl mx-auto">
-              Access daily analytical briefings, Supreme Court verdicts, and UPSC exam value-addition dispatches.
-            </p>
-          </div>
+          <p className="font-serif italic text-base sm:text-lg text-[#3D3028] font-semibold max-w-2xl mx-auto leading-relaxed">
+            “Understand What Is Happening Around You.”
+          </p>
 
-          {/* MAIN DIRECT EXTERNAL PORTAL LINK CARD */}
-          <div className="pt-4 max-w-2xl mx-auto">
-            <div className="card-parchment-3d p-8 md:p-10 space-y-6 text-center border-2 border-[#8C3A27]/30 bg-[#FAF6EE] shadow-xl">
-              
-              <div className="w-16 h-16 rounded-2xl bg-[#8C3A27]/10 text-[#8C3A27] flex items-center justify-center mx-auto">
-                <Sparkles className="w-8 h-8" />
-              </div>
+        </div>
+      </section>
 
-              <div className="space-y-2">
-                <h3 className="font-serif-header text-2xl sm:text-3xl font-extrabold text-[#221814]">
-                  Current Affairs Desk
-                </h3>
-                <p className="text-xs sm:text-sm text-[#3D3028] font-sans font-medium max-w-lg mx-auto">
-                  Click below to access all live daily current affairs articles, subject digests, and editorial briefings directly on the official IAS Mentoring portal.
-                </p>
-              </div>
+      {/* 2. DYNAMIC GOOGLE SHEET CMS CURRENT AFFAIRS SECTION */}
+      <section className="py-12 md:py-16 px-4 sm:px-6 lg:px-8 bg-[#FAF6EE] border-b border-[#D5C3B0]/40">
+        <div className="max-w-7xl mx-auto space-y-8">
 
+          {/* LOADING STATE */}
+          {loading && (
+            <div className="py-12 text-center space-y-3">
+              <Loader2 className="w-8 h-8 text-[#8C3A27] animate-spin mx-auto" />
+              <p className="text-xs font-serif italic text-[#7A6B5D] font-bold">
+                Fetching latest current affairs dispatches...
+              </p>
+            </div>
+          )}
+
+          {/* CONTENT GRID */}
+          {!loading && data.currentAffairs && data.currentAffairs.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {data.currentAffairs.map((item, idx) => {
+                const title = item.Title || item.title || 'Untitled Dispatch';
+                const date = item.Date || item.date || 'Today';
+                const category = item.Category || item.category || 'General Studies';
+                const shortSummary = item.Short_Summary || item.short_summary || item.Summary || item.summary || item.Description || item.description || '';
+                const rawBanner = item.Banner_Image || item.banner_image || item.Banner || item.banner || item.Image || item.image;
+                const bannerImage = getDirectImageUrl(rawBanner);
+
+                return (
+                  <div 
+                    key={idx} 
+                    className="card-parchment-3d rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0] overflow-hidden flex flex-col justify-between hover:border-[#8C3A27] transition-all shadow-sm group text-left"
+                  >
+                    {/* Banner Image */}
+                    {bannerImage && (
+                      <div className="w-full h-48 overflow-hidden bg-black/5 relative">
+                        <img 
+                          src={bannerImage} 
+                          alt={title} 
+                          className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-500"
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.style.display = 'none';
+                          }}
+                        />
+                      </div>
+                    )}
+
+                    <div className="p-6 space-y-3 flex-1">
+                      {/* Date & Category Badge */}
+                      <div className="flex items-center justify-between text-xs gap-2">
+                        <span className="inline-flex items-center gap-1.5 font-mono text-[#8C3A27] font-bold bg-[#8C3A27]/10 px-2.5 py-1 rounded-md border border-[#8C3A27]/20">
+                          <Tag className="w-3 h-3" />
+                          <span>{category}</span>
+                        </span>
+                        <span className="inline-flex items-center gap-1 font-serif text-[#7A6B5D] italic font-semibold">
+                          <Calendar className="w-3 h-3" />
+                          <span>{date}</span>
+                        </span>
+                      </div>
+
+                      {/* Title */}
+                      <h3 className="font-serif-header text-lg font-bold text-[#221814] leading-snug">
+                        {title}
+                      </h3>
+
+                      {/* Short Summary */}
+                      {shortSummary && (
+                        <p className="text-xs sm:text-sm text-[#3D3028] font-sans font-medium leading-relaxed line-clamp-3">
+                          {shortSummary}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Action Button */}
+                    <div className="p-6 pt-0">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const slug = createSlug(title);
+                          navigate(`/current-affairs/${slug}`);
+                        }}
+                        className="w-full inline-flex items-center justify-center gap-2 btn-terracotta-outline-pill text-xs py-2.5 px-4 font-serif font-bold transition-all cursor-pointer"
+                      >
+                        <BookOpen className="w-3.5 h-3.5" />
+                        <span>Read Full Analysis →</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : !loading && (
+            /* EMPTY STATE FALLBACK */
+            <div className="card-parchment-3d p-8 text-center max-w-xl mx-auto space-y-3 bg-[#FFFDF8] border border-[#D5C3B0] rounded-2xl">
+              <BookOpen className="w-10 h-10 text-[#8C3A27] mx-auto opacity-80" />
+              <h4 className="font-serif-header text-lg font-bold text-[#221814]">
+                Today's Dispatches Updating
+              </h4>
+              <p className="text-xs sm:text-sm font-serif italic text-[#5C4028] font-bold leading-relaxed">
+                Daily current affairs cards are updated every morning from our Content CMS. Click below to explore the complete current affairs portal.
+              </p>
               <div className="pt-2">
                 <a
                   href={CURRENT_AFFAIRS_URL}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-3 btn-terracotta-pill text-sm py-4 px-8 font-serif font-bold shadow-lg hover:shadow-2xl transition-all"
+                  className="btn-terracotta-pill text-xs py-2.5 px-6 inline-flex items-center gap-2 font-serif font-bold"
                 >
-                  <span>Explore Daily Current Affairs Dispatches</span>
-                  <ExternalLink className="w-5 h-5" />
+                  <span>Open Full Portal</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
                 </a>
               </div>
-
             </div>
-          </div>
+          )}
 
         </div>
       </section>
 
-      {/* 2. WHY VEEKSHANAM CURRENT AFFAIRS SECTION */}
-      <section className="section-clean-parchment py-16 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto space-y-12">
-          
-          <div className="text-center space-y-3 max-w-3xl mx-auto">
-            <span className="text-xs uppercase tracking-widest font-serif font-bold text-[#8C3A27]">
-              EDITORIAL RIGOR &amp; ANALYTICAL DEPTH
-            </span>
-            <h2 className="font-serif-header text-3xl sm:text-4xl font-extrabold text-[#221814]">
-              High-Yield Editorial Analysis for UPSC CSE
-            </h2>
-            <p className="text-sm sm:text-base text-[#3D3028] font-serif italic font-semibold">
-              “Factual knowledge builds Prelims score; analytical clarity crafts Mains answers.”
-            </p>
-          </div>
+      {/* GLOWING GHEE LAMP / FLAME DIVIDER */}
+      <SectionDivider />
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+      {/* COMPACT BOTTOM SECTION: CURRENT AFFAIRS DESK */}
+      <section className="py-12 px-4 sm:px-6 lg:px-8 bg-[#FAF6EE] border-t border-b border-[#D5C3B0]/40">
+        <div className="max-w-4xl mx-auto">
+          <div className="card-parchment-3d p-6 sm:p-8 border border-[#D5C3B0] bg-[#FFFDF8] rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-6 text-left shadow-sm hover:border-[#8C3A27] transition-all">
             
-            <div className="card-parchment-3d p-8 space-y-4 text-left border border-[#D5C3B0]/60">
-              <div className="w-12 h-12 rounded-xl bg-[#8C3A27]/10 text-[#8C3A27] flex items-center justify-center">
-                <BookOpen className="w-6 h-6" />
+            <div className="space-y-1.5 flex-1">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-[#8C3A27] bg-[#8C3A27]/10 px-2.5 py-0.5 rounded-md border border-[#8C3A27]/20">
+                  OFFICIAL PORTAL
+                </span>
+                <Sparkles className="w-4 h-4 text-[#8C3A27]" />
               </div>
-              <h3 className="font-serif-header text-xl font-bold text-[#221814]">
-                Polity &amp; Governance
+
+              <h3 className="font-serif-header text-lg sm:text-xl font-extrabold text-[#221814]">
+                Current Affairs Desk
               </h3>
+
               <p className="text-xs sm:text-sm text-[#3D3028] font-sans font-medium leading-relaxed">
-                In-depth breakdown of Supreme Court verdicts, constitutional amendments, parliamentary bills, and administrative reforms.
+                Explore complete archived daily dispatches, subject digests, and editorial briefings on our main portal.
               </p>
             </div>
 
-            <div className="card-parchment-3d p-8 space-y-4 text-left border border-[#D5C3B0]/60">
-              <div className="w-12 h-12 rounded-xl bg-[#8C3A27]/10 text-[#8C3A27] flex items-center justify-center">
-                <Award className="w-6 h-6" />
-              </div>
-              <h3 className="font-serif-header text-xl font-bold text-[#221814]">
-                Economy &amp; Trade Briefings
-              </h3>
-              <p className="text-xs sm:text-sm text-[#3D3028] font-sans font-medium leading-relaxed">
-                Macroeconomic indicators, RBI monetary policies, fiscal updates, GI tags, and global trade agreements simplified for GS II &amp; III.
-              </p>
-            </div>
-
-            <div className="card-parchment-3d p-8 space-y-4 text-left border border-[#D5C3B0]/60">
-              <div className="w-12 h-12 rounded-xl bg-[#8C3A27]/10 text-[#8C3A27] flex items-center justify-center">
-                <Shield className="w-6 h-6" />
-              </div>
-              <h3 className="font-serif-header text-xl font-bold text-[#221814]">
-                Science, Tech &amp; Environment
-              </h3>
-              <p className="text-xs sm:text-sm text-[#3D3028] font-sans font-medium leading-relaxed">
-                Clean energy initiatives, Small Modular Reactors (SMRs), biodiversity conservation, and technology policies simplified for revision.
-              </p>
+            <div className="shrink-0 w-full sm:w-auto">
+              <a
+                href={CURRENT_AFFAIRS_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-terracotta-pill text-xs py-3 px-6 font-serif font-bold transition-all flex items-center justify-center gap-2 w-full sm:w-auto cursor-pointer shadow-xs"
+              >
+                <span>Open Archives Desk ↗</span>
+                <ExternalLink className="w-3.5 h-3.5 opacity-80" />
+              </a>
             </div>
 
           </div>
-
-          <div className="text-center pt-4">
-            <a
-              href={CURRENT_AFFAIRS_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn-terracotta-pill text-xs py-3.5 px-8 inline-flex items-center gap-2 font-serif font-bold"
-            >
-              <span>Visit Official Current Affairs Portal</span>
-              <ExternalLink className="w-4 h-4" />
-            </a>
-          </div>
-
         </div>
       </section>
 

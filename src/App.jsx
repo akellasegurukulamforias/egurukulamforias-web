@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import DesktopViewPrompt from './components/DesktopViewPrompt';
+import AnnouncementPopup from './components/AnnouncementPopup';
+import { useCMSData } from './hooks/useCMSData';
 
 // Pages
 import HomePage from './pages/HomePage';
@@ -11,9 +13,12 @@ import TestSeriesPage from './pages/TestSeriesPage';
 import BlogPage from './pages/BlogPage';
 import ResourcesPage from './pages/ResourcesPage';
 import ConnectPage from './pages/ConnectPage';
+import CurrentAffairsReader from './pages/CurrentAffairsReader';
 
 export default function App() {
   const [currentPath, setCurrentPath] = useState(window.location.pathname || '/');
+  const [isPopupOpen, setIsPopupOpen] = useState(false);
+  const { data: cmsData } = useCMSData();
 
   useEffect(() => {
     const handlePopState = () => {
@@ -31,9 +36,22 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const handleOpenPopup = () => {
+    setIsPopupOpen(true);
+  };
+
+  const handleClosePopup = () => {
+    setIsPopupOpen(false);
+  };
+
   // Route Resolver for client-side navigation
   const renderPage = () => {
     const normalizedPath = currentPath.toLowerCase().replace(/\/$/, '') || '/';
+
+    if (normalizedPath.startsWith('/current-affairs/')) {
+      const slug = normalizedPath.replace('/current-affairs/', '');
+      return <CurrentAffairsReader slug={slug} navigate={navigate} />;
+    }
 
     switch (normalizedPath) {
       case '/':
@@ -70,8 +88,19 @@ export default function App() {
       {/* Desktop Mode Recommendation Popup for Mobile Users */}
       <DesktopViewPrompt />
 
+      {/* 5-Minute Intelligent Google Sheet CMS Announcement Poster Popup */}
+      <AnnouncementPopup 
+        activePopup={cmsData?.activePopup} 
+        isOpen={isPopupOpen}
+        onClose={handleClosePopup}
+      />
+
       {/* Top Sticky Header Bar */}
-      <Header currentPath={currentPath} navigate={navigate} />
+      <Header 
+        currentPath={currentPath} 
+        navigate={navigate} 
+        onOpenPopup={handleOpenPopup}
+      />
 
       {/* Main Container */}
       <main className="flex-1">

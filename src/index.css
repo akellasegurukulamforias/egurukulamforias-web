@@ -79,6 +79,10 @@ h1, h2, h3, .section-title, .font-serif-header {
   color: #FFD700 !important;
 }
 
+.font-telugu {
+  font-family: 'Suravaram', serif !important;
+}
+
 .font-sans-body, .font-editorial-body {
   font-family: 'Plus Jakarta Sans', sans-serif !important;
   color: #2A1E18 !important;
@@ -785,4 +789,85 @@ h1, h2, h3, .section-title, .font-serif-header {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* GOOGLE DOC CMS ARTICLE HTML CONTENT STYLING */
+.article-content h1,
+.article-content h2 {
+  font-family: 'Playfair Display', 'Cinzel', serif !important;
+  font-size: 1.5rem !important;
+  font-weight: 800 !important;
+  color: #6C1D18 !important;
+  margin-top: 1.75rem !important;
+  margin-bottom: 0.75rem !important;
+  border-bottom: 1px solid rgba(213, 195, 176, 0.6) !important;
+  padding-bottom: 0.35rem !important;
+}
+
+.article-content h3,
+.article-content h4 {
+  font-family: 'Playfair Display', 'Cinzel', serif !important;
+  font-size: 1.25rem !important;
+  font-weight: 700 !important;
+  color: #8B261E !important;
+  margin-top: 1.25rem !important;
+  margin-bottom: 0.5rem !important;
+}
+
+.article-content p {
+  margin-top: 0.75rem !important;
+  margin-bottom: 0.75rem !important;
+  color: #2C221E !important;
+  line-height: 1.8 !important;
+}
+
+.article-content ul,
+.article-content ol {
+  padding-left: 1.5rem !important;
+  margin-top: 0.75rem !important;
+  margin-bottom: 1rem !important;
+}
+
+.article-content ul {
+  list-style-type: disc !important;
+}
+
+.article-content ol {
+  list-style-type: decimal !important;
+}
+
+.article-content li {
+  margin-bottom: 0.5rem !important;
+  color: #3D3028 !important;
+}
+
+.article-content strong,
+.article-content b {
+  font-weight: 800 !important;
+  color: #140C08 !important;
+}
+
+.article-content blockquote {
+  border-left: 4px solid #8C3A27 !important;
+  padding-left: 1rem !important;
+  margin-top: 1.25rem !important;
+  margin-bottom: 1.25rem !important;
+  font-style: italic !important;
+  color: #5C4028 !important;
+  background-color: rgba(140, 58, 39, 0.05) !important;
+  padding-top: 0.75rem !important;
+  padding-bottom: 0.75rem !important;
+  border-radius: 0 0.75rem 0.75rem 0 !important;
+}
+
+.article-content img {
+  border-radius: 0.75rem !important;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1) !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  margin-top: 1rem !important;
+  margin-bottom: 1rem !important;
+  max-height: 500px !important;
+  object-fit: contain !important;
+  display: block !important;
 }

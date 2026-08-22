@@ -1,865 +1,653 @@
-import React, { useState, useMemo } from 'react';
-import { SectionDivider, CityscapeArtwork } from '../components/Artworks';
+import React, { useState, useEffect, useRef } from 'react';
+import { SectionDivider } from '../components/Artworks';
+import IASWithLifeSection from '../components/IASWithLifeSection';
 import { 
   ArrowRight, 
-  ArrowUpRight, 
-  Search, 
-  BookOpen, 
-  Video, 
-  FileText, 
-  CheckCircle, 
   Sparkles, 
-  X, 
-  Users,
-  Clock,
-  Tag,
-  GraduationCap,
-  ExternalLink,
-  Award,
-  Compass,
-  Zap,
-  Target,
-  ShieldCheck,
-  UserCheck,
-  TrendingUp,
-  Layers,
-  ChevronRight
+  Briefcase,
+  Home,
+  ArrowDown,
+  X,
+  Bell,
+  Clock
 } from 'lucide-react';
-import coursesData from '../data/courses.json';
 
 export default function ProgramsPage({ navigate }) {
-  const [selectedCategory, setSelectedCategory] = useState('ALL');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCourse, setSelectedCourse] = useState(null);
-  const [activeTier, setActiveTier] = useState(0);
+  const [activeTier, setActiveTier] = useState(0); // 0 = 99%, 1 = 75%, 2 = 50%
+  const [activeFieldStage, setActiveFieldStage] = useState(0); // 0 = Enter, 1 = Observe, 2 = Understand, 3 = Contribute
+  
+  // Session-Persistent "Coming Soon" Modal Popup State (Triggers only once per browser session)
+  const [showComingSoonModal, setShowComingSoonModal] = useState(false);
 
-  // Available Category Filter Pills
-  const categories = [
-    { id: 'ALL', label: 'All Courses' },
-    { id: 'UPSC CIVIL SERVICES', label: 'UPSC Civil Services' },
-    { id: 'GROUPS & STATE', label: 'APPSC & TGPSC Groups' },
-    { id: 'FOUNDATION', label: 'Foundation & Orientation' },
-    { id: 'WORKSHOPS', label: 'Workshops & Strategy' },
-    { id: 'OPTIONAL', label: 'Optional & History' },
-    { id: 'SPECIALIST & PERSPECTIVE', label: 'Perspective & Books' }
+  useEffect(() => {
+    const hasSeenModal = sessionStorage.getItem('hasSeenProgramsComingSoonModal');
+    if (!hasSeenModal) {
+      const timer = setTimeout(() => {
+        setShowComingSoonModal(true);
+      }, 1200);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
+  const handleCloseComingSoonModal = () => {
+    sessionStorage.setItem('hasSeenProgramsComingSoonModal', 'true');
+    setShowComingSoonModal(false);
+  };
+
+  const spectrumContainerRef = useRef(null);
+  const sankalpaContainerRef = useRef(null);
+
+  // 4 Mentorship Philosophy & Add-On Definitions
+  const spectrumModels = [
+    {
+      id: 0,
+      ratio: "99%",
+      mentorShare: "99% Mentor",
+      menteeShare: "1% Mentee",
+      title: "The Guided Path",
+      philosophy: "You don't have to figure out the path. Your mentor builds it with you.",
+      idealFor: "Aspirants seeking complete end-to-end direction.",
+      summary: "Everything is designed, structured, and provided by the mentor. The mentee’s responsibility is simple: follow the plan with discipline and consistency.",
+      deliverables: [
+        "Complete study roadmap & personalized timeline",
+        "Structured class schedule and daily study plan",
+        "Mentor-curated study materials and resources",
+        "Daily/weekly direction and progress monitoring",
+        "Comprehensive revision strategy and test evaluation"
+      ]
+    },
+    {
+      id: 1,
+      ratio: "75%",
+      mentorShare: "75% Mentor",
+      menteeShare: "25% Mentee",
+      title: "The Guided Learning",
+      philosophy: "The mentor leads in teaching and strategy. You absorb, revise, and execute.",
+      idealFor: "Aspirants seeking structured learning with personal ownership.",
+      summary: "The mentor takes the lead in teaching, planning, and directing preparation, while the mentee absorbs, organizes, revises, and executes independently.",
+      deliverables: [
+        "Structured lectures with clear topic-wise direction",
+        "Mentor-designed subject preparation strategy",
+        "Clear guidance on what to study and how to approach it",
+        "Mentee-driven revision and test execution",
+        "Periodic performance evaluation and feedback"
+      ]
+    },
+    {
+      id: 2,
+      ratio: "50%",
+      mentorShare: "50% Mentor",
+      menteeShare: "50% Mentee",
+      title: "The Strategic Partnership",
+      philosophy: "No classes. No study materials. Your mentor provides direction and corrections; you own the execution.",
+      idealFor: "Aspirants seeking high-level strategy with preparation independence.",
+      summary: "No classes. No study materials. The mentor provides strategy, direction, clarity, and corrections; the mentee takes complete ownership of preparation.",
+      deliverables: [
+        "Personalised preparation strategy & roadmaps",
+        "Subject-wise strategic guidance & direction",
+        "Regular strategy reviews and course corrections",
+        "Answer writing auditing & error pattern diagnostics",
+        "Mentee-driven execution with peer-level accountability"
+      ]
+    },
+    {
+      id: 3,
+      ratio: "Add-On",
+      isAddon: true,
+      mentorShare: "NextGen Governance",
+      menteeShare: "COMING SOON",
+      title: "NextGen Governance",
+      philosophy: "Master the diagnostic workflows and delivery frameworks to break down and scale complex public systems.",
+      idealFor: "The structured method to break down, design, and scale public systems.",
+      summary: "",
+      deliverables: [
+        "System Diagnostic Toolkits: Pinpoint root causes and structural bottlenecks behind complex policy failures.",
+        "Structured Decision Matrices: Map multi-stakeholder trade-offs to resolve complex administrative dilemmas with clarity.",
+        "Scalable Delivery Frameworks: Build modular, risk-tested rollout blueprints engineered for real-world public systems."
+      ]
+    }
   ];
 
-  // Filter courses based on active category & search query
-  const filteredCourses = useMemo(() => {
-    return coursesData.filter(course => {
-      const matchesCategory = selectedCategory === 'ALL' || course.category === selectedCategory;
-      const matchesSearch = searchQuery === '' || 
-        course.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        course.description.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchesCategory && matchesSearch;
-    });
-  }, [selectedCategory, searchQuery]);
+  // 4 Sankalpa Siddhi Stages Definitions
+  const sankalpaStages = [
+    {
+      id: 0,
+      number: "01",
+      title: "Enter the Field",
+      subtitle: "Students. Classrooms. Ground Reality.",
+      description: "Step out of theoretical coaching spaces and engage directly with government school students in active classroom environments."
+    },
+    {
+      id: 1,
+      number: "02",
+      title: "Observe",
+      subtitle: "What do they need?",
+      description: "Identify learning gaps, grassroots infrastructural challenges, and systemic hurdles faced by students and educators alike."
+    },
+    {
+      id: 2,
+      number: "03",
+      title: "Understand",
+      subtitle: "Ground Governance Realities",
+      description: "Connect textbook public policy concepts with real-world operational challenges of public education and welfare schemes."
+    },
+    {
+      id: 3,
+      number: "04",
+      title: "Contribute",
+      subtitle: "Meaningful Action & Impact",
+      description: "Build authentic, high-impact perspectives vital for UPSC Mains answers, Essay papers, and Interview DAF scoring."
+    }
+  ];
+
+  // Scroll observers for Section 1 and Section 2
+  useEffect(() => {
+    const handleScroll = () => {
+      // Section 1 observer (4 Tiers)
+      if (spectrumContainerRef.current) {
+        const rect = spectrumContainerRef.current.getBoundingClientRect();
+        const totalScrollable = spectrumContainerRef.current.offsetHeight - window.innerHeight;
+        if (totalScrollable > 0) {
+          const ratio = Math.max(0, Math.min(1, -rect.top / totalScrollable));
+          if (ratio < 0.25) setActiveTier(0);
+          else if (ratio < 0.50) setActiveTier(1);
+          else if (ratio < 0.75) setActiveTier(2);
+          else setActiveTier(3);
+        }
+      }
+
+      // Section 2 observer
+      if (sankalpaContainerRef.current) {
+        const rect = sankalpaContainerRef.current.getBoundingClientRect();
+        const totalScrollable = sankalpaContainerRef.current.offsetHeight - window.innerHeight;
+        if (totalScrollable > 0) {
+          const ratio = Math.max(0, Math.min(1, -rect.top / totalScrollable));
+          if (ratio < 0.25) setActiveFieldStage(0);
+          else if (ratio < 0.50) setActiveFieldStage(1);
+          else if (ratio < 0.75) setActiveFieldStage(2);
+          else setActiveFieldStage(3);
+        }
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const currentSpectrum = spectrumModels[activeTier];
+  const currentStage = sankalpaStages[activeFieldStage];
 
   return (
-    <div className="space-y-0 relative">
+    <div className="space-y-0 relative bg-[#FFFDF8] text-[#221814]">
       
-      {/* 1. UNIFIED HERO & MENTORSHIP SHOWCASE (EXPANDED WIDTH & EXACT USER COPY) */}
-      <section className="section-clean-parchment pt-8 pb-10 sm:pt-10 sm:pb-14 px-4 sm:px-6 lg:px-8 border-b border-[#D5C3B0]/40 bg-gradient-to-b from-[#FAF6EE] via-[#F4ECE1]/80 to-[#FAF6EE]">
-        <div className="max-w-7xl lg:max-w-[90rem] mx-auto space-y-7 text-center">
-          
-          {/* Unified Section Header */}
-          <div className="max-w-4xl mx-auto space-y-2.5">
-            <h1 className="font-serif-header text-3xl sm:text-4xl lg:text-5xl font-extrabold text-[#221814] leading-tight sm:whitespace-nowrap">
-              The e-Gurukulam Mentorship Spectrum
-            </h1>
-            <p className="font-serif italic text-base sm:text-lg text-[#8C3A27] font-bold sm:whitespace-nowrap">
-              From complete guidance to complete ownership.
-            </p>
-            <p className="text-xs sm:text-sm text-[#3D3028] font-sans font-medium max-w-3xl mx-auto leading-relaxed">
-              Three thoughtfully designed mentorship levels that evolve with your preparation, capability, and confidence. Choose the level of guidance that best fits your journey.
-            </p>
-          </div>
-
-          {/* LUXURY INTERACTIVE SEGMENTED TAB SELECTOR (STRICT SINGLE LINE) */}
-          <div className="flex items-center justify-center gap-2 max-w-3xl sm:max-w-4xl mx-auto p-1.5 bg-[#EFE6D7] rounded-2xl border border-[#C5A059]/40 shadow-inner">
-            {[
-              { id: 0, label: "01. Guided Path (99%)", icon: Compass },
-              { id: 1, label: "02. Guided Learning (75%)", icon: Target },
-              { id: 2, label: "03. Strategic Partnership (50%)", icon: Award }
-            ].map((tab) => {
-              const Icon = tab.icon;
-              const isSelected = activeTier === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTier(tab.id)}
-                  className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 px-3 sm:px-4 rounded-xl font-serif text-xs sm:text-sm font-bold whitespace-nowrap transition-all duration-300 cursor-pointer ${
-                    isSelected
-                      ? 'bg-[#8C3A27] text-white shadow-lg scale-105 border border-[#FFD700]/30'
-                      : 'text-[#5C4028] hover:text-[#140C08] hover:bg-[#FAF6EE]/80'
-                  }`}
-                >
-                  <Icon className={`w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0 ${isSelected ? 'text-[#FFD700]' : 'text-[#8C3A27]'}`} />
-                  <span className="hidden sm:inline whitespace-nowrap">{tab.label}</span>
-                  <span className="sm:hidden whitespace-nowrap">{tab.label.split('.')[0]}. Tier {tab.id + 1}</span>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* 3 PROGRESSIVE MODELS CARDS GRID (HIGH-CONTRAST VISIBLE TYPOGRAPHY & COMPACT HEIGHT) */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left items-stretch pt-2">
-            
-            {/* MODEL 1: 99% MENTOR - 1% MENTEE */}
-            <div 
-              onClick={() => setActiveTier(0)}
-              className={`card-parchment-3d p-5 flex flex-col justify-between rounded-2xl transition-all duration-300 relative overflow-hidden group cursor-pointer ${
-                activeTier === 0
-                  ? 'border-2 border-[#8C3A27] bg-[#FFFDF8] shadow-xl scale-[1.01] ring-2 ring-[#8C3A27]/10'
-                  : 'border-2 border-[#D5C3B0]/60 bg-[#FFFDF8]/90 hover:border-[#8C3A27]/60 shadow-md'
-              }`}
-            >
-              {/* Background Watermark Percentage */}
-              <span className="absolute -right-2 -top-4 text-7xl font-serif font-black text-[#8C3A27]/10 select-none pointer-events-none">
-                99%
-              </span>
-
-              <div className="space-y-3 relative z-10">
-                
-                {/* Header Title & Sub-tagline */}
-                <div className="border-b border-[#D5C3B0]/60 pb-2.5">
-                  <h3 className="font-serif-header text-xl font-extrabold text-[#140C08] group-hover:text-[#8C3A27] transition-colors leading-tight">
-                    99% Mentor – 1% Mentee
-                  </h3>
-                  <span className="text-xs font-serif font-extrabold text-[#8C3A27] bg-[#8C3A27]/10 px-2.5 py-0.5 rounded-md border border-[#8C3A27]/30 inline-block mt-1.5 shadow-xs">
-                    The Guided Path
-                  </span>
-                </div>
-
-                {/* Micro Ratio Bar */}
-                <div className="space-y-1 bg-[#FAF6EE] p-2.5 rounded-xl border border-[#D5C3B0]/60">
-                  <div className="flex justify-between text-xs font-serif font-extrabold text-[#140C08]">
-                    <span>Mentor Guidance: 99%</span>
-                    <span>Mentee Execution: 1%</span>
-                  </div>
-                  <div className="w-full h-2 bg-[#E8DEC9] rounded-full overflow-hidden flex">
-                    <div className="h-full bg-gradient-to-r from-[#8C3A27] to-[#C5A059] w-[99%]"></div>
-                    <div className="h-full bg-[#140C08] w-[1%]"></div>
-                  </div>
-                </div>
-
-                {/* Ideal For Badge */}
-                <div className="text-xs font-sans bg-[#F4ECE1] p-2.5 rounded-xl border border-[#D5C3B0]/60 space-y-0.5">
-                  <strong className="font-serif text-[#8C3A27] font-extrabold text-xs uppercase tracking-wider block">Ideal for:</strong>
-                  <span className="font-bold text-[#140C08] block leading-snug">Aspirants seeking end-to-end direction.</span>
-                </div>
-
-                {/* Summary Box */}
-                <p className="text-xs sm:text-sm text-[#140C08] font-medium leading-relaxed bg-[#FAF6EE] p-2.5 rounded-xl border border-[#D5C3B0]/60">
-                  Everything is designed, structured, and provided by the mentor. The mentee’s responsibility is simple: follow the plan with discipline and consistency.
-                </p>
-
-                {/* Key Deliverables List */}
-                <div className="space-y-1.5 pt-0.5">
-                  <strong className="font-serif text-xs font-extrabold text-[#8C3A27] uppercase tracking-wider block border-b border-[#D5C3B0]/50 pb-1">
-                    Key Deliverables:
-                  </strong>
-                  <ul className="space-y-1 text-xs font-semibold text-[#140C08]">
-                    <li className="flex items-center gap-1.5">
-                      <CheckCircle className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
-                      <span>Complete study roadmap</span>
-                    </li>
-                    <li className="flex items-center gap-1.5">
-                      <CheckCircle className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
-                      <span>Classes and learning schedule</span>
-                    </li>
-                    <li className="flex items-center gap-1.5">
-                      <CheckCircle className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
-                      <span>Study materials and resources</span>
-                    </li>
-                    <li className="flex items-center gap-1.5">
-                      <CheckCircle className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
-                      <span>Revision strategy</span>
-                    </li>
-                    <li className="flex items-center gap-1.5">
-                      <CheckCircle className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
-                      <span>Tests and evaluation</span>
-                    </li>
-                    <li className="flex items-center gap-1.5">
-                      <CheckCircle className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
-                      <span>Daily/weekly direction</span>
-                    </li>
-                    <li className="flex items-center gap-1.5">
-                      <CheckCircle className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
-                      <span>Continuous monitoring and guidance</span>
-                    </li>
-                  </ul>
-                </div>
-
-                {/* Philosophy Footer Note */}
-                <div className="p-2 rounded-xl bg-[#8C3A27]/10 border border-[#8C3A27]/25 text-center">
-                  <p className="font-serif italic font-extrabold text-xs text-[#8C3A27]">
-                    “Your mentor builds the path. You simply follow it.”
-                  </p>
-                </div>
-
-              </div>
-
-              {/* Bottom Action */}
-              <div className="pt-3 border-t border-[#D5C3B0]/50 mt-3 relative z-10">
-                <button
-                  onClick={(e) => { e.stopPropagation(); navigate('/contact'); }}
-                  className={`w-full text-xs py-2.5 justify-center font-bold transition-all rounded-full flex items-center gap-1.5 ${
-                    activeTier === 0
-                      ? 'btn-terracotta-pill shadow-md'
-                      : 'bg-[#FAF6EE] hover:bg-[#8C3A27] text-[#8C3A27] hover:text-white border border-[#8C3A27]/30'
-                  }`}
-                >
-                  <span>Select Guided Path</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-
-            {/* MODEL 2: 75% MENTOR - 25% MENTEE */}
-            <div 
-              onClick={() => setActiveTier(1)}
-              className={`card-parchment-3d p-5 flex flex-col justify-between rounded-2xl transition-all duration-300 relative overflow-hidden group cursor-pointer ${
-                activeTier === 1
-                  ? 'border-2 border-[#8C3A27] bg-[#FFFDF8] shadow-xl scale-[1.01] ring-2 ring-[#8C3A27]/10'
-                  : 'border-2 border-[#D5C3B0]/60 bg-[#FFFDF8]/90 hover:border-[#8C3A27]/60 shadow-md'
-              }`}
-            >
-              {/* Background Watermark Percentage */}
-              <span className="absolute -right-2 -top-4 text-7xl font-serif font-black text-[#C5A059]/15 select-none pointer-events-none">
-                75%
-              </span>
-
-              <div className="space-y-3 relative z-10">
-                
-                {/* Header Title & Sub-tagline */}
-                <div className="border-b border-[#D5C3B0]/60 pb-2.5">
-                  <h3 className="font-serif-header text-xl font-extrabold text-[#140C08] group-hover:text-[#8C3A27] transition-colors leading-tight">
-                    75% Mentor – 25% Mentee
-                  </h3>
-                  <span className="text-xs font-serif font-extrabold text-[#8C3A27] bg-[#8C3A27]/10 px-2.5 py-0.5 rounded-md border border-[#8C3A27]/30 inline-block mt-1.5 shadow-xs">
-                    The Guided Learning
-                  </span>
-                </div>
-
-                {/* Micro Ratio Bar */}
-                <div className="space-y-1 bg-[#FAF6EE] p-2.5 rounded-xl border border-[#D5C3B0]/60">
-                  <div className="flex justify-between text-xs font-serif font-extrabold text-[#140C08]">
-                    <span>Mentor Leadership: 75%</span>
-                    <span>Mentee Execution: 25%</span>
-                  </div>
-                  <div className="w-full h-2 bg-[#E8DEC9] rounded-full overflow-hidden flex">
-                    <div className="h-full bg-gradient-to-r from-[#8C3A27] to-[#C5A059] w-[75%]"></div>
-                    <div className="h-full bg-[#140C08] w-[25%]"></div>
-                  </div>
-                </div>
-
-                {/* Ideal For Badge */}
-                <div className="text-xs font-sans bg-[#F4ECE1] p-2.5 rounded-xl border border-[#D5C3B0]/60 space-y-0.5">
-                  <strong className="font-serif text-[#8C3A27] font-extrabold text-xs uppercase tracking-wider block">Ideal for:</strong>
-                  <span className="font-bold text-[#140C08] block leading-snug">Aspirants seeking structured learning with ownership.</span>
-                </div>
-
-                {/* Summary Box */}
-                <p className="text-xs sm:text-sm text-[#140C08] font-medium leading-relaxed bg-[#FAF6EE] p-2.5 rounded-xl border border-[#D5C3B0]/60">
-                  The mentor takes the lead in teaching, planning, and directing the preparation, while the mentee takes responsibility for absorbing, organizing, revising, and executing the learning independently.
-                </p>
-
-                {/* Key Deliverables List */}
-                <div className="space-y-1.5 pt-0.5">
-                  <strong className="font-serif text-xs font-extrabold text-[#8C3A27] uppercase tracking-wider block border-b border-[#D5C3B0]/50 pb-1">
-                    Key Deliverables:
-                  </strong>
-                  <ul className="space-y-1 text-xs font-semibold text-[#140C08]">
-                    <li className="flex items-center gap-1.5">
-                      <CheckCircle className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
-                      <span>Structured classes with clear direction</span>
-                    </li>
-                    <li className="flex items-center gap-1.5">
-                      <CheckCircle className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
-                      <span>Mentor-designed preparation strategy</span>
-                    </li>
-                    <li className="flex items-center gap-1.5">
-                      <CheckCircle className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
-                      <span>Topic-wise and subject-wise guidance</span>
-                    </li>
-                    <li className="flex items-center gap-1.5">
-                      <CheckCircle className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
-                      <span>Clear instructions on what to study &amp; approach</span>
-                    </li>
-                    <li className="flex items-center gap-1.5">
-                      <CheckCircle className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
-                      <span>Mentee-driven note-making &amp; consolidation</span>
-                    </li>
-                    <li className="flex items-center gap-1.5">
-                      <CheckCircle className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
-                      <span>Independent revision and practice</span>
-                    </li>
-                    <li className="flex items-center gap-1.5">
-                      <CheckCircle className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
-                      <span>Regular guidance, feedback, &amp; course correction</span>
-                    </li>
-                  </ul>
-                </div>
-
-                {/* Philosophy Footer Note */}
-                <div className="p-2 rounded-xl bg-[#8C3A27]/10 border border-[#8C3A27]/25 text-center">
-                  <p className="font-serif italic font-extrabold text-xs text-[#8C3A27]">
-                    “The mentor provides the knowledge &amp; direction. The mentee transforms it into preparation.”
-                  </p>
-                </div>
-
-              </div>
-
-              {/* Bottom Action */}
-              <div className="pt-3 border-t border-[#D5C3B0]/50 mt-3 relative z-10">
-                <button
-                  onClick={(e) => { e.stopPropagation(); navigate('/contact'); }}
-                  className={`w-full text-xs py-2.5 justify-center font-bold transition-all rounded-full flex items-center gap-1.5 ${
-                    activeTier === 1
-                      ? 'btn-terracotta-pill shadow-md'
-                      : 'bg-[#FAF6EE] hover:bg-[#8C3A27] text-[#8C3A27] hover:text-white border border-[#8C3A27]/30'
-                  }`}
-                >
-                  <span>Select Guided Learning</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-
-            {/* MODEL 3: 50% MENTOR - 50% MENTEE */}
-            <div 
-              onClick={() => setActiveTier(2)}
-              className={`card-parchment-3d p-5 flex flex-col justify-between rounded-2xl transition-all duration-300 relative overflow-hidden group cursor-pointer ${
-                activeTier === 2
-                  ? 'border-2 border-[#8C3A27] bg-[#FFFDF8] shadow-xl scale-[1.01] ring-2 ring-[#8C3A27]/10'
-                  : 'border-2 border-[#D5C3B0]/60 bg-[#FFFDF8]/90 hover:border-[#8C3A27]/60 shadow-md'
-              }`}
-            >
-              {/* Background Watermark Percentage */}
-              <span className="absolute -right-2 -top-4 text-7xl font-serif font-black text-[#140C08]/10 select-none pointer-events-none">
-                50%
-              </span>
-
-              <div className="space-y-3 relative z-10">
-                
-                {/* Header Title & Sub-tagline */}
-                <div className="border-b border-[#D5C3B0]/60 pb-2.5">
-                  <h3 className="font-serif-header text-xl font-extrabold text-[#140C08] group-hover:text-[#8C3A27] transition-colors leading-tight">
-                    50% Mentor – 50% Mentee
-                  </h3>
-                  <span className="text-xs font-serif font-extrabold text-[#8C3A27] bg-[#8C3A27]/10 px-2.5 py-0.5 rounded-md border border-[#8C3A27]/30 inline-block mt-1.5 shadow-xs">
-                    The Strategic Partnership
-                  </span>
-                </div>
-
-                {/* Micro Ratio Bar */}
-                <div className="space-y-1 bg-[#FAF6EE] p-2.5 rounded-xl border border-[#D5C3B0]/60">
-                  <div className="flex justify-between text-xs font-serif font-extrabold text-[#140C08]">
-                    <span>Mentor Collaboration: 50%</span>
-                    <span>Mentee Partnership: 50%</span>
-                  </div>
-                  <div className="w-full h-2 bg-[#E8DEC9] rounded-full overflow-hidden flex">
-                    <div className="h-full bg-[#8C3A27] w-[50%]"></div>
-                    <div className="h-full bg-[#140C08] w-[50%]"></div>
-                  </div>
-                </div>
-
-                {/* Ideal For Badge */}
-                <div className="text-xs font-sans bg-[#F4ECE1] p-2.5 rounded-xl border border-[#D5C3B0]/60 space-y-0.5">
-                  <strong className="font-serif text-[#8C3A27] font-extrabold text-xs uppercase tracking-wider block">Ideal for:</strong>
-                  <span className="font-bold text-[#140C08] block leading-snug">Aspirants seeking strategic guidance with independence.</span>
-                </div>
-
-                {/* Summary Box */}
-                <p className="text-xs sm:text-sm text-[#140C08] font-medium leading-relaxed bg-[#FAF6EE] p-2.5 rounded-xl border border-[#D5C3B0]/60">
-                  No classes. No study materials. The mentor provides the strategy, direction, clarity, and corrections; the mentee takes complete ownership of preparation and execution.
-                </p>
-
-                {/* Key Deliverables List */}
-                <div className="space-y-1.5 pt-0.5">
-                  <strong className="font-serif text-xs font-extrabold text-[#8C3A27] uppercase tracking-wider block border-b border-[#D5C3B0]/50 pb-1">
-                    Key Deliverables:
-                  </strong>
-                  <ul className="space-y-1 text-xs font-semibold text-[#140C08]">
-                    <li className="flex items-center gap-1.5">
-                      <CheckCircle className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
-                      <span>Personalised preparation strategy</span>
-                    </li>
-                    <li className="flex items-center gap-1.5">
-                      <CheckCircle className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
-                      <span>Complete roadmap and direction</span>
-                    </li>
-                    <li className="flex items-center gap-1.5">
-                      <CheckCircle className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
-                      <span>Subject-wise guidance</span>
-                    </li>
-                    <li className="flex items-center gap-1.5">
-                      <CheckCircle className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
-                      <span>Resource selection guidance</span>
-                    </li>
-                    <li className="flex items-center gap-1.5">
-                      <CheckCircle className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
-                      <span>Revision and test strategy</span>
-                    </li>
-                    <li className="flex items-center gap-1.5">
-                      <CheckCircle className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
-                      <span>Performance analysis</span>
-                    </li>
-                    <li className="flex items-center gap-1.5">
-                      <CheckCircle className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
-                      <span>Continuous mentoring and course correction</span>
-                    </li>
-                  </ul>
-                </div>
-
-                {/* Philosophy Footer Note */}
-                <div className="p-2 rounded-xl bg-[#8C3A27]/10 border border-[#8C3A27]/25 text-center">
-                  <p className="font-serif italic font-extrabold text-xs text-[#8C3A27]">
-                    “The mentor provides the direction. The mentee owns the journey.”
-                  </p>
-                </div>
-
-              </div>
-
-              {/* Bottom Action */}
-              <div className="pt-3 border-t border-[#D5C3B0]/50 mt-3 relative z-10">
-                <button
-                  onClick={(e) => { e.stopPropagation(); navigate('/contact'); }}
-                  className={`w-full text-xs py-2.5 justify-center font-bold transition-all rounded-full flex items-center gap-1.5 ${
-                    activeTier === 2
-                      ? 'btn-terracotta-pill shadow-md'
-                      : 'bg-[#FAF6EE] hover:bg-[#8C3A27] text-[#8C3A27] hover:text-white border border-[#8C3A27]/30'
-                  }`}
-                >
-                  <span>Select Strategic Partnership</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-
-          </div>
-
-          {/* Campaign CTA Diagnostic Bar (COMPACT & SLEEK) */}
-          <div className="card-parchment-3d p-4 sm:p-5 border-2 border-[#8C3A27]/40 bg-[#FAF6EE] flex flex-col sm:flex-row items-center justify-between gap-4 text-left shadow-md">
-            <div className="space-y-0.5 max-w-2xl">
-              <h4 className="font-serif-header text-base sm:text-lg font-extrabold text-[#221814]">
-                Unsure Which Mentorship Tier Fits Your Preparation Standing?
-              </h4>
-              <p className="text-xs sm:text-sm text-[#3D3028] font-sans font-medium">
-                Book a direct 1-on-1 guidance session with Akella Raghavendra Sir.
-              </p>
-            </div>
-            <button
-              onClick={() => navigate('/contact')}
-              className="btn-terracotta-pill text-xs py-3 px-6 font-serif font-bold whitespace-nowrap shrink-0 shadow-md hover:shadow-lg transition-all"
-            >
-              <span>BOOK AN APPOINTMENT →</span>
-            </button>
-          </div>
-
-        </div>
-      </section>
-
-      {/* 3. SANKALPA SIDDHI FIELDWORK SPECIAL ANNOUNCEMENT BANNER (ELEGANT PARCHMENT EDITORIAL) */}
-      <section className="section-clean-parchment py-10 px-4 sm:px-6 lg:px-8 border-b border-[#D5C3B0]/40 bg-gradient-to-b from-[#FAF6EE] to-[#F4ECE1]">
-        <div className="max-w-7xl mx-auto">
-          <div className="card-parchment-3d p-6 sm:p-8 md:p-10 border-2 border-[#8C3A27]/40 bg-[#FFFDF8] rounded-3xl space-y-6 relative overflow-hidden text-left shadow-xl">
-            
-            {/* Background Emblem */}
-            <div className="absolute -right-6 -bottom-6 opacity-5 pointer-events-none">
-              <Award className="w-72 h-72 text-[#8C3A27]" />
-            </div>
-
-            <div className="space-y-5 relative z-10">
-              
-              {/* Header & Badges */}
-              <div className="space-y-3">
-                <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#8C3A27]/10 border border-[#8C3A27]/30 text-[#8C3A27] text-xs font-serif font-extrabold uppercase tracking-widest shadow-xs">
-                  <Sparkles className="w-3.5 h-3.5 text-[#8C3A27]" />
-                  <span>SPECIAL GOVERNANCE FIELDWORK OPPORTUNITY</span>
-                </div>
-
-                <h2 className="font-serif-header text-2xl sm:text-3xl md:text-4xl font-extrabold text-[#221814] leading-tight">
-                  Sankalpa Siddhi <span className="text-[#8C3A27] font-semibold">(సంకల్ప సిద్ధి)</span>
-                  <span className="block text-base sm:text-xl font-serif text-[#3D3028] font-bold mt-1">
-                    Nurturing Talent in Government Schools
-                  </span>
-                </h2>
-              </div>
-
-              {/* Full-Width Description Paragraphs (Zero Wasted Space) */}
-              <div className="space-y-2.5 text-xs sm:text-sm text-[#3D3028] font-sans font-medium leading-relaxed">
-                <p>
-                  An exclusive e-Gurukulam initiative that gives aspirants an opportunity to actively engage with government schools: interacting with students, understanding their learning needs, identifying grassroots challenges, and contributing to meaningful educational interventions.
-                </p>
-                <p>
-                  This hands-on experience helps aspirants connect classroom concepts with the realities of public education, developing a deeper understanding of governance, social issues, implementation challenges, leadership, and public service. These real-world experiences provide valuable insights for UPSC IAS Mains and authentic perspectives for the Interview and DAF.
-                </p>
-              </div>
-
-              {/* Unified Footer Bar with Badges & CTA Button */}
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-3 border-t border-[#D5C3B0]/50">
-                <div className="flex flex-wrap items-center gap-3">
-                  <span className="text-[11px] font-serif font-bold text-[#8C3A27] bg-[#8C3A27]/10 px-3 py-1.5 rounded-lg border border-[#8C3A27]/25 flex items-center gap-1.5 shadow-xs">
-                    <CheckCircle className="w-3.5 h-3.5 text-emerald-700" />
-                    <span>Practical Public Policy Fieldwork</span>
-                  </span>
-                  <span className="text-[11px] font-serif font-bold text-[#8C3A27] bg-[#8C3A27]/10 px-3 py-1.5 rounded-lg border border-[#8C3A27]/25 flex items-center gap-1.5 shadow-xs">
-                    <CheckCircle className="w-3.5 h-3.5 text-emerald-700" />
-                    <span>Direct UPSC DAF &amp; Interview Enhancement</span>
-                  </span>
-                </div>
-
-                <a
-                  href="https://www.sankalpasiddi.com/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn-terracotta-pill text-xs py-3 px-7 w-full sm:w-auto justify-center font-serif font-bold shadow-md hover:shadow-xl transition-all flex items-center gap-2 shrink-0 cursor-pointer"
-                >
-                  <span>EXPLORE SANKALPA SIDDHI</span>
-                  <ExternalLink className="w-4 h-4" />
-                </a>
-              </div>
-
-            </div>
-
-          </div>
-        </div>
-      </section>
-
-      {/* 4. SEARCH & CATEGORY FILTER BAR — SINGLE UNIFIED ROW WITH ZERO CLIPPING */}
-      <section className="section-clean-parchment py-3 px-4 sm:px-6 lg:px-8 border-b border-[#D5C3B0]/30 sticky top-[73px] z-30 bg-[#FBF7F0]/95 backdrop-blur-md shadow-xs">
-        <div className="max-w-7xl mx-auto flex items-center gap-2 sm:gap-3 w-full overflow-hidden">
-          
-          {/* Compact Width Search Input */}
-          <div className="relative w-36 sm:w-44 shrink-0">
-            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#7A6B5D]" />
-            <input
-              type="text"
-              placeholder="Search..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-8 pr-6 py-2 bg-[#FAF6EE] border border-[#D5C3B0] rounded-xl text-xs text-[#221814] placeholder-[#7A6B5D] focus:outline-hidden focus:border-[#8C3A27] focus:ring-1 focus:ring-[#8C3A27] transition-all font-medium"
-            />
-            {searchQuery && (
-              <button 
-                onClick={() => setSearchQuery('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-[#7A6B5D] hover:text-[#8C3A27]"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-
-          {/* Category Filter Pills — pr-10 guarantees Perspective & Books is NEVER cut off on right */}
-          <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto scrollbar-none py-1.5 pr-10 flex-1 min-w-0">
-            {categories.map((cat) => (
-              <button
-                key={cat.id}
-                onClick={() => setSelectedCategory(cat.id)}
-                className={`whitespace-nowrap px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-full text-[11px] sm:text-xs font-serif font-bold tracking-wide transition-all shrink-0 ${
-                  selectedCategory === cat.id
-                    ? 'bg-[#8C3A27] text-white shadow-sm'
-                    : 'bg-[#FAF6EE] text-[#3D3028] border border-[#D5C3B0] hover:border-[#8C3A27] hover:bg-[#F4ECE1]'
-                }`}
-              >
-                {cat.label}
-              </button>
-            ))}
-          </div>
-
-        </div>
-      </section>
-
-      {/* 5. COURSES CATALOG GRID */}
-      <section className="section-clean-parchment py-12 px-4 sm:px-6 lg:px-8 border-b border-[#D5C3B0]/30">
-        <div className="max-w-7xl mx-auto space-y-8">
-          
-          {filteredCourses.length === 0 ? (
-            <div className="text-center py-16 card-parchment-3d max-w-lg mx-auto space-y-4">
-              <BookOpen className="w-12 h-12 text-[#8C3A27] mx-auto opacity-50" />
-              <h3 className="font-serif-header text-xl font-bold text-[#221814]">No Courses Found</h3>
-              <p className="text-xs text-[#3D3028]">Try clearing your search term or selecting a different category filter.</p>
-              <button
-                onClick={() => { setSelectedCategory('ALL'); setSearchQuery(''); }}
-                className="btn-terracotta-pill text-xs py-2 px-6"
-              >
-                Reset Filters
-              </button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {filteredCourses.map((course) => (
-                <div 
-                  key={course.id} 
-                  className="card-parchment-3d overflow-hidden flex flex-col justify-between group hover:shadow-xl transition-all duration-300 border border-[#D5C3B0]/60"
-                >
-                  <div>
-                    {/* Course Banner Artwork Image */}
-                    <div className="relative aspect-16/9 overflow-hidden bg-[#E8DEC9] border-b border-[#D5C3B0]/40">
-                      <img 
-                        src={course.imageUrl} 
-                        alt={course.title}
-                        loading="lazy"
-                        decoding="async"
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                        onError={(e) => {
-                          e.target.onerror = null;
-                          e.target.src = 'https://ali-cdn-cp-assets-public.classplus.co/daman-bot/XmceKP96T9Hg.png';
-                        }}
-                      />
-                      
-                      {/* Price Badge */}
-                      <div className="absolute top-3 right-3 bg-[#221814]/90 backdrop-blur-md text-amber-300 px-3 py-1 rounded-lg border border-amber-500/30 text-xs font-serif font-extrabold shadow-lg">
-                        ₹{course.price.toLocaleString('en-IN')}
-                      </div>
-
-                      {/* Category Badge */}
-                      <div className="absolute bottom-3 left-3 bg-[#8C3A27]/90 text-white px-2.5 py-0.5 rounded-md text-[10px] font-serif font-bold uppercase tracking-wider">
-                        {course.category}
-                      </div>
-                    </div>
-
-                    {/* Content Section */}
-                    <div className="p-6 space-y-4">
-                      
-                      {/* Duration & Subscribers Pills */}
-                      <div className="flex flex-wrap items-center gap-3 text-[11px] font-medium text-[#7A6B5D]">
-                        <span className="flex items-center gap-1 bg-[#FAF6EE] px-2.5 py-1 rounded-md border border-[#D5C3B0]/40">
-                          <Clock className="w-3 h-3 text-[#8C3A27]" />
-                          <span>{course.duration}</span>
-                        </span>
-                        {course.subscribers > 0 && (
-                          <span className="flex items-center gap-1 bg-[#FAF6EE] px-2.5 py-1 rounded-md border border-[#D5C3B0]/40">
-                            <Users className="w-3 h-3 text-[#8C3A27]" />
-                            <span>{course.subscribers} Aspirants</span>
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Course Title */}
-                      <h3 className="font-serif-header text-xl font-bold text-[#221814] line-clamp-2 leading-snug group-hover:text-[#8C3A27] transition-colors">
-                        {course.title}
-                      </h3>
-
-                      {/* Brief Description */}
-                      <p className="text-xs text-[#3D3028] leading-relaxed font-sans font-medium line-clamp-3">
-                        {course.description}
-                      </p>
-
-                      {/* Learning Materials Breakdown */}
-                      <div className="pt-2 flex items-center gap-4 text-[11px] font-semibold text-[#5A4D41]">
-                        {course.materials.videos > 0 && (
-                          <span className="flex items-center gap-1">
-                            <Video className="w-3.5 h-3.5 text-[#8C3A27]" />
-                            <span>{course.materials.videos} Videos</span>
-                          </span>
-                        )}
-                        {course.materials.files > 0 && (
-                          <span className="flex items-center gap-1">
-                            <FileText className="w-3.5 h-3.5 text-[#8C3A27]" />
-                            <span>{course.materials.files} Notes</span>
-                          </span>
-                        )}
-                      </div>
-
-                    </div>
-                  </div>
-
-                  {/* Actions Footer */}
-                  <div className="p-6 pt-0 space-y-2.5">
-                    <button
-                      onClick={() => setSelectedCourse(course)}
-                      className="w-full btn-terracotta-outline-pill text-xs py-2.5 justify-center font-bold"
-                    >
-                      <span>Read Full Course Details</span>
-                      <BookOpen className="w-3.5 h-3.5" />
-                    </button>
-                    
-                    <button
-                      onClick={() => navigate('/contact')}
-                      className="w-full btn-terracotta-pill text-xs py-2.5 justify-center font-bold"
-                    >
-                      <span>Enroll Now (₹{course.price})</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-        </div>
-      </section>
+      {/* ==================================================================== */}
+      {/* SECTION 1: NEW PREMIUM INITIATIVE (IAS | WITH LIFE) */}
+      {/* ==================================================================== */}
+      <IASWithLifeSection navigate={navigate} />
 
       {/* GLOWING GHEE LAMP / FLAME DIVIDER */}
       <SectionDivider />
 
-      {/* 6. BOTTOM SECTION — PUBLIC GOVERNANCE & KNOWLEDGE */}
-      <section className="section-mottled-parchment py-12 md:py-16 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
+      {/* ==================================================================== */}
+      {/* SECTION 2: FIXED IN-PLACE SCROLLYTELLING SPECTRUM */}
+      {/* ==================================================================== */}
+      <section ref={spectrumContainerRef} className="h-[400vh] relative bg-[#FAF6EE] border-b border-[#D5C3B0]/40">
+        
+        {/* STICKY FIXED VIEWPORT CONTAINER */}
+        <div className="sticky top-20 h-[calc(100vh-5rem)] flex flex-col justify-center px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto overflow-hidden">
+          
+          {/* Header Title Block */}
+          <div className="space-y-2 text-center mb-8">
+            <span className="text-xs font-serif uppercase tracking-widest font-extrabold text-[#8C3A27] bg-[#8C3A27]/10 px-3.5 py-1 rounded-full inline-block border border-[#8C3A27]/20">
+              FRAMEWORK FOR SUCCESS
+            </span>
+
+            <h1 className="font-serif-header text-3xl sm:text-4xl lg:text-5xl font-black text-[#221814] tracking-tight leading-none">
+              The e-Gurukulam <span className="text-[#8C3A27]">Mentorship Spectrum</span>
+            </h1>
+
+            <p className="font-serif italic text-base sm:text-lg text-[#5C4028] font-bold">
+              From complete guidance to complete ownership.
+            </p>
+          </div>
+
+          {/* MAIN GRID: FIXED LEFT NAV + IN-PLACE SWAPPING CONTENT */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center text-left">
             
-            {/* Left Column: Title & Copy */}
-            <div className="lg:col-span-6 space-y-5 text-left">
-              <span className="text-xs uppercase tracking-widest font-serif font-bold text-[#8C3A27]">
-                HOLISTIC CIVIL SERVICES PREPARATION
-              </span>
-
-              <h2 className="font-serif-header text-3xl sm:text-4xl font-extrabold text-[#221814]">
-                Transformative Guidance &amp; Ground-Level Insights
-              </h2>
-
-              <p className="font-serif italic text-base text-[#8C3A27] font-bold">
-                “Every program combines academic rigor with practical governance perspective.”
-              </p>
-
-              <div className="space-y-3 text-xs sm:text-sm text-[#3D3028] leading-relaxed font-sans font-medium">
-                <p>
-                  Our academic offerings provide comprehensive syllabus coverage, structured mentorship, and practical fieldwork opportunities to build well-rounded public servants.
-                </p>
+            {/* PROMINENT VERTICAL LEFT NAV */}
+            <div className="lg:col-span-5 space-y-5 py-2 border-r-0 lg:border-r border-[#D5C3B0]/50 lg:pr-8">
+              
+              <div className="space-y-0.5 border-b-2 border-[#8C3A27] pb-2.5">
+                <span className="text-xs font-mono uppercase tracking-widest text-[#8C3A27] font-extrabold block">
+                  MENTOR
+                </span>
+                <h3 className="font-serif-header text-lg sm:text-xl font-black text-[#221814] tracking-wider uppercase">
+                  PHILOSOPHY SPECTRUM
+                </h3>
+                <span className="text-xs font-mono uppercase tracking-widest text-[#8C3A27] font-extrabold block">
+                  MENTEE
+                </span>
               </div>
 
-              <div className="pt-2 flex flex-wrap gap-4">
-                <button
-                  onClick={() => navigate('/contact')}
-                  className="btn-terracotta-pill text-xs py-3 px-6"
-                >
-                  <span>Talk to Mentor</span>
-                  <ArrowRight className="w-4 h-4" />
-                </button>
+              {/* 3 Prominent Navigation Items */}
+              <div className="space-y-3">
+                {spectrumModels.map((model, idx) => {
+                  const isSelected = activeTier === idx;
+                  return (
+                    <button
+                      key={model.id}
+                      onClick={() => setActiveTier(idx)}
+                      className={`w-full text-left transition-all duration-300 py-3 px-4 rounded-xl flex items-center gap-4 cursor-pointer focus:outline-none ${
+                        isSelected
+                          ? 'text-[#8C3A27] font-black translate-x-1.5'
+                          : 'text-[#5C4028] opacity-75 hover:opacity-100 hover:text-[#221814]'
+                      }`}
+                    >
+                      <span className={`font-serif font-black shrink-0 ${
+                        model.isAddon ? 'text-lg sm:text-xl font-mono' : 'text-2xl sm:text-3xl'
+                      } ${
+                        isSelected ? 'text-[#8C3A27]' : 'text-[#7A6B5D]'
+                      }`}>
+                        {model.ratio}
+                      </span>
+
+                      <div className="space-y-0.5 min-w-0">
+                        <span className={`font-serif text-sm sm:text-base font-extrabold tracking-wide block ${
+                          isSelected ? 'text-[#8C3A27] font-black' : 'text-[#221814]'
+                        }`}>
+                          {model.title}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
+
+              <div className="pt-2 flex items-center gap-2 text-xs sm:text-sm font-serif italic text-[#7A6B5D]">
+                <ArrowDown className="w-4 h-4 text-[#8C3A27] animate-bounce shrink-0" />
+                <span>Scroll to experience each program</span>
+              </div>
+
             </div>
 
-            {/* Right Column: Image Card with Overlay Text inside */}
-            <div className="lg:col-span-6 flex justify-center">
-              <CityscapeArtwork />
+            {/* IN-PLACE CONTENT DISPLAY AREA */}
+            <div className="lg:col-span-7 relative min-h-[320px] flex flex-col justify-center lg:pl-2">
+              
+              {/* Translucent Background Watermark Number */}
+              <span className="absolute -left-6 -top-10 text-[11rem] sm:text-[15rem] font-serif font-black text-[#8C3A27]/5 select-none pointer-events-none leading-none">
+                {currentSpectrum.ratio}
+              </span>
+
+              <div key={currentSpectrum.id} className="relative z-10 space-y-5 animate-fade-in transition-all duration-500">
+                
+                {/* Ratio Tag & Title */}
+                <div className="space-y-1.5 border-b border-[#D5C3B0]/60 pb-4">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className="text-xs font-mono font-bold uppercase tracking-widest text-[#8C3A27] bg-[#8C3A27]/10 px-3 py-1 rounded-md border border-[#8C3A27]/20">
+                      {currentSpectrum.mentorShare} · {currentSpectrum.menteeShare}
+                    </span>
+                    {currentSpectrum.idealFor && (
+                      <span className="text-xs sm:text-sm font-serif text-[#7A6B5D] italic font-semibold">
+                        {currentSpectrum.idealFor}
+                      </span>
+                    )}
+                  </div>
+
+                  <h2 className="font-serif-header text-3xl sm:text-4xl lg:text-5xl font-black text-[#221814] tracking-tight">
+                    {currentSpectrum.title}
+                  </h2>
+                </div>
+
+                {/* Philosophy Statement */}
+                <blockquote className="font-serif italic text-lg sm:text-2xl text-[#8C3A27] font-bold leading-relaxed border-l-4 border-[#8C3A27] pl-4 sm:pl-5 py-0.5">
+                  “{currentSpectrum.philosophy}”
+                </blockquote>
+
+                {/* Summary */}
+                {currentSpectrum.summary && (
+                  <p className="text-sm sm:text-base text-[#3D3028] font-sans font-medium leading-relaxed">
+                    {currentSpectrum.summary}
+                  </p>
+                )}
+
+                {/* Deliverables List */}
+                <div className="space-y-2.5 pt-1">
+                  <h4 className="font-serif-header text-xs sm:text-sm uppercase tracking-widest font-extrabold text-[#8C3A27]">
+                    WHAT YOU RECEIVE IN THIS MODEL:
+                  </h4>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs sm:text-sm font-semibold text-[#140C08]">
+                    {currentSpectrum.deliverables.map((item, idx) => {
+                      const parts = item.split(': ');
+                      if (parts.length > 1) {
+                        return (
+                          <div key={idx} className="flex items-start gap-2.5 py-0.5">
+                            <span className="w-2 h-2 rounded-full bg-[#8C3A27] mt-1.5 shrink-0"></span>
+                            <span>
+                              <strong className="font-sans font-extrabold text-[#140C08]">{parts[0]}: </strong>
+                              <span className="font-serif italic font-semibold text-[#3D3028]">{parts.slice(1).join(': ')}</span>
+                            </span>
+                          </div>
+                        );
+                      }
+                      return (
+                        <div key={idx} className="flex items-start gap-2.5 py-0.5">
+                          <span className="w-2 h-2 rounded-full bg-[#8C3A27] mt-1.5 shrink-0"></span>
+                          <span>{item}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Action Trigger */}
+                <div className="pt-4">
+                  {currentSpectrum.isAddon ? (
+                    <div className="pt-1">
+                      {/* Premium Editorial "COMING SOON" Campaign Seal / Sticker */}
+                      <div 
+                        onClick={() => navigate('/contact')}
+                        className="inline-block relative z-20 pointer-events-auto transform -rotate-2 hover:rotate-0 transition-transform duration-500 ease-out select-none cursor-pointer"
+                      >
+                        <div className="relative bg-[#8C3A27] text-[#F3EBDD] px-7 py-3 rounded-lg border-2 border-[#C5A059] shadow-[0_12px_30px_rgba(0,0,0,0.35)] flex items-center justify-center gap-3 overflow-hidden">
+                          {/* Inner Inset Hairline Frame */}
+                          <div className="absolute inset-1.5 border border-[#C5A059]/60 rounded-xs pointer-events-none" />
+                          
+                          {/* Subtle Corner Notch Stamp Accents */}
+                          <div className="w-2 h-2 bg-[#FFD700] rounded-full shrink-0" />
+                          <span className="font-mono text-sm sm:text-base lg:text-lg font-black uppercase tracking-[0.35em] text-[#F3EBDD] relative z-10 pt-0.5">
+                            COMING SOON
+                          </span>
+                          <div className="w-2 h-2 bg-[#FFD700] rounded-full shrink-0" />
+                        </div>
+                      </div>
+                      <span className="block text-xs font-serif italic text-[#7A6B5D] pt-2 font-bold">
+                        *Available as an optional add-on module for IAS aspirants
+                      </span>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => navigate('/contact')}
+                      className="btn-terracotta-pill text-xs sm:text-sm py-3.5 px-8 font-serif font-bold shadow-md hover:shadow-xl transition-all inline-flex items-center gap-2.5 cursor-pointer"
+                    >
+                      <span>BOOK A DIRECT 1-ON-1 GUIDANCE SESSION</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+
+              </div>
             </div>
 
           </div>
+
         </div>
+
       </section>
 
-      {/* 7. FULL COURSE DETAILS IN-SITE MODAL DRAWER */}
-      {selectedCourse && (
+      {/* ==================================================================== */}
+      {/* SECTION 3: SANKALPA SIDDHI (SCROLLYTELLING MATCHING SPECTRUM) */}
+      {/* ==================================================================== */}
+      <section ref={sankalpaContainerRef} className="h-[400vh] relative bg-[#FFFDF8] border-b border-[#D5C3B0]/40">
+        
+        {/* STICKY FIXED VIEWPORT CONTAINER */}
+        <div className="sticky top-20 h-[calc(100vh-5rem)] flex flex-col justify-center px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto overflow-hidden">
+          
+          {/* Header Title Block */}
+          <div className="space-y-2 text-center mb-8">
+            <span className="text-xs font-serif uppercase tracking-widest font-extrabold text-[#8C3A27] bg-[#8C3A27]/10 px-3.5 py-1 rounded-full inline-block border border-[#8C3A27]/20">
+              SPECIAL GOVERNANCE FIELDWORK OPPORTUNITY
+            </span>
+
+            <h2 className="font-serif-header text-3xl sm:text-4xl lg:text-5xl font-black text-[#221814] tracking-tight leading-none">
+              Sankalpa Siddhi <span className="text-[#8C3A27] font-telugu font-bold text-2xl sm:text-4xl lg:text-5xl ml-1.5">(సంకల్ప సిద్ధి)</span>
+            </h2>
+
+            <p className="font-serif italic text-base sm:text-lg text-[#5C4028] font-bold">
+              Nurturing Talent in Government Schools
+            </p>
+          </div>
+
+          {/* MAIN GRID: FIXED LEFT NAV + IN-PLACE SWAPPING CONTENT */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center text-left">
+            
+            {/* PROMINENT VERTICAL LEFT NAV */}
+            <div className="lg:col-span-5 space-y-5 py-2 border-r-0 lg:border-r border-[#D5C3B0]/50 lg:pr-8">
+              
+              <div className="space-y-0.5 border-b-2 border-[#8C3A27] pb-2.5">
+                <span className="text-xs font-mono uppercase tracking-widest text-[#8C3A27] font-extrabold block">
+                  FIELDWORK JOURNEY
+                </span>
+                <h3 className="font-serif-header text-lg sm:text-xl font-black text-[#221814] tracking-wider uppercase">
+                  SANKALPA SIDDHI STAGES
+                </h3>
+                <span className="text-xs font-mono uppercase tracking-widest text-[#8C3A27] font-extrabold block">
+                  THEORY → REALITY
+                </span>
+              </div>
+
+              {/* 4 Prominent Navigation Items */}
+              <div className="space-y-2.5">
+                {sankalpaStages.map((stage, idx) => {
+                  const isSelected = activeFieldStage === idx;
+                  return (
+                    <button
+                      key={stage.id}
+                      onClick={() => setActiveFieldStage(idx)}
+                      className={`w-full text-left transition-all duration-300 py-2.5 px-4 rounded-xl flex items-center gap-4 cursor-pointer focus:outline-none ${
+                        isSelected
+                          ? 'text-[#8C3A27] font-black translate-x-1.5'
+                          : 'text-[#5C4028] opacity-75 hover:opacity-100 hover:text-[#221814]'
+                      }`}
+                    >
+                      <span className={`font-mono text-xl sm:text-2xl font-black shrink-0 ${
+                        isSelected ? 'text-[#8C3A27]' : 'text-[#7A6B5D]'
+                      }`}>
+                        {stage.number}
+                      </span>
+
+                      <div className="space-y-0 min-w-0">
+                        <span className={`font-serif text-sm sm:text-base font-extrabold tracking-wide block ${
+                          isSelected ? 'text-[#8C3A27] font-black' : 'text-[#221814]'
+                        }`}>
+                          {stage.title}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="pt-2 flex items-center gap-2 text-xs sm:text-sm font-serif italic text-[#7A6B5D]">
+                <ArrowDown className="w-4 h-4 text-[#8C3A27] animate-bounce shrink-0" />
+                <span>Scroll to experience each stage</span>
+              </div>
+
+            </div>
+
+            {/* IN-PLACE CONTENT DISPLAY AREA */}
+            <div className="lg:col-span-7 relative min-h-[320px] flex flex-col justify-center lg:pl-2">
+              
+              {/* Translucent Background Watermark Stage Number */}
+              <span className="absolute -left-6 -top-10 text-[11rem] sm:text-[15rem] font-serif font-black text-[#8C3A27]/5 select-none pointer-events-none leading-none">
+                {currentStage.number}
+              </span>
+
+              <div key={currentStage.id} className="relative z-10 space-y-5 animate-fade-in transition-all duration-500">
+                
+                {/* Stage Tag & Title */}
+                <div className="space-y-1.5 border-b border-[#D5C3B0]/60 pb-4">
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs font-mono font-bold uppercase tracking-widest text-[#8C3A27] bg-[#8C3A27]/10 px-3 py-1 rounded-md border border-[#8C3A27]/20">
+                      STAGE {currentStage.number}
+                    </span>
+                    <span className="text-xs sm:text-sm font-serif text-[#7A6B5D] italic font-semibold">
+                      Governance Fieldwork
+                    </span>
+                  </div>
+
+                  <h2 className="font-serif-header text-3xl sm:text-4xl lg:text-5xl font-black text-[#221814] tracking-tight">
+                    {currentStage.title}
+                  </h2>
+                </div>
+
+                {/* Subtitle Statement */}
+                <blockquote className="font-serif italic text-lg sm:text-2xl text-[#8C3A27] font-bold leading-relaxed border-l-4 border-[#8C3A27] pl-4 sm:pl-5 py-0.5">
+                  “{currentStage.subtitle}”
+                </blockquote>
+
+                {/* Paragraph Description */}
+                <p className="text-sm sm:text-base text-[#3D3028] font-sans font-medium leading-relaxed">
+                  {currentStage.description}
+                </p>
+
+                {/* Punchline Statement */}
+                <div className="pt-2">
+                  <h3 className="font-serif-header text-base sm:text-lg font-black text-[#221814] tracking-widest uppercase">
+                    THEORY ENDS WHERE <span className="text-[#8C3A27]">REALITY BEGINS.</span>
+                  </h3>
+                </div>
+
+                {/* Action Trigger */}
+                <div className="pt-4">
+                  <a
+                    href="https://www.sankalpasiddi.com/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn-terracotta-pill text-xs sm:text-sm py-3.5 px-8 font-serif font-bold shadow-md hover:shadow-xl transition-all inline-flex items-center gap-2.5"
+                  >
+                    <span>EXPLORE SANKALPA SIDDHI ↗</span>
+                  </a>
+                </div>
+
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+
+      </section>
+
+      {/* ==================================================================== */}
+      {/* SESSION-ONLY "COMING SOON" PROGRAM PREVIEW MODAL POPUP */}
+      {/* APPEARS ONLY ONCE PER BROWSER SESSION & ONLY ON PROGRAMS PAGE */}
+      {/* ==================================================================== */}
+      {showComingSoonModal && (
         <div 
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 md:p-10 bg-black/70 backdrop-blur-xs transition-opacity animate-fade-in"
-          onClick={() => setSelectedCourse(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/75 backdrop-blur-xs transition-opacity animate-fade-in text-[#221814]"
+          onClick={handleCloseComingSoonModal}
         >
           <div 
-            className="relative w-full max-w-3xl max-h-[90vh] bg-[#FBF7F0] rounded-2xl shadow-2xl border border-[#D5C3B0] overflow-hidden flex flex-col"
+            className="relative w-full max-w-xl bg-[#FAF6EE] text-[#221814] rounded-3xl shadow-2xl border-2 border-[#8C3A27]/40 p-6 sm:p-8 overflow-hidden text-left"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Modal Header — High Contrast Parchment Header */}
-            <div className="relative bg-[#F4ECE1] border-b border-[#D5C3B0]/70 p-6 sm:p-8 flex-shrink-0">
-              <button 
-                onClick={() => setSelectedCourse(null)}
-                className="absolute top-5 right-5 p-2 rounded-full bg-[#8C3A27]/10 hover:bg-[#8C3A27]/20 text-[#8C3A27] transition-colors"
-                aria-label="Close modal"
-              >
-                <X className="w-5 h-5" />
-              </button>
+            {/* Close Button */}
+            <button 
+              type="button"
+              onClick={handleCloseComingSoonModal}
+              className="absolute top-5 right-5 p-2 rounded-full bg-[#8C3A27]/10 hover:bg-[#8C3A27]/20 text-[#8C3A27] transition-colors cursor-pointer"
+              aria-label="Close modal"
+            >
+              <X className="w-5 h-5" />
+            </button>
 
-              <div className="space-y-2 pr-10">
-                <span className="text-[11px] font-serif uppercase tracking-widest text-[#8C3A27] font-bold bg-[#8C3A27]/10 px-3 py-1 rounded-md inline-block">
-                  {selectedCourse.category}
-                </span>
-                
-                <h2 className="font-serif-header text-2xl sm:text-3xl font-extrabold text-[#221814] leading-tight" style={{ color: '#221814' }}>
-                  {selectedCourse.title}
-                </h2>
-                
-                <div className="flex flex-wrap items-center gap-3 text-xs sm:text-sm font-sans text-[#3D3028] pt-1 font-semibold">
-                  <span className="bg-[#8C3A27] text-white px-2.5 py-0.5 rounded-md font-bold">
-                    Price: ₹{selectedCourse.price.toLocaleString('en-IN')}
-                  </span>
-                  <span>•</span>
-                  <span>Validity: {selectedCourse.duration}</span>
-                  {selectedCourse.subscribers > 0 && (
-                    <>
-                      <span>•</span>
-                      <span>{selectedCourse.subscribers} Enrolled</span>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Modal Body (Scrollable) */}
-            <div className="p-6 sm:p-8 space-y-6 overflow-y-auto flex-1 font-sans text-[#221814]">
+            <div className="space-y-6">
               
-              {/* Course Banner Artwork Image */}
-              <div className="rounded-xl overflow-hidden border border-[#D5C3B0]/60 bg-[#FAF6EE]">
-                <img 
-                  src={selectedCourse.imageUrl} 
-                  alt={selectedCourse.title}
-                  loading="lazy"
-                  decoding="async"
-                  className="w-full max-h-72 object-contain bg-[#221814]"
-                  onError={(e) => {
-                    e.target.onerror = null;
-                    e.target.src = 'https://ali-cdn-cp-assets-public.classplus.co/daman-bot/XmceKP96T9Hg.png';
-                  }}
-                />
+              {/* Header Badge & Title */}
+              <div className="space-y-3 pr-8">
+                {/* Premium Editorial "Upcoming Initiatives" Campaign Seal Badge */}
+                <div className="inline-block relative z-20 select-none">
+                  <div className="relative bg-[#8C3A27] text-[#F3EBDD] px-4 py-1.5 rounded-md border border-[#C5A059] shadow-md flex items-center justify-center gap-2 overflow-hidden">
+                    {/* Inner Inset Hairline Frame */}
+                    <div className="absolute inset-0.5 border border-[#C5A059]/60 rounded-xs pointer-events-none" />
+                    
+                    {/* Corner Notch Stamp Accents */}
+                    <div className="w-1.5 h-1.5 bg-[#FFD700] rounded-full shrink-0" />
+                    <span className="font-mono text-xs font-black uppercase tracking-[0.25em] text-[#F3EBDD] relative z-10 pt-0.5">
+                      Upcoming Initiatives
+                    </span>
+                    <div className="w-1.5 h-1.5 bg-[#FFD700] rounded-full shrink-0" />
+                  </div>
+                </div>
+
+                <h3 className="font-serif-header text-xl sm:text-2xl lg:text-3xl font-extrabold text-[#221814] leading-none whitespace-nowrap">
+                  A NEW WAY TO PREPARE FOR IAS
+                </h3>
+
+                <p className="text-xs sm:text-sm font-serif italic text-[#5C4028] font-bold">
+                  Be the first to explore our upcoming specialized initiatives on the Programs Page.
+                </p>
               </div>
 
-              {/* Course Learning Materials Stats Grid */}
-              <div className="grid grid-cols-3 gap-4 text-center p-4 bg-[#F4ECE1] rounded-xl border border-[#D5C3B0]/60">
-                <div>
-                  <Video className="w-5 h-5 text-[#8C3A27] mx-auto mb-1" />
-                  <div className="text-base font-extrabold font-serif text-[#221814]">{selectedCourse.materials.videos}</div>
-                  <div className="text-[11px] text-[#7A6B5D] font-medium">Video Lectures</div>
+              {/* 2 Upcoming Initiatives Preview Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                
+                {/* Initiative 1: IAS | WITH LIFE */}
+                <div className="p-4 rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0] space-y-2 relative overflow-hidden group hover:border-[#8C3A27] transition-all">
+                  <div className="flex items-center justify-between">
+                    {/* Premium Editorial "COMING SOON" Campaign Seal Badge */}
+                    <div className="inline-block relative z-10 select-none transform -rotate-1 group-hover:rotate-0 transition-transform duration-300">
+                      <div className="relative bg-[#8C3A27] text-[#F3EBDD] px-3 py-1 rounded-md border border-[#C5A059] shadow-xs flex items-center justify-center gap-1.5 overflow-hidden">
+                        <div className="absolute inset-0.5 border border-[#C5A059]/60 rounded-xs pointer-events-none" />
+                        <div className="w-1.5 h-1.5 bg-[#FFD700] rounded-full shrink-0" />
+                        <span className="font-mono text-[10px] font-black uppercase tracking-[0.2em] text-[#F3EBDD] relative z-10 pt-0.5">
+                          COMING SOON
+                        </span>
+                        <div className="w-1.5 h-1.5 bg-[#FFD700] rounded-full shrink-0" />
+                      </div>
+                    </div>
+                    <Clock className="w-3.5 h-3.5 text-[#8C3A27]" />
+                  </div>
+
+                  <h4 className="font-serif-header text-base font-extrabold text-[#221814] pt-1">
+                    IAS | WITH LIFE
+                  </h4>
+
+                  <p className="text-xs font-serif italic text-[#5C4028] font-semibold leading-relaxed">
+                    Designed for Homemakers &amp; Working Professionals who can't put life on hold.
+                  </p>
                 </div>
-                <div>
-                  <FileText className="w-5 h-5 text-[#8C3A27] mx-auto mb-1" />
-                  <div className="text-base font-extrabold font-serif text-[#221814]">{selectedCourse.materials.files}</div>
-                  <div className="text-[11px] text-[#7A6B5D] font-medium">Study Files / Notes</div>
+
+                {/* Initiative 2: NextGen Governance */}
+                <div className="p-4 rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0] space-y-2 relative overflow-hidden group hover:border-[#8C3A27] transition-all">
+                  <div className="flex items-center justify-between">
+                    {/* Premium Editorial "COMING SOON" Campaign Seal Badge */}
+                    <div className="inline-block relative z-10 select-none transform -rotate-1 group-hover:rotate-0 transition-transform duration-300">
+                      <div className="relative bg-[#8C3A27] text-[#F3EBDD] px-3 py-1 rounded-md border border-[#C5A059] shadow-xs flex items-center justify-center gap-1.5 overflow-hidden">
+                        <div className="absolute inset-0.5 border border-[#C5A059]/60 rounded-xs pointer-events-none" />
+                        <div className="w-1.5 h-1.5 bg-[#FFD700] rounded-full shrink-0" />
+                        <span className="font-mono text-[10px] font-black uppercase tracking-[0.2em] text-[#F3EBDD] relative z-10 pt-0.5">
+                          COMING SOON
+                        </span>
+                        <div className="w-1.5 h-1.5 bg-[#FFD700] rounded-full shrink-0" />
+                      </div>
+                    </div>
+                    <Clock className="w-3.5 h-3.5 text-[#8C3A27]" />
+                  </div>
+
+                  <h4 className="font-serif-header text-base font-extrabold text-[#221814] pt-1">
+                    NextGen Governance
+                  </h4>
+
+                  <p className="text-xs font-serif italic text-[#5C4028] font-semibold leading-relaxed">
+                    Master diagnostic workflows to break down, design, and scale public systems.
+                  </p>
                 </div>
-                <div>
-                  <Clock className="w-5 h-5 text-[#8C3A27] mx-auto mb-1" />
-                  <div className="text-base font-extrabold font-serif text-[#221814]">{selectedCourse.duration.replace('Valid for ', '')}</div>
-                  <div className="text-[11px] text-[#7A6B5D] font-medium">Course Access</div>
-                </div>
+
               </div>
 
-              {/* Full Description */}
-              <div className="space-y-3">
-                <h4 className="font-serif-header text-lg font-bold text-[#8C3A27] border-b border-[#D5C3B0]/40 pb-2">
-                  Complete Course Syllabus &amp; Overview
-                </h4>
-                <div className="text-xs sm:text-sm text-[#3D3028] leading-relaxed whitespace-pre-line font-medium bg-[#FAF6EE] p-5 rounded-xl border border-[#D5C3B0]/40">
-                  {selectedCourse.description}
-                </div>
-              </div>
-
-            </div>
-
-            {/* Modal Footer */}
-            <div className="p-6 bg-[#F4ECE1] border-t border-[#D5C3B0]/60 flex flex-col sm:flex-row items-center justify-between gap-4 flex-shrink-0">
-              <div>
-                <div className="text-xs text-[#7A6B5D] font-medium">Official Enrollment Fee</div>
-                <div className="text-2xl font-extrabold font-serif text-[#221814]">₹{selectedCourse.price.toLocaleString('en-IN')}</div>
-              </div>
-
-              <div className="flex items-center gap-3 w-full sm:w-auto">
+              {/* Action Buttons */}
+              <div className="pt-2 flex flex-col sm:flex-row items-center gap-3 justify-end">
                 <button
-                  onClick={() => setSelectedCourse(null)}
-                  className="btn-terracotta-outline-pill text-xs py-3 px-5 font-bold w-1/2 sm:w-auto justify-center"
+                  type="button"
+                  onClick={handleCloseComingSoonModal}
+                  className="btn-terracotta-pill text-xs py-3 px-8 font-serif font-bold shadow-md hover:shadow-xl transition-all w-full sm:w-auto flex items-center justify-center gap-2 cursor-pointer"
                 >
-                  Close
-                </button>
-                <button
-                  onClick={() => {
-                    setSelectedCourse(null);
-                    navigate('/contact');
-                  }}
-                  className="btn-terracotta-pill text-xs py-3 px-6 font-bold w-1/2 sm:w-auto justify-center"
-                >
-                  <span>Enroll Now (₹{selectedCourse.price})</span>
-                  <ArrowRight className="w-4 h-4" />
+                  <span>EXPLORE UPCOMING PROGRAMS →</span>
                 </button>
               </div>
+
             </div>
 
           </div>

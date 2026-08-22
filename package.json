@@ -12,9 +12,11 @@
     "backup:watch": "powershell -ExecutionPolicy Bypass -File ./scripts/auto-backup-daemon.ps1"
   },
   "dependencies": {
+    "gsap": "^3.15.0",
     "lucide-react": "^0.344.0",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "react-markdown": "^10.1.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.3",
