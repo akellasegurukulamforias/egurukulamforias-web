@@ -586,17 +586,17 @@ export function AppointmentSection() {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
               
               {/* Full Width Google Map Embed Container */}
-              <div className="lg:col-span-7 rounded-xl overflow-hidden border-2 border-[#D5C3B0] shadow-md bg-[#FFFDF8] relative min-h-[320px]">
+              <div className="lg:col-span-7 w-full h-full min-h-[280px] md:min-h-[340px] rounded-2xl overflow-hidden shadow-sm border border-[#EAE0D5] bg-[#F4EDE2]">
                 <iframe
-                  src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3807.575239332152!2d78.52844517596001!3d17.37242550373059!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3bcb98fa75cb13b7%3A0x5097a35e82510f1d!2sAkella's%20Residence!5e0!3m2!1sen!2sin!4v1710000000000!5m2!1sen!2sin"
+                  src="https://maps.google.com/maps?q=8-97,+Road+No+4,+Vikas+Nagar,+Moosa+Ram+Bagh,+Dilshuknagar,+Hyderabad,+Telangana+500060&t=&z=16&ie=UTF8&iwloc=&output=embed"
                   width="100%"
-                  height="320"
-                  style={{ border: 0 }}
-                  allowFullScreen={true}
+                  height="100%"
+                  style={{ border: 0, minHeight: '320px' }}
+                  allowFullScreen=""
                   loading="lazy"
                   referrerPolicy="no-referrer-when-downgrade"
-                  title="e-Gurukulam Campus Map"
-                ></iframe>
+                  title="e-Gurukulam Hyderabad Location Map"
+                />
               </div>
 
               {/* Contact Details & Official Channels */}
