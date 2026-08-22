@@ -198,15 +198,15 @@ export function ContactSection() {
           <div className="contact-info-col lg:col-span-5 space-y-6">
             
             {/* Map Container */}
-            <div className="map-container card-parchment-3d p-2 overflow-hidden shadow-md">
+            <div className="map-container card-parchment-3d p-2 overflow-hidden shadow-md bg-[#FFFDF8] relative min-h-[260px]">
               <iframe
-                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d18126.807006177834!2d78.53201005!3d17.372420499999997!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3bcb98fa75cb13b7%3A0x5097a35e82510f1d!2s9GCH%2BX66%20Akella's%20Residence%2C%208-97%2C%20Road%20No%204%2C%20Vikas%20Nagar%2C%20Moosa%20Ram%20Bagh%2C%20Dilsukhnagar%2C%20Hyderabad%2C%20Telangana%20500060!5e1!3m2!1sen!2sin!4v1786442564374!5m2!1sen!2sin"
+                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3807.575239332152!2d78.52844517596001!3d17.37242550373059!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3bcb98fa75cb13b7%3A0x5097a35e82510f1d!2sAkella's%20Residence!5e0!3m2!1sen!2sin!4v1710000000000!5m2!1sen!2sin"
                 width="100%"
                 height="260"
                 style={{ border: 0, borderRadius: "12px" }}
                 allowFullScreen={true}
                 loading="lazy"
-                referrerPolicy="strict-origin-when-cross-origin"
+                referrerPolicy="no-referrer-when-downgrade"
                 title="Akella Residence Google Map"
               ></iframe>
             </div>
