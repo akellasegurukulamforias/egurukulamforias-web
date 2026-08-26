@@ -5,22 +5,19 @@ import { X, Shield, Lock, Maximize2, Minimize2 } from 'lucide-react';
 
 export function formatPdfPreviewUrl(url) {
   if (!url) return '';
-  let formatted = url;
   
   // Extract Google Drive ID if present
   const driveMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
   if (driveMatch && driveMatch[1]) {
-    formatted = `https://drive.google.com/file/d/${driveMatch[1]}/preview`;
-  } else {
-    formatted = url.replace(/\/view(\?.*)?$/, "/preview");
-  }
-
-  // Ensure trailing security query flags
-  if (!formatted.includes('#')) {
-    formatted += '#toolbar=0&navpanes=0';
+    const fileId = driveMatch[1];
+    return `https://docs.google.com/viewer?srcid=${fileId}&pid=explorer&efh=false&a=v&chrome=false&embedded=true`;
   }
   
-  return formatted;
+  if (url.includes("docs.google.com") || url.includes("drive.google.com")) {
+    return url;
+  }
+
+  return `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`;
 }
 
 export default function PdfViewerModal({ isOpen, onClose, pdfUrl, title, pdfTitle }) {
@@ -125,13 +122,13 @@ export default function PdfViewerModal({ isOpen, onClose, pdfUrl, title, pdfTitl
             title="Protected In-App Document" 
           />
 
-          {/* Locked iFrame */}
+          {/* Locked iFrame with referrerPolicy */}
           <iframe
             src={cleanEmbedUrl}
             className="w-full h-full border-0"
             title={displayTitle || "Current Affairs Document"}
             loading="eager"
-            sandbox="allow-scripts allow-same-origin"
+            referrerPolicy="no-referrer-when-downgrade"
           />
         </div>
       </div>

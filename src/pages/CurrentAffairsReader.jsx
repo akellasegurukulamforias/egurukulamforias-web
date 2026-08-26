@@ -42,10 +42,17 @@ export function getSecondaryImageUrl(url) {
 export function getEmbedUrl(url) {
   if (!url) return "";
   const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
-  const baseUrl = match && match[1] 
-    ? `https://drive.google.com/file/d/${match[1]}/preview` 
-    : url.replace(/\/view(\?.*)?$/, "/preview");
-  return baseUrl.includes('#') ? baseUrl : baseUrl + "#toolbar=0&navpanes=0&scrollbar=0";
+  if (match && match[1]) {
+    const fileId = match[1];
+    // Universal Google Docs Embedded Viewer URL (Bypasses 3P Cookie & Domain DRM Blockers)
+    return `https://docs.google.com/viewer?srcid=${fileId}&pid=explorer&efh=false&a=v&chrome=false&embedded=true`;
+  }
+  
+  if (url.includes("docs.google.com") || url.includes("drive.google.com")) {
+    return url;
+  }
+
+  return `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`;
 }
 
 export default function CurrentAffairsReader({ slug, navigate }) {
@@ -231,6 +238,7 @@ export default function CurrentAffairsReader({ slug, navigate }) {
                 title={title || "Protected Current Affairs PDF"}
                 className="w-full h-full border-0 pointer-events-auto"
                 loading="eager"
+                referrerPolicy="no-referrer-when-downgrade"
               />
             </div>
 
