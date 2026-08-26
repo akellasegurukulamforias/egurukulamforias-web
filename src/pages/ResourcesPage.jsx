@@ -16,25 +16,51 @@ import {
   PlayCircle,
   Loader2,
   Tag,
-  Download
+  Download,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import coursesData from '../data/courses.json';
 import { useCMSData } from '../hooks/useCMSData';
+import { getCMSImageLink, formatCMSImageUrl, getSecondaryCMSImageUrl } from '../services/cmsService';
+import PdfViewerModal from '../components/PdfViewerModal';
+
+// Helper to convert Google Drive viewing links into direct high-resolution image URLs
+const getDirectImageUrl = (url) => {
+  if (!url || typeof url !== 'string') return null;
+  if (url.includes("drive.google.com")) {
+    const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
+    if (match && match[1]) {
+      return `https://lh3.googleusercontent.com/d/${match[1]}`;
+    }
+  }
+  return url;
+};
+
+// Helper to convert Google Drive links into direct download links
+const getDirectDownloadUrl = (url) => {
+  if (!url) return '#';
+  if (typeof url !== 'string') return url;
+  if (url.includes("drive.google.com")) {
+    const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
+    if (match && match[1]) {
+      return `https://drive.google.com/uc?export=download&id=${match[1]}`;
+    }
+  }
+  return url;
+};
 
 export default function ResourcesPage({ navigate }) {
   const { data: cmsData, loading: cmsLoading } = useCMSData();
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCourse, setSelectedCourse] = useState(null);
-
-  const ANDROID_PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=co.shield.smpqz";
-  const IOS_APP_STORE_URL = "https://apps.apple.com/in/app/myinstitute/id1472483563";
-  const YOUTUBE_CHANNEL_URL = "https://www.youtube.com/channel/UCvli1LsskbL3Y4a8S8r035Q";
-  const ORG_CODE = "smpqz";
+  const [selectedPdf, setSelectedPdf] = useState(null);
 
   // Available Category Filter Pills
   const categories = [
     { id: 'ALL', label: 'All Courses' },
+    { id: 'FREE DOWNLOADS', label: 'Free Downloads', isScrollTarget: true },
     { id: 'UPSC CIVIL SERVICES', label: 'UPSC Civil Services' },
     { id: 'GROUPS & STATE', label: 'APPSC & TGPSC Groups' },
     { id: 'FOUNDATION', label: 'Foundation & Orientation' },
@@ -43,10 +69,22 @@ export default function ResourcesPage({ navigate }) {
     { id: 'SPECIALIST & PERSPECTIVE', label: 'Perspective & Books' }
   ];
 
+  const handleCategoryClick = (cat) => {
+    if (cat.id === 'FREE DOWNLOADS' || cat.isScrollTarget) {
+      const vaultElem = document.getElementById('downloads-vault-section');
+      if (vaultElem) {
+        vaultElem.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+      setSelectedCategory('FREE DOWNLOADS');
+      return;
+    }
+    setSelectedCategory(cat.id);
+  };
+
   // Filter courses based on active category & search query
   const filteredCourses = useMemo(() => {
     return coursesData.filter(course => {
-      const matchesCategory = selectedCategory === 'ALL' || course.category === selectedCategory;
+      const matchesCategory = selectedCategory === 'ALL' || selectedCategory === 'FREE DOWNLOADS' || course.category === selectedCategory;
       const matchesSearch = searchQuery === '' || 
         course.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         course.description.toLowerCase().includes(searchQuery.toLowerCase());
@@ -93,21 +131,63 @@ export default function ResourcesPage({ navigate }) {
             )}
           </div>
 
-          {/* Category Filter Pills */}
-          <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto scrollbar-none py-1.5 pr-10 flex-1 min-w-0">
-            {categories.map((cat) => (
-              <button
-                key={cat.id}
-                onClick={() => setSelectedCategory(cat.id)}
-                className={`whitespace-nowrap px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-full text-[11px] sm:text-xs font-serif font-bold tracking-wide transition-all shrink-0 ${
-                  selectedCategory === cat.id
-                    ? 'bg-[#8C3A27] text-white shadow-sm'
-                    : 'bg-[#FAF6EE] text-[#3D3028] border border-[#D5C3B0] hover:border-[#8C3A27] hover:bg-[#F4ECE1]'
-                }`}
-              >
-                {cat.label}
-              </button>
-            ))}
+          {/* Category Filter Pills — Interactive Horizontal Scroll */}
+          <div className="relative flex items-center flex-1 min-w-0 mx-1 sm:mx-2">
+            {/* Scroll Left Button */}
+            <button
+              type="button"
+              onClick={() => {
+                const elem = document.getElementById('resources-category-pills-scroll');
+                if (elem) elem.scrollBy({ left: -220, behavior: 'smooth' });
+              }}
+              className="p-1 rounded-full bg-[#8C3A27]/10 hover:bg-[#8C3A27] text-[#8C3A27] hover:text-white transition-all shrink-0 mr-1 flex items-center justify-center cursor-pointer border border-[#8C3A27]/20 shadow-xs"
+              title="Scroll Left"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+            </button>
+
+            {/* Horizontal Scroll Track */}
+            <div 
+              id="resources-category-pills-scroll"
+              className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto py-1.5 flex-1 min-w-0 scroll-smooth scrollbar-thin scrollbar-thumb-[#8C3A27]/30 scrollbar-track-transparent"
+            >
+              {categories.map((cat) => {
+                const isFreeDownloads = cat.id === 'FREE DOWNLOADS';
+                const isActive = selectedCategory === cat.id;
+
+                return (
+                  <button
+                    key={cat.id}
+                    onClick={() => handleCategoryClick(cat)}
+                    className={`whitespace-nowrap px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-full text-[11px] sm:text-xs font-serif font-bold tracking-wide transition-all shrink-0 cursor-pointer flex items-center gap-1.5 ${
+                      isFreeDownloads
+                        ? isActive
+                          ? 'bg-[#8C3A27] text-white shadow-sm ring-2 ring-[#D4AF37]'
+                          : 'bg-[#8C3A27]/10 text-[#8C3A27] border border-[#8C3A27]/40 hover:bg-[#8C3A27] hover:text-white'
+                        : isActive
+                          ? 'bg-[#8C3A27] text-white shadow-sm'
+                          : 'bg-[#FAF6EE] text-[#3D3028] border border-[#D5C3B0] hover:border-[#8C3A27] hover:bg-[#F4ECE1]'
+                    }`}
+                  >
+                    {isFreeDownloads && <Download className="w-3.5 h-3.5 shrink-0" />}
+                    <span>{cat.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Scroll Right Button */}
+            <button
+              type="button"
+              onClick={() => {
+                const elem = document.getElementById('resources-category-pills-scroll');
+                if (elem) elem.scrollBy({ left: 220, behavior: 'smooth' });
+              }}
+              className="p-1 rounded-full bg-[#8C3A27]/10 hover:bg-[#8C3A27] text-[#8C3A27] hover:text-white transition-all shrink-0 ml-1 flex items-center justify-center cursor-pointer border border-[#8C3A27]/20 shadow-xs"
+              title="Scroll Right"
+            >
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
           </div>
 
         </div>
@@ -240,18 +320,15 @@ export default function ResourcesPage({ navigate }) {
       <SectionDivider />
 
       {/* DYNAMIC GOOGLE SHEET CMS DIGITAL RESOURCES SECTION */}
-      <section className="py-12 md:py-16 px-4 sm:px-6 lg:px-8 bg-[#FAF6EE] border-b border-[#D5C3B0]/40">
+      <section id="downloads-vault-section" className="py-12 md:py-16 px-4 sm:px-6 lg:px-8 bg-[#FAF6EE] border-b border-[#D5C3B0]/40 scroll-mt-24">
         <div className="max-w-7xl mx-auto space-y-8">
           
           <div className="text-center space-y-2 max-w-3xl mx-auto">
-            <span className="text-xs uppercase tracking-widest font-mono font-bold text-[#8C3A27] bg-[#8C3A27]/10 px-3 py-1 rounded-full border border-[#8C3A27]/20 inline-block">
-              LIVE DOWNLOADS VAULT
-            </span>
             <h2 className="font-serif-header text-3xl sm:text-4xl font-extrabold text-[#221814]">
-              Direct PDF Notes &amp; Drive Downloads
+              Downloads Vault
             </h2>
             <p className="text-xs sm:text-sm text-[#3D3028] font-sans font-medium">
-              Access official study guides, syllabus micro-notes, and PDF resources directly via Google Drive.
+              Access official study guides, syllabus micro-notes, and PDF resources
             </p>
           </div>
 
@@ -274,12 +351,65 @@ export default function ResourcesPage({ navigate }) {
                 const description = item.Description || item.description || item.Summary || item.summary || '';
                 const driveLink = item.Drive_Link || item.drive_link || item.Drive || item.drive || item.Link || item.link;
 
+                const rawPoster = 
+                  item.Poster_Image_Link || item.poster_image_link ||
+                  item.Poster_Image || item.poster_image ||
+                  item.Banner_Image || item.banner_image ||
+                  item.Poster_Link || item.poster_link ||
+                  item.Image_Link || item.image_link ||
+                  item.Poster || item.poster ||
+                  item.Image || item.image ||
+                  item.Thumbnail || item.thumbnail ||
+                  item.Cover || item.cover ||
+                  item.Photo || item.photo ||
+                  item.Pic || item.pic ||
+                  item.URL || item.url;
+
+                const posterUrl = formatCMSImageUrl(rawPoster);
+                const isFree = item.Is_Free !== false && item.is_free !== false && item.Free !== false;
+
                 return (
                   <div 
                     key={idx} 
-                    className="card-parchment-3d p-6 rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0] space-y-4 flex flex-col justify-between hover:border-[#8C3A27] transition-all shadow-sm text-left"
+                    className="card-parchment-3d p-6 rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0] space-y-4 flex flex-col justify-between hover:border-[#8C3A27] transition-all shadow-sm text-left overflow-hidden"
                   >
                     <div className="space-y-3">
+                      {/* Top Poster Image or Parchment Book Header */}
+                      {posterUrl ? (
+                        <div className="w-full h-44 rounded-xl overflow-hidden bg-[#FAF6EE] border border-[#D5C3B0]/40 -mt-1 mb-3 flex items-center justify-center">
+                          <img 
+                            src={posterUrl} 
+                            alt={title}
+                            loading="eager"
+                            referrerPolicy="no-referrer"
+                            fetchPriority="high"
+                            decoding="async"
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              const secondary = getSecondaryCMSImageUrl(rawPoster);
+                              if (secondary && e.target.src !== secondary) {
+                                e.target.src = secondary;
+                              } else {
+                                e.target.onerror = null;
+                                e.target.parentElement.style.display = 'none';
+                              }
+                            }}
+                          />
+                        </div>
+                      ) : (
+                        <div className="w-full h-28 rounded-xl bg-gradient-to-br from-[#F4ECE1] to-[#EAE0D5] border border-[#D5C3B0]/60 -mt-1 mb-3 p-4 flex flex-col justify-between relative overflow-hidden">
+                          <div className="flex items-center justify-between">
+                            <BookOpen className="w-6 h-6 text-[#8C3A27] opacity-80" />
+                            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#8C3A27] bg-[#8C3A27]/10 px-2 py-0.5 rounded-md border border-[#8C3A27]/20">
+                              PDF RESOURCE
+                            </span>
+                          </div>
+                          <div className="font-serif-header text-sm font-bold text-[#6C1D18] truncate">
+                            {title}
+                          </div>
+                        </div>
+                      )}
+
                       {/* Category Badge */}
                       <div className="flex items-center justify-between text-xs">
                         <span className="inline-flex items-center gap-1.5 font-mono text-[#8C3A27] font-bold bg-[#8C3A27]/10 px-2.5 py-1 rounded-md border border-[#8C3A27]/20">
@@ -302,18 +432,34 @@ export default function ResourcesPage({ navigate }) {
                       )}
                     </div>
 
-                    {/* Direct Drive / Download Button */}
+                    {/* Action Buttons: View (Protected Reader) & Download (Free Direct Download) */}
                     {driveLink && (
-                      <div className="pt-2 border-t border-[#D5C3B0]/40">
-                        <a
-                          href={driveLink}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="w-full inline-flex items-center justify-center gap-2 btn-terracotta-pill text-xs py-2.5 px-4 font-serif font-bold transition-all cursor-pointer shadow-xs"
+                      <div className="pt-3 border-t border-[#D5C3B0]/40 flex items-center gap-2">
+                        {/* View Button */}
+                        <button
+                          type="button"
+                          onClick={() => setSelectedPdf({ url: driveLink, title: title })}
+                          className="flex-1 inline-flex items-center justify-center gap-1.5 btn-terracotta-pill text-xs py-2 px-3 font-serif font-bold transition-all cursor-pointer shadow-xs"
+                          title="View document in-app"
                         >
-                          <Download className="w-3.5 h-3.5" />
-                          <span>Open in Google Drive ↗</span>
-                        </a>
+                          <BookOpen className="w-3.5 h-3.5" />
+                          <span>View</span>
+                        </button>
+
+                        {/* Direct Free Download Button */}
+                        {isFree && (
+                          <a
+                            href={getDirectDownloadUrl(driveLink)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            download
+                            className="flex-1 inline-flex items-center justify-center gap-1.5 bg-[#FAF6EE] hover:bg-[#8C3A27] text-[#3D3028] hover:text-white border border-[#D5C3B0] hover:border-[#8C3A27] text-xs py-2 px-3 rounded-full font-serif font-bold transition-all cursor-pointer shadow-xs text-center"
+                            title="Download PDF directly"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            <span>Download</span>
+                          </a>
+                        )}
                       </div>
                     )}
                   </div>
@@ -332,100 +478,6 @@ export default function ResourcesPage({ navigate }) {
               </p>
             </div>
           )}
-
-        </div>
-      </section>
-
-      {/* COMPACT BOTTOM SECTION: MOBILE APP & YOUTUBE PLATFORMS */}
-      <section className="py-12 px-4 sm:px-6 lg:px-8 bg-[#FAF6EE] border-t border-b border-[#D5C3B0]/40">
-        <div className="max-w-6xl mx-auto space-y-6">
-          
-          <div className="text-center space-y-1 max-w-2xl mx-auto">
-            <span className="text-[11px] uppercase tracking-widest font-mono font-bold text-[#8C3A27] bg-[#8C3A27]/10 px-3 py-0.5 rounded-full border border-[#8C3A27]/20 inline-block">
-              OFFICIAL DIGITAL PLATFORMS
-            </span>
-            <h3 className="font-serif-header text-xl sm:text-2xl font-extrabold text-[#221814]">
-              Learn On Mobile &amp; YouTube
-            </h3>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            
-            {/* Compact Card A: Mobile App Vault */}
-            <div className="card-parchment-3d p-6 rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0] flex flex-col justify-between space-y-4 shadow-sm hover:border-[#8C3A27] transition-all text-left">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-[#8C3A27] bg-[#8C3A27]/10 px-2.5 py-0.5 rounded-md border border-[#8C3A27]/20">
-                    OFFICIAL APP VAULT
-                  </span>
-                  <Sparkles className="w-4 h-4 text-[#8C3A27]" />
-                </div>
-
-                <h4 className="font-serif-header text-base sm:text-lg font-extrabold text-[#221814]">
-                  Mobile App &amp; Notes Vault
-                </h4>
-
-                <p className="text-xs text-[#3D3028] font-sans font-medium leading-relaxed">
-                  Access recorded and live classes, subject notes, micro-syllabus breakdowns, and Prelims booklets. Use Org Code <strong className="text-[#8C3A27]">smpqz</strong> for login.
-                </p>
-              </div>
-
-              {/* Compact App Download Buttons */}
-              <div className="flex items-center gap-3 pt-2 border-t border-[#D5C3B0]/40">
-                <a
-                  href={ANDROID_PLAY_STORE_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-1 btn-terracotta-pill text-[11px] py-2.5 px-3 font-serif font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
-                >
-                  <span>Google Play ↗</span>
-                </a>
-
-                <a
-                  href={IOS_APP_STORE_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-1 btn-terracotta-pill text-[11px] py-2.5 px-3 font-serif font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
-                >
-                  <Apple className="w-3.5 h-3.5" />
-                  <span>App Store ↗</span>
-                </a>
-              </div>
-            </div>
-
-            {/* Compact Card B: YouTube Video Lectures */}
-            <div className="card-parchment-3d p-6 rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0] flex flex-col justify-between space-y-4 shadow-sm hover:border-[#8C3A27] transition-all text-left">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-[#FF0000] bg-[#FF0000]/10 px-2.5 py-0.5 rounded-md border border-[#FF0000]/20">
-                    FREE VIDEO LECTURES
-                  </span>
-                  <PlayCircle className="w-4 h-4 text-[#FF0000]" />
-                </div>
-
-                <h4 className="font-serif-header text-base sm:text-lg font-extrabold text-[#221814]">
-                  e-Gurukulam Official YouTube Channel
-                </h4>
-
-                <p className="text-xs text-[#3D3028] font-sans font-medium leading-relaxed">
-                  Watch free video lectures, exam preparation strategy sessions, GS micro-syllabus breakdowns, and daily mentorship by Akella Raghavendra Sir.
-                </p>
-              </div>
-
-              {/* YouTube Action Button */}
-              <div className="pt-2 border-t border-[#D5C3B0]/40">
-                <a 
-                  href={YOUTUBE_CHANNEL_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full btn-terracotta-pill text-[11px] py-2.5 px-4 font-serif font-bold transition-all flex items-center justify-center gap-2 bg-[#8C3A27] hover:bg-[#FF0000] cursor-pointer shadow-xs"
-                >
-                  <span>SUBSCRIBE &amp; WATCH ON YOUTUBE ↗</span>
-                </a>
-              </div>
-            </div>
-
-          </div>
 
         </div>
       </section>
@@ -557,6 +609,14 @@ export default function ResourcesPage({ navigate }) {
           </div>
         </div>
       )}
+
+      {/* SECURE IN-PAGE PDF READER MODAL */}
+      <PdfViewerModal 
+        isOpen={!!selectedPdf} 
+        onClose={() => setSelectedPdf(null)} 
+        pdfUrl={selectedPdf?.url} 
+        pdfTitle={selectedPdf?.title} 
+      />
 
     </div>
   );

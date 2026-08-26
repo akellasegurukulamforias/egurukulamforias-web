@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, ArrowRight, Sparkles, ExternalLink } from 'lucide-react';
 import { useCMSData } from '../hooks/useCMSData';
+import { getCMSImageLink, getSecondaryCMSImageUrl } from '../services/cmsService';
 
 const RECURRENCE_INTERVAL = 5 * 60 * 1000; // 5 minutes in milliseconds (300,000 ms)
 const INITIAL_LANDING_DELAY = 2000; // 2 seconds after landing
@@ -14,7 +15,8 @@ export default function CMSPopupModal({ navigate }) {
   const activePopup = data?.activePopup;
 
   // Extract keys dynamically with fallback key mappings
-  const posterImg = activePopup ? (activePopup.Poster_Image_Link || activePopup.poster_image_link || activePopup.Poster_Link || activePopup.poster_link || activePopup.Image || activePopup.image) : null;
+  const posterImg = getCMSImageLink(activePopup);
+  const rawPoster = activePopup ? (activePopup.Poster_Image_Link || activePopup.poster_image_link || activePopup.Banner_Image || activePopup.banner_image || activePopup.Poster_Image || activePopup.poster_image || activePopup.Poster_Link || activePopup.poster_link || activePopup.Image || activePopup.image) : null;
   const headline = activePopup ? (activePopup.Headline || activePopup.headline || activePopup.Title || activePopup.title) : null;
   const link = activePopup ? (activePopup.Link || activePopup.link || activePopup.URL || activePopup.url) : null;
   const subheading = activePopup ? (activePopup.Subheading || activePopup.subheading || activePopup.Description || activePopup.description) : null;
@@ -127,10 +129,17 @@ export default function CMSPopupModal({ navigate }) {
               <img 
                 src={posterImg} 
                 alt={headline || "Announcement Poster"} 
+                loading="eager"
+                referrerPolicy="no-referrer"
                 className="w-full max-h-64 object-cover group-hover:scale-102 transition-transform duration-500"
                 onError={(e) => {
-                  e.target.onerror = null;
-                  e.target.style.display = 'none';
+                  const secondary = getSecondaryCMSImageUrl(rawPoster);
+                  if (secondary && e.target.src !== secondary) {
+                    e.target.src = secondary;
+                  } else {
+                    e.target.onerror = null;
+                    e.target.style.display = 'none';
+                  }
                 }}
               />
             </div>

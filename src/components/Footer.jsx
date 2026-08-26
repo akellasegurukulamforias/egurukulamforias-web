@@ -10,7 +10,7 @@ export default function Footer({ navigate }) {
   const MAPS_URL = "https://maps.app.goo.gl/NhQYhywYBYX1ffkk9";
   const LEGACY_PLATFORM_URL = "https://www.iasmentoring.com/";
   const SANKALPA_SIDDHI_URL = "https://www.sankalpasiddi.com/";
-  const YOUTUBE_CHANNEL_URL = "https://www.youtube.com/channel/UCvli1LsskbL3Y4a8S8r035Q";
+  const YOUTUBE_CHANNEL_URL = "https://www.youtube.com/@e-GurukulamforIAS";
 
   const navLinks = [
     { path: '/', label: 'Home' },

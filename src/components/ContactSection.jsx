@@ -198,16 +198,16 @@ export function ContactSection() {
           <div className="contact-info-col lg:col-span-5 space-y-6">
             
             {/* Map Container */}
-            <div className="w-full h-full min-h-[280px] md:min-h-[340px] rounded-2xl overflow-hidden shadow-sm border border-[#EAE0D5] bg-[#F4EDE2]">
+            <div className="w-full h-full min-h-[300px] md:min-h-[360px] rounded-2xl overflow-hidden border border-[#EAE0D5] bg-[#F4EDE2] shadow-sm relative">
               <iframe
-                src="https://maps.google.com/maps?q=8-97,+Road+No+4,+Vikas+Nagar,+Moosa+Ram+Bagh,+Dilshuknagar,+Hyderabad,+Telangana+500060&t=&z=16&ie=UTF8&iwloc=&output=embed"
+                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d4531.70275657702!2d78.52541087586285!3d17.37237988351223!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3bcb98fa75cb13b7%3A0x5097a35e82510f1d!2s9GCH%2BX66%20Akella's%20Residence%2C%208-97%2C%20Road%20No%204%2C%20Vikas%20Nagar%2C%20Moosa%20Ram%20Bagh%2C%20Dilsukhnagar%2C%20Hyderabad%2C%20Telangana%20500060!5e1!3m2!1sen!2sin!4v1787734711906!5m2!1sen!2sin"
                 width="100%"
                 height="100%"
-                style={{ border: 0, minHeight: '320px' }}
+                style={{ border: 0, minHeight: "320px" }}
                 allowFullScreen=""
                 loading="lazy"
                 referrerPolicy="no-referrer-when-downgrade"
-                title="e-Gurukulam Hyderabad Location Map"
+                title="e-Gurukulam Hyderabad Institute Location"
               />
             </div>
 
@@ -279,7 +279,7 @@ export function ContactSection() {
 
                 {/* 5. YouTube */}
                 <a 
-                  href="https://youtube.com" 
+                  href="https://www.youtube.com/@e-GurukulamforIAS" 
                   target="_blank" 
                   rel="noopener noreferrer" 
                   aria-label="YouTube" 

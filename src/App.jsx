@@ -3,6 +3,7 @@ import Header from './components/Header';
 import Footer from './components/Footer';
 import DesktopViewPrompt from './components/DesktopViewPrompt';
 import AnnouncementPopup from './components/AnnouncementPopup';
+import FloatingSocialDock from './components/FloatingSocialDock';
 import { useCMSData } from './hooks/useCMSData';
 
 // Pages
@@ -94,6 +95,9 @@ export default function App() {
         isOpen={isPopupOpen}
         onClose={handleClosePopup}
       />
+
+      {/* Floating Radial/Arc Social Ecosystem Dock */}
+      <FloatingSocialDock />
 
       {/* Top Sticky Header Bar */}
       <Header 

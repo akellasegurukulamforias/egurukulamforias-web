@@ -1,9 +1,10 @@
 // src/pages/CurrentAffairsReader.jsx
 // Native Current Affairs Editorial Reader Page with Markdown & PDF Support
-import React from 'react';
-import { ArrowLeft, Calendar, Tag, Loader2, BookOpen, ShieldAlert } from 'lucide-react';
+import React, { useState } from 'react';
+import { ArrowLeft, Calendar, Tag, Loader2, BookOpen, ShieldAlert, Maximize2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { useCMSData } from '../hooks/useCMSData';
+import PdfViewerModal from '../components/PdfViewerModal';
 
 export function createSlug(text) {
   if (!text) return '';
@@ -15,9 +16,21 @@ export function createSlug(text) {
 }
 
 export function getDirectImageUrl(url) {
-  if (!url) return null;
-  if (typeof url !== 'string') return url;
-  if (url.includes("drive.google.com")) {
+  if (!url || typeof url !== 'string') return null;
+  const trimmed = url.trim();
+  if (!trimmed) return null;
+  if (trimmed.includes("drive.google.com")) {
+    const match = trimmed.match(/\/d\/([a-zA-Z0-9_-]+)/) || trimmed.match(/id=([a-zA-Z0-9_-]+)/);
+    if (match && match[1]) {
+      return `https://drive.google.com/thumbnail?id=${match[1]}&sz=w1200`;
+    }
+  }
+  return trimmed;
+}
+
+export function getSecondaryImageUrl(url) {
+  if (!url || typeof url !== 'string') return null;
+  if (url.includes("drive.google.com") || url.includes("id=")) {
     const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
     if (match && match[1]) {
       return `https://lh3.googleusercontent.com/d/${match[1]}`;
@@ -29,13 +42,15 @@ export function getDirectImageUrl(url) {
 export function getEmbedUrl(url) {
   if (!url) return "";
   const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
-  return match && match[1] 
+  const baseUrl = match && match[1] 
     ? `https://drive.google.com/file/d/${match[1]}/preview` 
-    : url;
+    : url.replace(/\/view(\?.*)?$/, "/preview");
+  return baseUrl.includes('#') ? baseUrl : baseUrl + "#toolbar=0&navpanes=0&scrollbar=0";
 }
 
 export default function CurrentAffairsReader({ slug, navigate }) {
   const { data, loading } = useCMSData();
+  const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
 
   // Find matching article by slug or fallback to history.state
   const currentAffairsList = data?.currentAffairs || [];
@@ -108,12 +123,19 @@ export default function CurrentAffairsReader({ slug, navigate }) {
             <img 
               src={bannerImage} 
               alt={title} 
-              className="w-full h-auto object-cover max-h-[500px] mx-auto"
+              loading="eager"
+              referrerPolicy="no-referrer"
               fetchPriority="high"
               decoding="async"
+              className="w-full h-auto object-cover max-h-[500px] mx-auto"
               onError={(e) => {
-                e.target.onerror = null;
-                e.target.style.display = 'none';
+                const secondary = getSecondaryImageUrl(rawBanner);
+                if (secondary && e.target.src !== secondary) {
+                  e.target.src = secondary;
+                } else {
+                  e.target.onerror = null;
+                  e.target.style.display = 'none';
+                }
               }}
             />
           </div>
@@ -177,19 +199,48 @@ export default function CurrentAffairsReader({ slug, navigate }) {
         {/* EMBEDDED PDF READER (IF PDF LINK IS POPULATED) */}
         {!loading && embedUrl && (
           <div className="space-y-4 pt-4">
-            <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-widest text-[#8C3A27] font-bold">
-              <BookOpen className="w-4 h-4 text-[#8C3A27]" />
-              <span>OFFICIAL BRIEFING PDF NOTE</span>
+            <div className="flex items-center justify-between gap-2 text-xs font-mono uppercase tracking-widest text-[#8C3A27] font-bold">
+              <div className="flex items-center gap-2">
+                <BookOpen className="w-4 h-4 text-[#8C3A27]" />
+                <span>OFFICIAL BRIEFING PDF NOTE</span>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsPdfModalOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-[#8C3A27] hover:bg-[#732D1B] text-white rounded-lg text-xs font-serif font-bold transition shadow-xs cursor-pointer"
+              >
+                <Maximize2 className="w-3.5 h-3.5" />
+                <span>⤢ Open Fullscreen Reader</span>
+              </button>
             </div>
             
-            <div className="w-full max-w-5xl mx-auto bg-white rounded-3xl shadow-xl border border-[#D5C3B0] overflow-hidden">
+            <div 
+              className="relative w-full max-w-5xl mx-auto h-[80vh] bg-stone-900 rounded-3xl overflow-hidden border border-[#D5C3B0] shadow-xl select-none"
+              onContextMenu={(e) => e.preventDefault()}
+            >
+              {/* Security Header Shield: Blocks clicking the Google Drive "Open in New Tab / Pop-out" icon */}
+              <div 
+                className="absolute top-0 right-0 w-28 h-16 z-20 bg-transparent cursor-default" 
+                title="Protected Document — Direct Downloading Disabled" 
+              />
+
+              {/* Embedded Document Stream */}
               <iframe
                 src={embedUrl}
-                title={title}
-                className="w-full h-[85vh] border-0"
-                allow="autoplay"
+                title={title || "Protected Current Affairs PDF"}
+                className="w-full h-full border-0 pointer-events-auto"
+                loading="eager"
               />
             </div>
+
+            {/* SECURE IN-APP FULLSCREEN PDF VIEWER MODAL */}
+            <PdfViewerModal
+              isOpen={isPdfModalOpen}
+              onClose={() => setIsPdfModalOpen(false)}
+              pdfUrl={pdfUrl}
+              title={title}
+            />
           </div>
         )}
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Menu, X, ArrowUpRight, Sparkles } from 'lucide-react';
+import { Menu, X, ArrowUpRight, Sparkles, Phone, Globe } from 'lucide-react';
 import { useCMSData } from '../hooks/useCMSData';
 
 export default function Header({ currentPath, navigate, onOpenPopup }) {
@@ -36,6 +36,81 @@ export default function Header({ currentPath, navigate, onOpenPopup }) {
 
   return (
     <div className="sticky top-0 z-50">
+      {/* EXECUTIVE TOP UTILITY RIBBON */}
+      <div className="w-full bg-[#140E0C] text-[#FAF5EE] border-b border-[#D4AF37]/25 py-2 px-4 md:px-6 select-none overflow-x-auto scrollbar-none">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4 text-xs font-sans font-medium min-w-max md:min-w-0">
+          
+          {/* Left Side: Institutional Direct Lines */}
+          <div className="flex items-center gap-2 text-[#FAF5EE]/90">
+            <Phone className="w-3.5 h-3.5 text-[#D4AF37] shrink-0" />
+            <span className="text-[11px] uppercase tracking-wider text-[#D4AF37] font-semibold hidden sm:inline">
+              Reach Us:
+            </span>
+            <div className="flex items-center gap-2 tracking-wide text-xs md:text-sm">
+              <a href="tel:+918897826108" className="hover:text-[#D4AF37] transition-colors">
+                +91 88978 26108
+              </a>
+              <span className="opacity-40">•</span>
+              <a href="tel:+919912211109" className="hover:text-[#D4AF37] transition-colors">
+                +91 99122 11109
+              </a>
+              <span className="opacity-40">•</span>
+              <a href="tel:+918985894254" className="hover:text-[#D4AF37] transition-colors">
+                +91 89858 94254
+              </a>
+            </div>
+          </div>
+
+          {/* Center Vertical Divider (Desktop) */}
+          <div className="hidden lg:block h-3.5 w-px bg-[#D4AF37]/30 mx-2 shrink-0" />
+
+          {/* Right Side: Sister Ecosystem Portals */}
+          <div className="flex items-center gap-3 shrink-0 text-xs">
+            <div className="flex items-center gap-1.5 text-[#D4AF37] font-semibold text-[11px] uppercase tracking-wider">
+              <Globe className="w-3.5 h-3.5 text-[#D4AF37] shrink-0" />
+              <span className="hidden sm:inline">Our Ecosystem:</span>
+            </div>
+            
+            <div className="flex items-center gap-2.5">
+              <a 
+                href="https://www.sankalpasiddi.com/" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="hover:text-[#D4AF37] transition-colors inline-flex items-center gap-0.5 group"
+              >
+                <span>Sankalpa Siddi</span>
+                <ArrowUpRight className="w-3 h-3 text-[#D4AF37] opacity-60 group-hover:opacity-100 transition-opacity" />
+              </a>
+
+              <span className="opacity-40">•</span>
+
+              <a 
+                href="https://iasmentoring.com/" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="hover:text-[#D4AF37] transition-colors inline-flex items-center gap-0.5 group"
+              >
+                <span>IAS Mentoring</span>
+                <ArrowUpRight className="w-3 h-3 text-[#D4AF37] opacity-60 group-hover:opacity-100 transition-opacity" />
+              </a>
+
+              <span className="opacity-40">•</span>
+
+              <a 
+                href="https://akellaraghavendra.com/" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="hover:text-[#D4AF37] transition-colors inline-flex items-center gap-0.5 group"
+              >
+                <span>Akella Raghavendra Foundation</span>
+                <ArrowUpRight className="w-3 h-3 text-[#D4AF37] opacity-60 group-hover:opacity-100 transition-opacity" />
+              </a>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
       {/* ANNOUNCEMENT TICKER BAR (LIVE GOOGLE SHEET CMS INTEGRATION) */}
       <div className="w-full bg-[#8C3A27] text-[#FAF6EE] text-xs font-serif font-bold py-1.5 px-4 overflow-hidden relative border-b border-[#C5A059]/40 flex items-center gap-3 select-none">
         

@@ -37,7 +37,7 @@ export function AppointmentSection() {
     (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_APPS_SCRIPT_URL) ||
     (typeof process !== 'undefined' && process.env && process.env.NEXT_PUBLIC_APPS_SCRIPT_URL) ||
     "https://script.google.com/macros/s/AKfycbxbjFRyxiRgeNtUoivxdhxRqxlTlZiES5hhrkgaXkWUz_JfOIwO6fxHj2zsP6jK_ic1/exec";
-  const YOUTUBE_CHANNEL_URL = "https://www.youtube.com/channel/UCvli1LsskbL3Y4a8S8r035Q";
+  const YOUTUBE_CHANNEL_URL = "https://www.youtube.com/@e-GurukulamforIAS";
 
   // 1. Admission / Program Enquiry Form Submission Handler
   const handleEnquirySubmit = async (e) => {

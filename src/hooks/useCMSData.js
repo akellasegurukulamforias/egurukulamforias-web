@@ -1,30 +1,40 @@
 // src/hooks/useCMSData.js
+// Custom Hook with Stale-While-Revalidate Strategy for 0ms Instant Page Renders
 import { useState, useEffect } from 'react';
-import { fetchCMSData } from '../services/cmsService';
+import { fetchCMSData, getCachedCMSData } from '../services/cmsService';
 
 export function useCMSData() {
-  const [data, setData] = useState({
-    activePopup: null,
-    liveTicker: [],
-    currentAffairs: [],
-    resources: []
-  });
-  const [loading, setLoading] = useState(true);
+  // Step 1: Synchronous 0ms Cache Load from LocalStorage
+  const initialCache = getCachedCMSData();
+
+  const [data, setData] = useState(
+    initialCache || {
+      activePopup: null,
+      liveTicker: [],
+      currentAffairs: [],
+      resources: [],
+      socialPlatforms: [],
+      testSeries: []
+    }
+  );
+  
+  // If cached data is present, loading is false immediately (0ms skeleton delay)
+  const [loading, setLoading] = useState(!initialCache);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
 
-    async function loadData() {
+    async function revalidateCMSData() {
       try {
-        setLoading(true);
-        const result = await fetchCMSData();
+        // Step 2: Background Network Sync
+        const freshData = await fetchCMSData(true);
         if (isMounted) {
-          setData(result);
+          setData(freshData);
           setError(null);
         }
       } catch (err) {
-        if (isMounted) {
+        if (isMounted && !initialCache) {
           setError(err.message || 'Failed to fetch CMS data');
         }
       } finally {
@@ -34,7 +44,7 @@ export function useCMSData() {
       }
     }
 
-    loadData();
+    revalidateCMSData();
 
     return () => {
       isMounted = false;

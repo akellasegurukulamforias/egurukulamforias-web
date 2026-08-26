@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { getCMSImageLink, getSecondaryCMSImageUrl } from "../services/cmsService";
 
 export default function AnnouncementPopup({ activePopup, isOpen: externalIsOpen, onClose }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -42,41 +43,20 @@ export default function AnnouncementPopup({ activePopup, isOpen: externalIsOpen,
 
   if (!isOpen || !activePopup) return null;
 
-  // Helper to convert Google Drive viewing links into direct high-resolution image URLs
-  const getDirectImageUrl = (url) => {
-    if (!url) return null;
-    if (typeof url !== 'string') return url;
-    if (url.includes("drive.google.com")) {
-      const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
-      if (match && match[1]) {
-        return `https://lh3.googleusercontent.com/d/${match[1]}`;
-      }
-    }
-    return url;
-  };
-
-  // Extract poster image link safely across varying case keys
-  const rawPosterLink =
-    activePopup.Poster_Image_Link ||
-    activePopup.poster_image_link ||
-    activePopup.Poster_Link ||
-    activePopup.poster_link ||
-    activePopup.Poster ||
-    activePopup.poster ||
-    activePopup.Image ||
-    activePopup.image;
-
-  const posterLink = getDirectImageUrl(rawPosterLink);
+  const posterLink = getCMSImageLink(activePopup);
   const headline = activePopup.Headline || activePopup.headline || activePopup.Title || activePopup.title;
   const actionLink = activePopup.Link || activePopup.link || activePopup.URL || activePopup.url;
+
+  // Raw URL for fallback if primary thumbnail gets blocked
+  const rawPoster = activePopup.Poster_Image_Link || activePopup.poster_image_link || activePopup.Banner_Image || activePopup.banner_image || activePopup.Poster_Image || activePopup.poster_image || activePopup.Poster_Link || activePopup.poster_link || activePopup.Image || activePopup.image;
 
   // If no image and no headline, do not show
   if (!posterLink && !headline) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn select-none">
       {/* Backdrop click to close */}
-      <div className="absolute inset-0" onClick={handleClose} />
+      <div className="absolute inset-0 z-0" onClick={handleClose} />
 
       <div className="relative z-10 max-w-md w-full bg-[#FAF5EE] border border-[#EAE0D5] rounded-2xl shadow-2xl overflow-hidden p-3 text-center">
         {/* Close Button */}
@@ -94,12 +74,19 @@ export default function AnnouncementPopup({ activePopup, isOpen: externalIsOpen,
             <img
               src={posterLink}
               alt={headline || "Announcement Poster"}
+              loading="eager"
+              referrerPolicy="no-referrer"
               fetchPriority="high"
               decoding="async"
               className="w-full h-auto max-h-[75vh] object-contain rounded-xl"
               onError={(e) => {
-                e.target.onerror = null;
-                e.target.style.display = 'none';
+                const secondary = getSecondaryCMSImageUrl(rawPoster);
+                if (secondary && e.target.src !== secondary) {
+                  e.target.src = secondary;
+                } else {
+                  e.target.onerror = null;
+                  e.target.style.display = 'none';
+                }
               }}
             />
           </div>
