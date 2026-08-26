@@ -11,7 +11,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { useCMSData } from '../hooks/useCMSData';
-import { createSlug, getDirectImageUrl } from './CurrentAffairsReader';
+import { createSlug, getDirectImageUrl, getDirectViewUrl } from './CurrentAffairsReader';
 import { SectionDivider } from '../components/Artworks';
 
 export default function BlogPage({ navigate }) {
@@ -60,6 +60,8 @@ export default function BlogPage({ navigate }) {
                 const shortSummary = item.Short_Summary || item.short_summary || item.Summary || item.summary || item.Description || item.description || '';
                 const rawBanner = item.Banner_Image || item.banner_image || item.Banner || item.banner || item.Image || item.image;
                 const bannerImage = getDirectImageUrl(rawBanner);
+
+                const rawPdf = item.PDF_Link || item.pdf_link || item.PDF_URL || item.pdf_url || item.Drive_Link || item.drive_link || item.PDF || item.pdf || item.Link || item.link;
 
                 return (
                   <div 
@@ -112,8 +114,12 @@ export default function BlogPage({ navigate }) {
                       <button
                         type="button"
                         onClick={() => {
-                          const slug = createSlug(title);
-                          navigate(`/current-affairs/${slug}`);
+                          if (rawPdf && typeof rawPdf === 'string' && rawPdf.trim()) {
+                            window.open(getDirectViewUrl(rawPdf), '_blank', 'noopener,noreferrer');
+                          } else {
+                            const slug = createSlug(title);
+                            navigate(`/current-affairs/${slug}`);
+                          }
                         }}
                         className="w-full inline-flex items-center justify-center gap-2 btn-terracotta-outline-pill text-xs py-2.5 px-4 font-serif font-bold transition-all cursor-pointer"
                       >

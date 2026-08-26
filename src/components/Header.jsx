@@ -1,6 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Menu, X, ArrowUpRight, Sparkles, Phone, Globe } from 'lucide-react';
 import { useCMSData } from '../hooks/useCMSData';
+
+// Helper to strip leading emojis from CMS strings so icons never duplicate
+const stripLeadingEmoji = (str) => {
+  if (!str || typeof str !== 'string') return '';
+  return str.replace(/^[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F600}-\u{1F64F}\u{1F680}-\u{1F6FF}\u{2702}-\u{27B0}\u{24C2}-\u{1F251}]\s*/u, '').trim();
+};
 
 export default function Header({ currentPath, navigate, onOpenPopup }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -18,6 +24,105 @@ export default function Header({ currentPath, navigate, onOpenPopup }) {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  // Build Dynamic Horizontal Loop of New Additions & CMS Announcements
+  const updateItems = useMemo(() => {
+    const items = [];
+
+    // 1. Live Ticker Announcements from CMS
+    if (data?.liveTicker && Array.isArray(data.liveTicker)) {
+      data.liveTicker.forEach((t, i) => {
+        const headline = t.Headline || t.headline || t.Title || t.title;
+        if (headline) {
+          items.push({
+            id: `ticker-${i}-${headline}`,
+            type: 'ANNOUNCEMENT',
+            icon: '🎯',
+            text: stripLeadingEmoji(headline),
+            onClick: () => onOpenPopup && onOpenPopup()
+          });
+        }
+      });
+    }
+
+    // 2. Latest Current Affairs Dispatches from CMS
+    if (data?.currentAffairs && Array.isArray(data.currentAffairs)) {
+      data.currentAffairs.slice(0, 4).forEach((ca, i) => {
+        const title = ca.Title || ca.title || ca.Headline || ca.headline;
+        if (title) {
+          const cleanTitle = stripLeadingEmoji(title);
+          items.push({
+            id: `ca-${i}-${cleanTitle}`,
+            type: 'CURRENT_AFFAIRS',
+            icon: '📰',
+            text: `New Current Affairs: ${cleanTitle}`,
+            onClick: () => navigate('/blog')
+          });
+        }
+      });
+    }
+
+    // 3. Latest Test Series Programs from CMS
+    if (data?.testSeries && Array.isArray(data.testSeries)) {
+      data.testSeries.slice(0, 3).forEach((ts, i) => {
+        const title = ts.Title || ts.title || ts.Name || ts.name;
+        if (title) {
+          const cleanTitle = stripLeadingEmoji(title);
+          items.push({
+            id: `ts-${i}-${cleanTitle}`,
+            type: 'TEST_SERIES',
+            icon: '📝',
+            text: `New Test Series: ${cleanTitle}`,
+            onClick: () => navigate('/test-series')
+          });
+        }
+      });
+    }
+
+    // 4. Latest Study Resources & PDF Downloads from CMS
+    if (data?.digitalResources && Array.isArray(data.digitalResources)) {
+      data.digitalResources.slice(0, 3).forEach((res, i) => {
+        const title = res.Title || res.title || res.Name || res.name;
+        if (title) {
+          const cleanTitle = stripLeadingEmoji(title);
+          items.push({
+            id: `res-${i}-${cleanTitle}`,
+            type: 'RESOURCE',
+            icon: '📚',
+            text: `New Study Resource: ${cleanTitle}`,
+            onClick: () => navigate('/resources')
+          });
+        }
+      });
+    }
+
+    // Fallback if CMS data is empty
+    if (items.length === 0) {
+      items.push({
+        id: 'fallback-1',
+        type: 'ANNOUNCEMENT',
+        icon: '🎯',
+        text: 'Ekadasa Sadhana Deeksha: 110 Days Complete UPSC Coverage',
+        onClick: () => onOpenPopup && onOpenPopup()
+      });
+      items.push({
+        id: 'fallback-2',
+        type: 'CURRENT_AFFAIRS',
+        icon: '📰',
+        text: 'New Current Affairs Dispatches Updated Daily',
+        onClick: () => navigate('/blog')
+      });
+      items.push({
+        id: 'fallback-3',
+        type: 'RESOURCE',
+        icon: '📚',
+        text: 'Downloads Vault: Access Syllabus Micro-Notes & PDF Resources',
+        onClick: () => navigate('/resources')
+      });
+    }
+
+    return items;
+  }, [data, navigate, onOpenPopup]);
 
   const navItems = [
     { path: '/', label: 'Home' },
@@ -111,47 +216,38 @@ export default function Header({ currentPath, navigate, onOpenPopup }) {
         </div>
       </div>
 
-      {/* ANNOUNCEMENT TICKER BAR (LIVE GOOGLE SHEET CMS INTEGRATION) */}
+      {/* ANNOUNCEMENT & NEW ADDITIONS TICKER BAR (DYNAMIC HORIZONTAL CONTINUOUS LOOP) */}
       <div className="w-full bg-[#8C3A27] text-[#FAF6EE] text-xs font-serif font-bold py-1.5 px-4 overflow-hidden relative border-b border-[#C5A059]/40 flex items-center gap-3 select-none">
         
         {/* Clickable UPDATES Badge Button */}
         <button 
           type="button"
           onClick={() => onOpenPopup && onOpenPopup()}
-          className="flex items-center gap-1.5 shrink-0 bg-[#732D1B] hover:bg-[#5C2415] px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-widest text-[#FFD700] border border-[#C5A059]/40 shadow-xs transition-all cursor-pointer group"
+          className="flex items-center gap-1.5 shrink-0 bg-[#732D1B] hover:bg-[#5C2415] px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-widest text-[#FFD700] border border-[#C5A059]/40 shadow-xs transition-all cursor-pointer group z-10"
           title="Click to view active announcement poster modal"
         >
           <Sparkles className="w-3 h-3 text-[#FFD700] group-hover:scale-110 transition-transform" />
           <span>UPDATES</span>
         </button>
 
-        {/* Clickable Ticker Headline Text Container */}
-        <div 
-          className="overflow-hidden whitespace-nowrap w-full cursor-pointer group"
-          onClick={() => onOpenPopup && onOpenPopup()}
-          title="Click to view active announcement poster modal"
-        >
-          {data.liveTicker && data.liveTicker.length > 0 ? (
-            <div className="inline-flex gap-8 animate-marquee">
-              {data.liveTicker.map((item, idx) => {
-                const headline = item.Headline || item.headline || item.Title || item.title;
-                return (
-                  <span key={idx} className="inline-flex items-center gap-2">
-                    <span className="hover:text-[#FFD700] hover:underline transition-colors inline-flex items-center gap-1 cursor-pointer">
-                      <span>{headline}</span>
-                      <ArrowUpRight className="w-3 h-3 text-[#C5A059]" />
-                    </span>
-                    {idx < data.liveTicker.length - 1 && <span className="opacity-50">•</span>}
-                  </span>
-                );
-              })}
-            </div>
-          ) : (
-            <span className="hover:text-[#FFD700] hover:underline transition-colors cursor-pointer inline-flex items-center gap-1">
-              🎯 Ekadasa Sadhana Deeksha: 110 Days = Complete UPSC Coverage (Starts 24-08-2026)
-              <ArrowUpRight className="w-3 h-3 text-[#C5A059]" />
-            </span>
-          )}
+        {/* Continuous Horizontal Looping Ticker Track */}
+        <div className="overflow-hidden whitespace-nowrap w-full flex-1">
+          <div className="inline-flex gap-8 animate-marquee">
+            {/* Render 2 identical sets of items to guarantee seamless 100% infinite looping marquee */}
+            {[...updateItems, ...updateItems].map((item, idx) => (
+              <button
+                key={`${item.id}-${idx}`}
+                type="button"
+                onClick={item.onClick}
+                className="inline-flex items-center gap-2 hover:text-[#FFD700] transition-colors cursor-pointer text-left bg-transparent border-0 p-0 text-xs font-serif font-bold group"
+              >
+                <span>{item.icon}</span>
+                <span className="group-hover:underline underline-offset-2">{item.text}</span>
+                <ArrowUpRight className="w-3 h-3 text-[#C5A059] group-hover:text-[#FFD700] transition-colors shrink-0" />
+                <span className="opacity-40 text-amber-200/60 ml-4">•</span>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 

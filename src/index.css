@@ -871,3 +871,24 @@ h1, h2, h3, .section-title, .font-serif-header {
   object-fit: contain !important;
   display: block !important;
 }
+
+/* CONTINUOUS HORIZONTAL MARQUEE ANIMATION FOR NEW ADDITIONS TICKER */
+@keyframes marquee {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee {
+  display: inline-flex;
+  white-space: nowrap;
+  animation: marquee 38s linear infinite;
+  will-change: transform;
+}
+
+.animate-marquee:hover {
+  animation-play-state: paused;
+}

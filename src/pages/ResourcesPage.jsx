@@ -37,6 +37,19 @@ const getDirectImageUrl = (url) => {
   return url;
 };
 
+// Helper to convert Google Drive links into direct view links (opens in Google Drive native viewer)
+const getDirectViewUrl = (url) => {
+  if (!url || typeof url !== 'string') return '#';
+  const trimmed = url.trim();
+  if (trimmed.includes("drive.google.com")) {
+    const match = trimmed.match(/\/d\/([a-zA-Z0-9_-]+)/) || trimmed.match(/id=([a-zA-Z0-9_-]+)/);
+    if (match && match[1]) {
+      return `https://drive.google.com/file/d/${match[1]}/view?usp=sharing`;
+    }
+  }
+  return trimmed;
+};
+
 // Helper to convert Google Drive links into direct download links
 const getDirectDownloadUrl = (url) => {
   if (!url) return '#';
@@ -436,15 +449,16 @@ export default function ResourcesPage({ navigate }) {
                     {driveLink && (
                       <div className="pt-3 border-t border-[#D5C3B0]/40 flex items-center gap-2">
                         {/* View Button */}
-                        <button
-                          type="button"
-                          onClick={() => setSelectedPdf({ url: driveLink, title: title })}
-                          className="flex-1 inline-flex items-center justify-center gap-1.5 btn-terracotta-pill text-xs py-2 px-3 font-serif font-bold transition-all cursor-pointer shadow-xs"
-                          title="View document in-app"
+                        <a
+                          href={getDirectViewUrl(driveLink)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 inline-flex items-center justify-center gap-1.5 btn-terracotta-pill text-xs py-2 px-3 font-serif font-bold transition-all cursor-pointer shadow-xs text-center"
+                          title="View PDF document in Google Drive"
                         >
                           <BookOpen className="w-3.5 h-3.5" />
-                          <span>View</span>
-                        </button>
+                          <span>View ↗</span>
+                        </a>
 
                         {/* Direct Free Download Button */}
                         {isFree && (
