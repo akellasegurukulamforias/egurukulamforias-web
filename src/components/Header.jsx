@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Menu, X, ArrowUpRight, Sparkles, Phone, Globe } from 'lucide-react';
 import { useCMSData } from '../hooks/useCMSData';
+import { sortCurrentAffairsByDate } from '../utils/dateUtils';
 
 // Helper to strip leading emojis from CMS strings so icons never duplicate
 const stripLeadingEmoji = (str) => {
@@ -45,9 +46,10 @@ export default function Header({ currentPath, navigate, onOpenPopup }) {
       });
     }
 
-    // 2. Latest Current Affairs Dispatches from CMS
+    // 2. Latest Current Affairs Dispatches from CMS (Sorted latest first)
     if (data?.currentAffairs && Array.isArray(data.currentAffairs)) {
-      data.currentAffairs.slice(0, 4).forEach((ca, i) => {
+      const sortedCA = sortCurrentAffairsByDate(data.currentAffairs);
+      sortedCA.slice(0, 4).forEach((ca, i) => {
         const title = ca.Title || ca.title || ca.Headline || ca.headline;
         if (title) {
           const cleanTitle = stripLeadingEmoji(title);

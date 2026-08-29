@@ -14,7 +14,7 @@ import TestSeriesPage from './pages/TestSeriesPage';
 import BlogPage from './pages/BlogPage';
 import ResourcesPage from './pages/ResourcesPage';
 import ConnectPage from './pages/ConnectPage';
-import CurrentAffairsReader from './pages/CurrentAffairsReader';
+import CurrentAffairsDetailPage from './pages/CurrentAffairsDetailPage';
 
 export default function App() {
   const [currentPath, setCurrentPath] = useState(window.location.pathname || '/');
@@ -51,7 +51,7 @@ export default function App() {
 
     if (normalizedPath.startsWith('/current-affairs/')) {
       const slug = normalizedPath.replace('/current-affairs/', '');
-      return <CurrentAffairsReader slug={slug} navigate={navigate} />;
+      return <CurrentAffairsDetailPage slug={slug} navigate={navigate} />;
     }
 
     switch (normalizedPath) {

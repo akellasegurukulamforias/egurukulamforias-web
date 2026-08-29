@@ -1,8 +1,7 @@
-// src/services/cmsService.js
-// Centralized Service with Stale-While-Revalidate LocalStorage Strategy for Google Sheet Content CMS Integration
+import { sortCurrentAffairsByDate } from '../utils/dateUtils';
 
-const CMS_API_ENDPOINT = 'https://script.google.com/macros/s/AKfycbyOt8dZ7S9ot1Zy3GyyXgsDTPsrF016odbaXhf9DXXPMllvQzmQvKabubXZFzRra51x/exec';
-const LOCAL_STORAGE_KEY = 'egk_cms_data_v5'; // Bumped to v5 for instant cache clearance of deleted social items
+export const CMS_API_ENDPOINT = 'https://script.google.com/macros/s/AKfycbyOt8dZ7S9ot1Zy3GyyXgsDTPsrF016odbaXhf9DXXPMllvQzmQvKabubXZFzRra51x/exec';
+export const LOCAL_STORAGE_KEY = 'egk_cms_data_v6'; // Bumped to v6 for sorted current affairs order (latest first)
 
 // Robust Google Drive & Web Image URL Formatter
 export function formatCMSImageUrl(url) {
@@ -64,6 +63,9 @@ export function getCachedCMSData() {
     if (cached) {
       const parsed = JSON.parse(cached);
       if (parsed && typeof parsed === 'object') {
+        if (Array.isArray(parsed.currentAffairs)) {
+          parsed.currentAffairs = sortCurrentAffairsByDate(parsed.currentAffairs);
+        }
         return parsed;
       }
     }
@@ -141,7 +143,7 @@ export async function fetchCMSData(forceRevalidate = false) {
       const freshData = {
         activePopup: rawData.activePopup && typeof rawData.activePopup === 'object' ? rawData.activePopup : null,
         liveTicker: Array.isArray(rawData.liveTicker) ? rawData.liveTicker : [],
-        currentAffairs: Array.isArray(rawData.currentAffairs) ? rawData.currentAffairs : [],
+        currentAffairs: sortCurrentAffairsByDate(Array.isArray(rawData.currentAffairs) ? rawData.currentAffairs : []),
         resources: Array.isArray(rawData.resources) ? rawData.resources : [],
         socialPlatforms,
         testSeries: Array.isArray(rawData.testSeries) 

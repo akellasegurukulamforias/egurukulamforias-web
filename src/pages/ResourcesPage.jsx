@@ -336,7 +336,7 @@ export default function ResourcesPage({ navigate }) {
       <section id="downloads-vault-section" className="py-12 md:py-16 px-4 sm:px-6 lg:px-8 bg-[#FAF6EE] border-b border-[#D5C3B0]/40 scroll-mt-24">
         <div className="max-w-7xl mx-auto space-y-8">
           
-          <div className="text-center space-y-2 max-w-3xl mx-auto">
+          <div className="text-center space-y-2 max-w-3xl mx-auto pb-6 border-b border-[#D5C3B0]/60">
             <h2 className="font-serif-header text-3xl sm:text-4xl font-extrabold text-[#221814]">
               Downloads Vault
             </h2>
