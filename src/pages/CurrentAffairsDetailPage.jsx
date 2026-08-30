@@ -1,5 +1,5 @@
 // src/pages/CurrentAffairsDetailPage.jsx
-// Dedicated Current Affairs Article Page with Exact Layout Fidelity & Academic Typography
+// Dedicated Current Affairs Article Page with Exact Layout Fidelity, SPA Direct-Link Loading & Academic Typography
 import React, { useMemo } from 'react';
 import { 
   ArrowLeft, 
@@ -8,7 +8,9 @@ import {
   Clock, 
   ChevronLeft, 
   ChevronRight, 
-  ShieldAlert 
+  ShieldAlert,
+  Loader2,
+  BookOpen
 } from 'lucide-react';
 import { useCMSData } from '../hooks/useCMSData';
 import { sortCurrentAffairsByDate } from '../utils/dateUtils';
@@ -67,7 +69,7 @@ function cleanDocHtml(rawHtml) {
     return `<img ${cleanAttrs} class="max-w-full rounded-2xl shadow-md my-6 mx-auto block object-contain border border-[#D5C3B0]/40" />`;
   });
 
-  // 6. Clean empty paragraph tags
+  // 7. Clean empty paragraph tags
   html = html.replace(/<p[^>]*>\s*(?:&nbsp;|<br\s*\/?>|\s)*<\/p>/gi, '');
 
   return html;
@@ -85,23 +87,28 @@ function estimateReadingTime(content) {
 }
 
 export default function CurrentAffairsDetailPage({ slug, navigate }) {
-  const { data } = useCMSData();
+  const { data, loading: cmsLoading } = useCMSData();
 
   // Sorted list of articles (latest first)
   const sortedArticles = useMemo(() => {
     return sortCurrentAffairsByDate(data?.currentAffairs || []);
   }, [data?.currentAffairs]);
 
+  const normalizedSlug = useMemo(() => {
+    return (slug || '').trim().toLowerCase();
+  }, [slug]);
+
   // Find matching article index and item by slug
   const currentIndex = useMemo(() => {
+    if (!sortedArticles || sortedArticles.length === 0) return -1;
     return sortedArticles.findIndex(art => {
       const artTitle = art.Title || art.title || '';
-      const artSlug = art.Slug || art.slug || createSlug(artTitle);
-      return artSlug === slug || createSlug(artTitle) === slug;
+      const artSlug = (art.Slug || art.slug || createSlug(artTitle)).trim().toLowerCase();
+      return artSlug === normalizedSlug || createSlug(artTitle).toLowerCase() === normalizedSlug;
     });
-  }, [sortedArticles, slug]);
+  }, [sortedArticles, normalizedSlug]);
 
-  const article = currentIndex !== -1 ? sortedArticles[currentIndex] : sortedArticles[0] || null;
+  const article = currentIndex !== -1 ? sortedArticles[currentIndex] : null;
   const prevArticle = currentIndex > 0 ? sortedArticles[currentIndex - 1] : null;
   const nextArticle = currentIndex >= 0 && currentIndex < sortedArticles.length - 1 ? sortedArticles[currentIndex + 1] : null;
 
@@ -142,6 +149,77 @@ export default function CurrentAffairsDetailPage({ slug, navigate }) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  // 1. SKELETON LOADER FOR DIRECT DEEP-LINK ENTRANCE (WHILE CMS DATA IS LOADING)
+  if (cmsLoading && !article) {
+    return (
+      <div className="min-h-screen bg-[#FFFDF8] text-[#221814] py-12 px-4 sm:px-6 lg:px-8 select-text">
+        <div className="max-w-4xl mx-auto space-y-8 animate-fade-in text-left">
+          {/* Top Sticky Breadcrumb Placeholder */}
+          <div className="bg-[#FAF6EE] p-5 sm:p-6 rounded-3xl border border-[#D5C3B0] shadow-sm flex items-center justify-between">
+            <div className="h-4 bg-[#D5C3B0]/40 rounded-md w-36 animate-pulse"></div>
+            <div className="h-4 bg-[#D5C3B0]/30 rounded-md w-24 animate-pulse"></div>
+          </div>
+
+          {/* Title Placeholder */}
+          <div className="space-y-3 pb-6 border-b border-[#D5C3B0]/60 animate-pulse">
+            <div className="h-8 sm:h-12 bg-[#D5C3B0]/50 rounded-xl w-4/5"></div>
+            <div className="h-6 sm:h-8 bg-[#D5C3B0]/30 rounded-xl w-2/3"></div>
+          </div>
+
+          {/* Hero Banner Placeholder */}
+          <div className="w-full h-64 sm:h-96 rounded-3xl bg-[#D5C3B0]/20 border border-[#D5C3B0] animate-pulse flex items-center justify-center">
+            <div className="flex items-center gap-2.5 text-xs font-serif italic text-[#8C3A27] font-bold">
+              <Loader2 className="w-5 h-5 animate-spin" />
+              <span>Loading daily editorial analysis...</span>
+            </div>
+          </div>
+
+          {/* Summary Box Placeholder */}
+          <div className="p-6 rounded-2xl bg-[#F4ECE1] border-l-4 border-[#8C3A27] space-y-2 animate-pulse">
+            <div className="h-4 bg-[#D5C3B0]/40 rounded-md w-full"></div>
+            <div className="h-4 bg-[#D5C3B0]/40 rounded-md w-5/6"></div>
+          </div>
+
+          {/* Multi-Paragraph Shimmer */}
+          <div className="space-y-4 pt-4 animate-pulse">
+            <div className="h-6 bg-[#D5C3B0]/40 rounded-md w-1/3 my-4"></div>
+            <div className="h-4 bg-[#D5C3B0]/30 rounded-md w-full"></div>
+            <div className="h-4 bg-[#D5C3B0]/30 rounded-md w-11/12"></div>
+            <div className="h-4 bg-[#D5C3B0]/30 rounded-md w-4/5"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 2. DISPATCH NOT FOUND STATE (ONCE CMS FETCH HAS COMPLETED AND SLUG DOES NOT MATCH)
+  if (!cmsLoading && !article) {
+    return (
+      <div className="min-h-screen bg-[#FFFDF8] text-[#221814] py-16 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-xl mx-auto space-y-6 text-center bg-[#FAF6EE] p-8 sm:p-12 rounded-3xl border border-[#D5C3B0] shadow-sm">
+          <ShieldAlert className="w-12 h-12 text-[#8C3A27] mx-auto opacity-80" />
+          <h2 className="font-serif-header text-2xl sm:text-3xl font-extrabold text-[#221814]">
+            Dispatch Not Found
+          </h2>
+          <p className="text-xs sm:text-sm font-serif italic text-[#5C4028] font-semibold leading-relaxed">
+            The requested Current Affairs article could not be located or may have been archived.
+          </p>
+          <div className="pt-2">
+            <button
+              type="button"
+              onClick={() => navigate('/blog')}
+              className="btn-terracotta-pill text-xs py-3 px-6 font-serif font-bold cursor-pointer inline-flex items-center gap-2"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Back to Current Affairs</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 3. FULL EDITORIAL DISPATCH VIEW
   return (
     <div className="min-h-screen bg-[#FFFDF8] text-[#221814] py-12 px-4 sm:px-6 lg:px-8 select-text">
       <div className="max-w-4xl mx-auto space-y-8 animate-fade-in text-left">

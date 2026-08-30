@@ -50,7 +50,12 @@ export default function App() {
     const normalizedPath = currentPath.toLowerCase().replace(/\/$/, '') || '/';
 
     if (normalizedPath.startsWith('/current-affairs/')) {
-      const slug = normalizedPath.replace('/current-affairs/', '');
+      let slug = normalizedPath.replace('/current-affairs/', '');
+      try {
+        slug = decodeURIComponent(slug);
+      } catch (e) {
+        // keep raw slug
+      }
       return <CurrentAffairsDetailPage slug={slug} navigate={navigate} />;
     }
 
