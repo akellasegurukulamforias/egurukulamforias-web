@@ -86,6 +86,9 @@ function estimateReadingTime(content) {
   return `${minutes} min read`;
 }
 
+// Helper to normalize string keys by stripping non-alphanumeric characters
+const normalizeKey = (str) => String(str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
 export default function CurrentAffairsDetailPage({ slug, navigate }) {
   const { data, loading: cmsLoading } = useCMSData();
 
@@ -94,19 +97,25 @@ export default function CurrentAffairsDetailPage({ slug, navigate }) {
     return sortCurrentAffairsByDate(data?.currentAffairs || []);
   }, [data?.currentAffairs]);
 
-  const normalizedSlug = useMemo(() => {
-    return (slug || '').trim().toLowerCase();
-  }, [slug]);
+  const targetSlug = slug || '';
+  const targetNorm = normalizeKey(targetSlug);
 
-  // Find matching article index and item by slug
+  // Resilient article matching: direct slug, normalized slug, normalized title, or docId
   const currentIndex = useMemo(() => {
     if (!sortedArticles || sortedArticles.length === 0) return -1;
     return sortedArticles.findIndex(art => {
       const artTitle = art.Title || art.title || '';
-      const artSlug = (art.Slug || art.slug || createSlug(artTitle)).trim().toLowerCase();
-      return artSlug === normalizedSlug || createSlug(artTitle).toLowerCase() === normalizedSlug;
+      const artSlug = art.Slug || art.slug || createSlug(artTitle);
+      const docId = art.docId || art.Doc_ID || art.id || '';
+
+      return (
+        artSlug === targetSlug ||
+        normalizeKey(artSlug) === targetNorm ||
+        normalizeKey(artTitle) === targetNorm ||
+        (docId && normalizeKey(docId) === targetNorm)
+      );
     });
-  }, [sortedArticles, normalizedSlug]);
+  }, [sortedArticles, targetSlug, targetNorm]);
 
   const article = currentIndex !== -1 ? sortedArticles[currentIndex] : null;
   const prevArticle = currentIndex > 0 ? sortedArticles[currentIndex - 1] : null;
@@ -147,6 +156,37 @@ export default function CurrentAffairsDetailPage({ slug, navigate }) {
     const artSlug = art.Slug || art.slug || createSlug(artTitle);
     navigate(`/current-affairs/${artSlug}`);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Intercept clicks on internal links within article HTML to prevent full page reloads
+  const handleContentClick = (e) => {
+    const anchor = e.target.closest('a');
+    if (!anchor) return;
+
+    const href = anchor.getAttribute('href');
+    if (!href || href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:')) return;
+
+    try {
+      const url = new URL(href, window.location.origin);
+      const isInternal = 
+        url.origin === window.location.origin || 
+        url.hostname.includes('egurukulamforias') ||
+        url.hostname === 'localhost' ||
+        url.hostname === '127.0.0.1';
+
+      if (isInternal) {
+        e.preventDefault();
+        const targetPath = url.pathname + url.search + url.hash;
+        navigate(targetPath);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    } catch (err) {
+      if (href.startsWith('/')) {
+        e.preventDefault();
+        navigate(href);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }
   };
 
   // 1. SKELETON LOADER FOR DIRECT DEEP-LINK ENTRANCE (WHILE CMS DATA IS LOADING)
@@ -295,6 +335,7 @@ export default function CurrentAffairsDetailPage({ slug, navigate }) {
           <div 
             className="doc-article-content max-w-none text-stone-800 font-sans leading-relaxed my-8 [&_ul]:pl-6 [&_ul]:space-y-2 [&_li]:list-disc [&_li]:pl-1"
             dangerouslySetInnerHTML={{ __html: fullContentHtml }} 
+            onClick={handleContentClick}
           />
         ) : (
           <div className="py-12 text-center space-y-3 bg-[#FAF6EE] p-8 rounded-3xl border border-[#D5C3B0]">
