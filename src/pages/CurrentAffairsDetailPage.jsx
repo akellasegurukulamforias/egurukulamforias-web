@@ -1,6 +1,4 @@
-// src/pages/CurrentAffairsDetailPage.jsx
-// Dedicated Current Affairs Article Page with Exact Layout Fidelity, SPA Direct-Link Loading & Academic Typography
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { 
   ArrowLeft, 
   Calendar, 
@@ -157,6 +155,20 @@ export default function CurrentAffairsDetailPage({ slug, navigate }) {
     navigate(`/current-affairs/${artSlug}`);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  // Sync document title & trigger GA4 page view when article loads
+  useEffect(() => {
+    if (article && title) {
+      document.title = `${title} | e-Gurukulam for IAS`;
+      if (typeof window !== 'undefined' && typeof window.gtag === 'function') {
+        window.gtag('config', 'G-T5W96019N1', {
+          page_path: window.location.pathname,
+          page_location: window.location.href,
+          page_title: document.title,
+        });
+      }
+    }
+  }, [article, title]);
 
   // Intercept clicks on internal links within article HTML to prevent full page reloads
   const handleContentClick = (e) => {

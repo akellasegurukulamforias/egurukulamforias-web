@@ -29,6 +29,17 @@ export default function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
+  // SPA Route Tracking for Google Analytics 4 (GA4 Measurement ID: G-T5W96019N1)
+  useEffect(() => {
+    if (typeof window !== 'undefined' && typeof window.gtag === 'function') {
+      window.gtag('config', 'G-T5W96019N1', {
+        page_path: currentPath,
+        page_location: window.location.href,
+        page_title: document.title,
+      });
+    }
+  }, [currentPath]);
+
   const navigate = (path) => {
     if (window.location.pathname !== path) {
       window.history.pushState({}, '', path);
