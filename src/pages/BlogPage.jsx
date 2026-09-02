@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { useCMSData } from '../hooks/useCMSData';
 import { createSlug, getDirectImageUrl } from './CurrentAffairsReader';
-import { sortCurrentAffairsByDate } from '../utils/dateUtils';
+import { sortCurrentAffairsByDate, formatDisplayDate } from '../utils/dateUtils';
 
 export default function BlogPage({ navigate }) {
   const CURRENT_AFFAIRS_URL = "https://www.iasmentoring.com/current_affairs.html";
@@ -62,7 +62,7 @@ export default function BlogPage({ navigate }) {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {sortedCurrentAffairs.map((item, idx) => {
                 const title = item.Title || item.title || 'Untitled Dispatch';
-                const date = item.Date || item.date || 'Today';
+                const date = formatDisplayDate(item.Date || item.date) || 'Today';
                 const category = item.Category || item.category || 'General Studies';
                 const shortSummary = item.Short_Summary || item.short_summary || item.Summary || item.summary || item.Description || item.description || '';
                 const rawBanner = item.Banner_Image || item.banner_image || item.Banner || item.banner || item.Image || item.image;

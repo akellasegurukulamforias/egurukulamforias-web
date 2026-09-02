@@ -5,6 +5,7 @@ import { X, Calendar, Tag, Share2, BookOpen, ExternalLink, ArrowLeft } from 'luc
 import { FaWhatsapp, FaTelegramPlane } from 'react-icons/fa';
 import ReactMarkdown from 'react-markdown';
 import { getDirectImageUrl, getSecondaryImageUrl } from '../pages/CurrentAffairsReader';
+import { formatDisplayDate } from '../utils/formatDate';
 
 /**
  * Clean & optimize raw Google Docs / CMS HTML for responsive, Apple-grade editorial rendering
@@ -50,7 +51,7 @@ export default function EditorialReaderModal({ isOpen, onClose, article }) {
   if (!isOpen || !article) return null;
 
   const title = article.Title || article.title || 'Current Affairs Editorial Analysis';
-  const date = article.Date || article.date || 'Today';
+  const date = formatDisplayDate(article.Date || article.date) || 'Today';
   const category = article.Category || article.category || 'General Studies';
   const rawBanner = article.Banner_Image || article.banner_image || article.Banner || article.banner || article.Image || article.image;
   const bannerImage = getDirectImageUrl(rawBanner);

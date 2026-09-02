@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { ArrowLeft, Calendar, Tag, Loader2, BookOpen, ShieldAlert, Maximize2, Download } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { useCMSData } from '../hooks/useCMSData';
+import { formatDisplayDate } from '../utils/formatDate';
 
 export function createSlug(text) {
   if (!text) return '';
@@ -109,7 +110,7 @@ export default function CurrentAffairsReader({ slug, navigate }) {
   }) || articleFromState || currentAffairsList[0];
 
   const title = item?.Title || item?.title || 'Current Affairs Editorial';
-  const date = item?.Date || item?.date || 'Today';
+  const date = formatDisplayDate(item?.Date || item?.date) || 'Today';
   const category = item?.Category || item?.category || 'General Studies';
   const rawBanner = item?.Banner_Image || item?.banner_image || item?.Banner || item?.banner || item?.Image || item?.image;
   const bannerImage = getDirectImageUrl(rawBanner);

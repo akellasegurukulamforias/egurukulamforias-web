@@ -11,7 +11,7 @@ import {
   BookOpen
 } from 'lucide-react';
 import { useCMSData } from '../hooks/useCMSData';
-import { sortCurrentAffairsByDate } from '../utils/dateUtils';
+import { sortCurrentAffairsByDate, formatDisplayDate } from '../utils/dateUtils';
 import { 
   createSlug, 
   getDirectImageUrl, 
@@ -121,7 +121,7 @@ export default function CurrentAffairsDetailPage({ slug, navigate }) {
 
   // Extract article fields
   const title = article?.Title || article?.title || 'Current Affairs Editorial Analysis';
-  const date = article?.Date || article?.date || 'Today';
+  const date = formatDisplayDate(article?.Date || article?.date) || 'Today';
   const category = article?.Category || article?.category || 'General Studies';
   const rawBanner = article?.Banner_Image || article?.banner_image || article?.Banner || article?.banner || article?.Image || article?.image;
   const bannerImage = getDirectImageUrl(rawBanner);
