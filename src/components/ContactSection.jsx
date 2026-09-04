@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Send, CheckCircle, Phone, MessageSquare } from 'lucide-react';
-import { sanitizePayload, isSpamBot, isRateLimited } from '../utils/sanitize';
+import { sanitizePayload, isSpamBot, isRateLimited, isValidPhone, isValidEmail } from '../utils/sanitize';
 
 export function ContactSection() {
   const [formData, setFormData] = useState({
@@ -10,6 +10,8 @@ export function ContactSection() {
     message: '',
     hp_trap: '' // Hidden honeypot field
   });
+  const [honeypot, setHoneypot] = useState('');
+  const [validationError, setValidationError] = useState('');
   const [status, setStatus] = useState('idle'); // 'idle' | 'loading' | 'success' | 'error'
 
   // GOOGLE APPS SCRIPT WEB APP URL
@@ -20,13 +22,24 @@ export function ContactSection() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // 1. Anti-Spam Honeypot Verification
-    if (isSpamBot(formData.hp_trap)) {
+    // 1. Strict Validation Rules (Mobile Number & Email Address)
+    if (!isValidPhone(formData.mobile)) {
+      setValidationError("⚠️ Please enter a valid 10-digit mobile number (must start with 6, 7, 8, or 9).");
+      return;
+    }
+    if (!isValidEmail(formData.email)) {
+      setValidationError("⚠️ Please enter a valid email address.");
+      return;
+    }
+    setValidationError('');
+
+    // 2. Anti-Spam Honeypot Verification (Silently simulate success for the bot without writing to backend)
+    if ((honeypot && honeypot.trim() !== '') || isSpamBot(formData.hp_trap)) {
       setStatus('success');
       return;
     }
 
-    // 2. Client-Side Rate Limiting (3-Second Cooldown)
+    // 3. Client-Side Rate Limiting (3-Second Cooldown)
     if (isRateLimited('ContactForm', 3000)) {
       return;
     }
@@ -39,7 +52,8 @@ export function ContactSection() {
       name: formData.name,
       mobile: formData.mobile,
       email: formData.email,
-      message: formData.message
+      message: formData.message,
+      hp_website_check: honeypot
     });
 
     try {
@@ -53,6 +67,7 @@ export function ContactSection() {
       });
 
       setStatus('success');
+      setHoneypot('');
       setFormData({ name: '', mobile: '', email: '', message: '', hp_trap: '' });
     } catch (err) {
       console.error("Form Submission Error:", err);
@@ -84,17 +99,15 @@ export function ContactSection() {
           <div className="lg:col-span-7 card-parchment-3d p-6 sm:p-8 space-y-6">
             <form onSubmit={handleSubmit} className="contact-form space-y-5">
               
-              {/* Honeypot Trap Field */}
-              <div className="hidden opacity-0 pointer-events-none absolute -left-[9999px]" aria-hidden="true">
-                <label htmlFor="contact_hp_trap">Do not fill this field</label>
-                <input 
-                  type="text" 
-                  id="contact_hp_trap" 
-                  name="contact_hp_trap" 
-                  tabIndex="-1" 
+              {/* Honeypot field - hidden from humans, traps automated bots */}
+              <div style={{ display: 'none', position: 'absolute', left: '-9999px' }} aria-hidden="true">
+                <input
+                  type="text"
+                  name="hp_website_check"
+                  tabIndex="-1"
                   autoComplete="off"
-                  value={formData.hp_trap}
-                  onChange={(e) => setFormData({ ...formData, hp_trap: e.target.value })}
+                  value={honeypot}
+                  onChange={(e) => setHoneypot(e.target.value)}
                 />
               </div>
 
@@ -158,6 +171,27 @@ export function ContactSection() {
                   className="manuscript-input w-full resize-none"
                 ></textarea>
               </div>
+
+              {/* On-Screen Validation Alert Popup / Banner */}
+              {validationError && (
+                <div 
+                  role="alert" 
+                  className="p-4 border-2 border-amber-600 bg-amber-50 rounded-xl text-amber-950 font-bold text-xs flex items-center justify-between shadow-md animate-fade-in my-2"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-base shrink-0">⚠️</span>
+                    <span>{validationError.replace('⚠️ ', '')}</span>
+                  </div>
+                  <button 
+                    type="button" 
+                    onClick={() => setValidationError('')} 
+                    className="text-amber-900 hover:text-black font-extrabold px-2 py-1 cursor-pointer text-sm shrink-0"
+                    aria-label="Dismiss error"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
 
               <div className="pt-2">
                 <button 

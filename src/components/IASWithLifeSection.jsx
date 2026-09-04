@@ -6,6 +6,7 @@ import {
   ArrowRight,
   Loader2
 } from 'lucide-react';
+import { isValidPhone, isValidEmail } from '../utils/sanitize';
 
 export default function IASWithLifeSection({ navigate }) {
   // Modal State
@@ -25,6 +26,8 @@ export default function IASWithLifeSection({ navigate }) {
     category: 'Managing Both',
     stage: 'Preparing'
   });
+  const [honeypot, setHoneypot] = useState('');
+  const [validationError, setValidationError] = useState('');
 
   const sectionRef = useRef(null);
 
@@ -59,6 +62,24 @@ export default function IASWithLifeSection({ navigate }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // 1. Strict Validation Rules (Mobile Number & Email Address)
+    if (!isValidPhone(formData.phone)) {
+      setValidationError("⚠️ Please enter a valid 10-digit mobile number (must start with 6, 7, 8, or 9).");
+      return;
+    }
+    if (!isValidEmail(formData.email)) {
+      setValidationError("⚠️ Please enter a valid email address.");
+      return;
+    }
+    setValidationError('');
+
+    // 2. Anti-Spam Honeypot Verification (Silently simulate success for the bot without writing to backend)
+    if (honeypot && honeypot.trim() !== '') {
+      setIsSubmitted(true);
+      return;
+    }
+
     setIsSubmitting(true);
 
     const payload = {
@@ -67,7 +88,8 @@ export default function IASWithLifeSection({ navigate }) {
       email: formData.email,
       whatsapp: formData.phone,
       profileType: formData.category,
-      preparationStage: formData.stage
+      preparationStage: formData.stage,
+      hp_website_check: honeypot
     };
 
     try {
@@ -92,6 +114,8 @@ export default function IASWithLifeSection({ navigate }) {
   const handleResetModal = () => {
     setIsModalOpen(false);
     setIsSubmitted(false);
+    setHoneypot('');
+    setValidationError('');
     setFormData({
       fullName: '',
       email: '',
@@ -419,6 +443,18 @@ export default function IASWithLifeSection({ navigate }) {
                 {/* Form Fields */}
                 <form onSubmit={handleSubmit} className="space-y-4 text-xs font-sans">
                   
+                  {/* Honeypot field - hidden from humans, traps automated bots */}
+                  <div style={{ display: 'none', position: 'absolute', left: '-9999px' }} aria-hidden="true">
+                    <input
+                      type="text"
+                      name="hp_website_check"
+                      tabIndex="-1"
+                      autoComplete="off"
+                      value={honeypot}
+                      onChange={(e) => setHoneypot(e.target.value)}
+                    />
+                  </div>
+
                   {/* Full Name */}
                   <div className="space-y-1">
                     <label className="font-serif font-bold text-[#221814] block">Full Name *</label>
@@ -488,6 +524,27 @@ export default function IASWithLifeSection({ navigate }) {
                       <option value="Returning to Preparation">Returning to Preparation</option>
                     </select>
                   </div>
+
+                  {/* On-Screen Validation Alert Popup / Banner */}
+                  {validationError && (
+                    <div 
+                      role="alert" 
+                      className="p-4 border-2 border-amber-600 bg-amber-50 rounded-xl text-amber-950 font-bold text-xs flex items-center justify-between shadow-md animate-fade-in my-2"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-base shrink-0">⚠️</span>
+                        <span>{validationError.replace('⚠️ ', '')}</span>
+                      </div>
+                      <button 
+                        type="button" 
+                        onClick={() => setValidationError('')} 
+                        className="text-amber-900 hover:text-black font-extrabold px-2 py-1 cursor-pointer text-sm shrink-0"
+                        aria-label="Dismiss error"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
 
                   {/* Submit Button */}
                   <div className="pt-3">

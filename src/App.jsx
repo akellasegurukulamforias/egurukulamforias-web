@@ -19,6 +19,8 @@ import CurrentAffairsDetailPage from './pages/CurrentAffairsDetailPage';
 export default function App() {
   const [currentPath, setCurrentPath] = useState(window.location.pathname || '/');
   const [isPopupOpen, setIsPopupOpen] = useState(false);
+  const [popupInitialIndex, setPopupInitialIndex] = useState(0);
+  const [popupSelectedItem, setPopupSelectedItem] = useState(null);
   const { data: cmsData } = useCMSData();
 
   useEffect(() => {
@@ -48,7 +50,16 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleOpenPopup = () => {
+  const handleOpenPopup = (indexOrItem = 0) => {
+    if (typeof indexOrItem === 'number') {
+      setPopupInitialIndex(indexOrItem);
+      setPopupSelectedItem(null);
+    } else if (indexOrItem && typeof indexOrItem === 'object') {
+      setPopupSelectedItem(indexOrItem);
+    } else {
+      setPopupInitialIndex(0);
+      setPopupSelectedItem(null);
+    }
     setIsPopupOpen(true);
   };
 
@@ -105,9 +116,12 @@ export default function App() {
       {/* Desktop Mode Recommendation Popup for Mobile Users */}
       <DesktopViewPrompt />
 
-      {/* 5-Minute Intelligent Google Sheet CMS Announcement Poster Popup */}
+      {/* Dynamic Fanned Deck Google Sheet CMS Live Ticker / Announcement Popup Modal */}
       <AnnouncementPopup 
         activePopup={cmsData?.activePopup} 
+        tickerItems={cmsData?.liveTicker}
+        initialIndex={popupInitialIndex}
+        selectedItem={popupSelectedItem}
         isOpen={isPopupOpen}
         onClose={handleClosePopup}
       />

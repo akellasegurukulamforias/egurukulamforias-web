@@ -72,3 +72,33 @@ export function isRateLimited(formId = 'default', cooldownMs = 3000) {
   submissionTimestamps.set(formId, now);
   return false; // Clear to submit
 }
+
+/**
+ * Strict Indian 10-digit mobile number validation:
+ * Must be exactly 10 digits and start with 6, 7, 8, or 9.
+ */
+export function isValidPhone(phone) {
+  if (!phone) return false;
+  let digits = String(phone).replace(/\D/g, '');
+  // Normalize optional +91 (12 digits) or 0 (11 digits) to standard 10-digit number
+  if (digits.length === 12 && digits.startsWith('91')) {
+    digits = digits.slice(2);
+  } else if (digits.length === 11 && digits.startsWith('0')) {
+    digits = digits.slice(1);
+  }
+  return /^[6-9]\d{9}$/.test(digits);
+}
+
+/**
+ * Strict email validation:
+ * Valid format and rejects dot-stuffed spam addresses (< 4 dots before @).
+ */
+export function isValidEmail(email) {
+  if (!email) return false;
+  const trimmed = String(email).trim();
+  const formatValid = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(trimmed);
+  const usernamePart = trimmed.split('@')[0] || '';
+  const dotCount = (usernamePart.match(/\./g) || []).length;
+  return formatValid && dotCount < 4;
+}
+

@@ -40,7 +40,7 @@ export default function Header({ currentPath, navigate, onOpenPopup }) {
             type: 'ANNOUNCEMENT',
             icon: '🎯',
             text: stripLeadingEmoji(headline),
-            onClick: () => onOpenPopup && onOpenPopup()
+            onClick: () => onOpenPopup && onOpenPopup(i, t)
           });
         }
       });
@@ -224,7 +224,7 @@ export default function Header({ currentPath, navigate, onOpenPopup }) {
         {/* Clickable UPDATES Badge Button */}
         <button 
           type="button"
-          onClick={() => onOpenPopup && onOpenPopup()}
+          onClick={() => onOpenPopup && onOpenPopup(0)}
           className="flex items-center gap-1.5 shrink-0 bg-[#732D1B] hover:bg-[#5C2415] px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-widest text-[#FFD700] border border-[#C5A059]/40 shadow-xs transition-all cursor-pointer group z-10"
           title="Click to view active announcement poster modal"
         >

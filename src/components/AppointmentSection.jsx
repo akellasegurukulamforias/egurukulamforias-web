@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Send, CheckCircle, Phone, MessageSquare, MapPin, Mail, ExternalLink, Calendar, Clock } from 'lucide-react';
-import { sanitizePayload, isSpamBot, isRateLimited } from '../utils/sanitize';
+import { sanitizePayload, isSpamBot, isRateLimited, isValidPhone, isValidEmail } from '../utils/sanitize';
 
 export function AppointmentSection() {
   // LEFT FORM: Program Enquiry / Personal Details / Admissions
@@ -14,6 +14,8 @@ export function AppointmentSection() {
     message: '',
     hp_trap: '' // Honeypot trap
   });
+  const [enquiryHoneypot, setEnquiryHoneypot] = useState('');
+  const [enquiryValidationError, setEnquiryValidationError] = useState('');
   const [enquiryStatus, setEnquiryStatus] = useState('idle'); // 'idle' | 'loading' | 'success' | 'error'
 
   // RIGHT FORM: Book an Appointment
@@ -30,6 +32,8 @@ export function AppointmentSection() {
     appointmentMode: 'Online Video Session (Whatsapp/Google Meet)',
     hp_trap: '' // Honeypot trap
   });
+  const [appointmentHoneypot, setAppointmentHoneypot] = useState('');
+  const [appointmentValidationError, setAppointmentValidationError] = useState('');
   const [appointmentStatus, setAppointmentStatus] = useState('idle'); // 'idle' | 'loading' | 'success' | 'error'
 
   // DEPLOYED GOOGLE APPS SCRIPT WEB APP ENDPOINT
@@ -43,13 +47,24 @@ export function AppointmentSection() {
   const handleEnquirySubmit = async (e) => {
     e.preventDefault();
 
-    // Anti-Spam Honeypot Verification
-    if (isSpamBot(enquiryForm.hp_trap)) {
+    // 1. Strict Validation Rules (Mobile Number & Email Address)
+    if (!isValidPhone(enquiryForm.phone)) {
+      setEnquiryValidationError("⚠️ Please enter a valid 10-digit mobile number (must start with 6, 7, 8, or 9).");
+      return;
+    }
+    if (!isValidEmail(enquiryForm.email)) {
+      setEnquiryValidationError("⚠️ Please enter a valid email address.");
+      return;
+    }
+    setEnquiryValidationError('');
+
+    // 2. Anti-Spam Honeypot Verification (Silently simulate success for the bot without writing to backend)
+    if ((enquiryHoneypot && enquiryHoneypot.trim() !== '') || isSpamBot(enquiryForm.hp_trap)) {
       setEnquiryStatus('success');
       return;
     }
 
-    // Rate Limiting (3-Second Cooldown)
+    // 3. Rate Limiting (3-Second Cooldown)
     if (isRateLimited('EnquiryForm', 3000)) {
       return;
     }
@@ -64,7 +79,8 @@ export function AppointmentSection() {
       address: enquiryForm.address,
       program: enquiryForm.program,
       prepStage: enquiryForm.prepStage,
-      message: enquiryForm.message
+      message: enquiryForm.message,
+      hp_website_check: enquiryHoneypot
     });
 
     try {
@@ -75,6 +91,7 @@ export function AppointmentSection() {
         body: JSON.stringify(sanitizedPayload),
       });
       setEnquiryStatus('success');
+      setEnquiryHoneypot('');
       setEnquiryForm({
         fullName: '',
         email: '',
@@ -95,13 +112,24 @@ export function AppointmentSection() {
   const handleAppointmentSubmit = async (e) => {
     e.preventDefault();
 
-    // Anti-Spam Honeypot Verification
-    if (isSpamBot(appointmentForm.hp_trap)) {
+    // 1. Strict Validation Rules (Mobile Number & Email Address)
+    if (!isValidPhone(appointmentForm.mobile)) {
+      setAppointmentValidationError("⚠️ Please enter a valid 10-digit mobile number (must start with 6, 7, 8, or 9).");
+      return;
+    }
+    if (!isValidEmail(appointmentForm.email)) {
+      setAppointmentValidationError("⚠️ Please enter a valid email address.");
+      return;
+    }
+    setAppointmentValidationError('');
+
+    // 2. Anti-Spam Honeypot Verification (Silently simulate success for the bot without writing to backend)
+    if ((appointmentHoneypot && appointmentHoneypot.trim() !== '') || isSpamBot(appointmentForm.hp_trap)) {
       setAppointmentStatus('success');
       return;
     }
 
-    // Rate Limiting (3-Second Cooldown)
+    // 3. Rate Limiting (3-Second Cooldown)
     if (isRateLimited('AppointmentForm', 3000)) {
       return;
     }
@@ -119,7 +147,8 @@ export function AppointmentSection() {
       appointmentDate: appointmentForm.appointmentDate,
       timeSlot: appointmentForm.appointmentTime,
       mode: appointmentForm.appointmentMode,
-      message: appointmentForm.message
+      message: appointmentForm.message,
+      hp_website_check: appointmentHoneypot
     });
 
     try {
@@ -130,6 +159,7 @@ export function AppointmentSection() {
         body: JSON.stringify(sanitizedPayload),
       });
       setAppointmentStatus('success');
+      setAppointmentHoneypot('');
       setAppointmentForm({
         name: '',
         mobile: '',
@@ -175,6 +205,18 @@ export function AppointmentSection() {
 
             <form className="space-y-4 text-left flex-1 flex flex-col justify-between" onSubmit={handleEnquirySubmit}>
               
+              {/* Honeypot field - hidden from humans, traps automated bots */}
+              <div style={{ display: 'none', position: 'absolute', left: '-9999px' }} aria-hidden="true">
+                <input
+                  type="text"
+                  name="hp_website_check"
+                  tabIndex="-1"
+                  autoComplete="off"
+                  value={enquiryHoneypot}
+                  onChange={(e) => setEnquiryHoneypot(e.target.value)}
+                />
+              </div>
+
               <div className="space-y-4">
                 {/* Full Name */}
                 <div className="form-group space-y-1">
@@ -300,6 +342,27 @@ export function AppointmentSection() {
                 </div>
               </div>
 
+              {/* On-Screen Validation Alert Popup / Banner */}
+              {enquiryValidationError && (
+                <div 
+                  role="alert" 
+                  className="p-4 border-2 border-amber-600 bg-amber-50 rounded-xl text-amber-950 font-bold text-xs flex items-center justify-between shadow-md animate-fade-in my-2"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-base shrink-0">⚠️</span>
+                    <span>{enquiryValidationError.replace('⚠️ ', '')}</span>
+                  </div>
+                  <button 
+                    type="button" 
+                    onClick={() => setEnquiryValidationError('')} 
+                    className="text-amber-900 hover:text-black font-extrabold px-2 py-1 cursor-pointer text-sm shrink-0"
+                    aria-label="Dismiss error"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+
               <div className="pt-4">
                 <button 
                   type="submit" 
@@ -350,6 +413,18 @@ export function AppointmentSection() {
 
             <form className="space-y-4 text-left flex-1 flex flex-col justify-between" onSubmit={handleAppointmentSubmit}>
               
+              {/* Honeypot field - hidden from humans, traps automated bots */}
+              <div style={{ display: 'none', position: 'absolute', left: '-9999px' }} aria-hidden="true">
+                <input
+                  type="text"
+                  name="hp_website_check"
+                  tabIndex="-1"
+                  autoComplete="off"
+                  value={appointmentHoneypot}
+                  onChange={(e) => setAppointmentHoneypot(e.target.value)}
+                />
+              </div>
+
               <div className="space-y-4">
                 {/* Full Name */}
                 <div className="form-group space-y-1">
@@ -526,6 +601,27 @@ export function AppointmentSection() {
                   ></textarea>
                 </div>
               </div>
+
+              {/* On-Screen Validation Alert Popup / Banner */}
+              {appointmentValidationError && (
+                <div 
+                  role="alert" 
+                  className="p-4 border-2 border-amber-600 bg-amber-50 rounded-xl text-amber-950 font-bold text-xs flex items-center justify-between shadow-md animate-fade-in my-2"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-base shrink-0">⚠️</span>
+                    <span>{appointmentValidationError.replace('⚠️ ', '')}</span>
+                  </div>
+                  <button 
+                    type="button" 
+                    onClick={() => setAppointmentValidationError('')} 
+                    className="text-amber-900 hover:text-black font-extrabold px-2 py-1 cursor-pointer text-sm shrink-0"
+                    aria-label="Dismiss error"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
 
               <div className="pt-4">
                 <button 
