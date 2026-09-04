@@ -90,10 +90,13 @@ export default function App() {
         return <AboutPage navigate={navigate} />;
       case '/programs':
       case '/courses':
+      case '/mentorship':
+      case '/ias-with-life':
         return <ProgramsPage navigate={navigate} />;
       case '/test-series':
       case '/sadhana':
         return <TestSeriesPage navigate={navigate} />;
+      case '/current-affairs':
       case '/blog':
       case '/insights':
       case '/journal':

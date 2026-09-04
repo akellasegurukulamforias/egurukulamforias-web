@@ -5,8 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "prebuild": "node scripts/generate-sitemap.js",
     "build": "node scripts/sync-courses.cjs && node scripts/sync-free-tests.cjs && vite build",
     "preview": "vite preview",
+    "sitemap": "node scripts/generate-sitemap.js",
     "sync:courses": "node scripts/sync-courses.cjs",
     "sync:tests": "node scripts/sync-free-tests.cjs",
     "backup:watch": "powershell -ExecutionPolicy Bypass -File ./scripts/auto-backup-daemon.ps1"
