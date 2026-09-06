@@ -10,11 +10,71 @@
       "destination": "/robots.txt"
     },
     {
-      "source": "/((?!sitemap\\.xml|robots\\.txt).*)",
+      "source": "/favicon:slug(.*)",
+      "destination": "/favicon:slug$1"
+    },
+    {
+      "source": "/apple-touch-icon:slug(.*)",
+      "destination": "/apple-touch-icon:slug$1"
+    },
+    {
+      "source": "/((?!sitemap\\.xml|robots\\.txt|favicon|apple-touch-icon|.*\\.[\\w]+$).*)",
       "destination": "/index.html"
     }
   ],
   "headers": [
+    {
+      "source": "/favicon-48x48.png",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "image/png"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=86400, stale-while-revalidate=604800"
+        }
+      ]
+    },
+    {
+      "source": "/favicon-192x192.png",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "image/png"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=86400, stale-while-revalidate=604800"
+        }
+      ]
+    },
+    {
+      "source": "/apple-touch-icon.png",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "image/png"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=86400, stale-while-revalidate=604800"
+        }
+      ]
+    },
+    {
+      "source": "/favicon.ico",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "image/x-icon"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=86400, stale-while-revalidate=604800"
+        }
+      ]
+    },
     {
       "source": "/sitemap.xml",
       "headers": [

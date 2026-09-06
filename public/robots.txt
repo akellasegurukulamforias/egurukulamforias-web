@@ -1,4 +1,11 @@
 User-agent: *
 Allow: /
 
+# Ensure Googlebot-Image has explicit access to root favicon assets
+User-agent: Googlebot-Image
+Allow: /favicon*.png
+Allow: /apple-touch-icon.png
+Allow: /favicon.ico
+Allow: /
+
 Sitemap: https://egurukulamforias.com/sitemap.xml
