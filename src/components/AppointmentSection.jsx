@@ -1,8 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Send, CheckCircle, Phone, MessageSquare, MapPin, Mail, ExternalLink, Calendar, Clock } from 'lucide-react';
 import { sanitizePayload, isSpamBot, isRateLimited, isValidPhone, isValidEmail } from '../utils/sanitize';
 
 export function AppointmentSection() {
+  // Store form mounted timestamp on component load for 3-second fill timer bot defense
+  const formMountedAt = useRef(Date.now());
+
   // LEFT FORM: Program Enquiry / Personal Details / Admissions
   const [enquiryForm, setEnquiryForm] = useState({
     fullName: '',
@@ -12,7 +15,8 @@ export function AppointmentSection() {
     program: 'Mentorship programs',
     prepStage: 'Not Started',
     message: '',
-    hp_trap: '' // Honeypot trap
+    hp_trap: '', // Honeypot trap
+    user_organization_code: '' // Zero-dependency Honeypot field
   });
   const [enquiryHoneypot, setEnquiryHoneypot] = useState('');
   const [enquiryValidationError, setEnquiryValidationError] = useState('');
@@ -30,7 +34,8 @@ export function AppointmentSection() {
     appointmentDate: '',
     appointmentTime: '10:00 AM - 11:00 AM',
     appointmentMode: 'Online Video Session (Whatsapp/Google Meet)',
-    hp_trap: '' // Honeypot trap
+    hp_trap: '', // Honeypot trap
+    user_organization_code: '' // Zero-dependency Honeypot field
   });
   const [appointmentHoneypot, setAppointmentHoneypot] = useState('');
   const [appointmentValidationError, setAppointmentValidationError] = useState('');
@@ -47,9 +52,11 @@ export function AppointmentSection() {
   const handleEnquirySubmit = async (e) => {
     e.preventDefault();
 
-    // 1. Strict Validation Rules (Mobile Number & Email Address)
-    if (!isValidPhone(enquiryForm.phone)) {
-      setEnquiryValidationError("⚠️ Please enter a valid 10-digit mobile number (must start with 6, 7, 8, or 9).");
+    // 1. Strict 10-Digit Indian Mobile Number Regex Validation
+    const contactNumber = (enquiryForm.phone || '').trim();
+    if (!/^[6-9]\d{9}$/.test(contactNumber)) {
+      alert("Please enter a valid 10-digit Indian mobile number.");
+      setEnquiryValidationError("⚠️ Please enter a valid 10-digit Indian mobile number.");
       return;
     }
     if (!isValidEmail(enquiryForm.email)) {
@@ -58,13 +65,25 @@ export function AppointmentSection() {
     }
     setEnquiryValidationError('');
 
-    // 2. Anti-Spam Honeypot Verification (Silently simulate success for the bot without writing to backend)
-    if ((enquiryHoneypot && enquiryHoneypot.trim() !== '') || isSpamBot(enquiryForm.hp_trap)) {
+    // 2. Anti-Spam Honeypot Verification (Silently simulate success for bots without writing to backend)
+    if (
+      (enquiryForm.user_organization_code && enquiryForm.user_organization_code.trim() !== '') ||
+      (enquiryHoneypot && enquiryHoneypot.trim() !== '') ||
+      isSpamBot(enquiryForm.hp_trap)
+    ) {
       setEnquiryStatus('success');
       return;
     }
 
-    // 3. Rate Limiting (3-Second Cooldown)
+    // 3. 3-Second Fill Timer Defense
+    const elapsed_ms = Date.now() - formMountedAt.current;
+    if (elapsed_ms < 3000) {
+      alert("Please take a moment to review your details before submitting.");
+      setEnquiryValidationError("⚠️ Please take a moment to review your details before submitting.");
+      return;
+    }
+
+    // 4. Rate Limiting (3-Second Cooldown)
     if (isRateLimited('EnquiryForm', 3000)) {
       return;
     }
@@ -75,11 +94,13 @@ export function AppointmentSection() {
       formType: "admissions",
       fullName: enquiryForm.fullName,
       email: enquiryForm.email,
-      contactNumber: enquiryForm.phone,
+      contactNumber: contactNumber,
       address: enquiryForm.address,
       program: enquiryForm.program,
       prepStage: enquiryForm.prepStage,
       message: enquiryForm.message,
+      user_organization_code: enquiryForm.user_organization_code || '',
+      elapsed_ms: elapsed_ms,
       hp_website_check: enquiryHoneypot
     });
 
@@ -100,7 +121,8 @@ export function AppointmentSection() {
         program: 'Mentorship programs',
         prepStage: 'Not Started',
         message: '',
-        hp_trap: ''
+        hp_trap: '',
+        user_organization_code: ''
       });
     } catch (err) {
       console.error("Admissions Form Submission Error:", err);
@@ -112,9 +134,11 @@ export function AppointmentSection() {
   const handleAppointmentSubmit = async (e) => {
     e.preventDefault();
 
-    // 1. Strict Validation Rules (Mobile Number & Email Address)
-    if (!isValidPhone(appointmentForm.mobile)) {
-      setAppointmentValidationError("⚠️ Please enter a valid 10-digit mobile number (must start with 6, 7, 8, or 9).");
+    // 1. Strict 10-Digit Indian Mobile Number Regex Validation
+    const contactNumber = (appointmentForm.mobile || '').trim();
+    if (!/^[6-9]\d{9}$/.test(contactNumber)) {
+      alert("Please enter a valid 10-digit Indian mobile number.");
+      setAppointmentValidationError("⚠️ Please enter a valid 10-digit Indian mobile number.");
       return;
     }
     if (!isValidEmail(appointmentForm.email)) {
@@ -123,13 +147,25 @@ export function AppointmentSection() {
     }
     setAppointmentValidationError('');
 
-    // 2. Anti-Spam Honeypot Verification (Silently simulate success for the bot without writing to backend)
-    if ((appointmentHoneypot && appointmentHoneypot.trim() !== '') || isSpamBot(appointmentForm.hp_trap)) {
+    // 2. Anti-Spam Honeypot Verification (Silently simulate success for bots without writing to backend)
+    if (
+      (appointmentForm.user_organization_code && appointmentForm.user_organization_code.trim() !== '') ||
+      (appointmentHoneypot && appointmentHoneypot.trim() !== '') ||
+      isSpamBot(appointmentForm.hp_trap)
+    ) {
       setAppointmentStatus('success');
       return;
     }
 
-    // 3. Rate Limiting (3-Second Cooldown)
+    // 3. 3-Second Fill Timer Defense
+    const elapsed_ms = Date.now() - formMountedAt.current;
+    if (elapsed_ms < 3000) {
+      alert("Please take a moment to review your details before submitting.");
+      setAppointmentValidationError("⚠️ Please take a moment to review your details before submitting.");
+      return;
+    }
+
+    // 4. Rate Limiting (3-Second Cooldown)
     if (isRateLimited('AppointmentForm', 3000)) {
       return;
     }
@@ -139,7 +175,7 @@ export function AppointmentSection() {
     const sanitizedPayload = sanitizePayload({
       formType: "appointment",
       fullName: appointmentForm.name,
-      contactNumber: appointmentForm.mobile,
+      contactNumber: contactNumber,
       email: appointmentForm.email,
       address: appointmentForm.currentAddress,
       prepStage: appointmentForm.prepStage,
@@ -148,6 +184,8 @@ export function AppointmentSection() {
       timeSlot: appointmentForm.appointmentTime,
       mode: appointmentForm.appointmentMode,
       message: appointmentForm.message,
+      user_organization_code: appointmentForm.user_organization_code || '',
+      elapsed_ms: elapsed_ms,
       hp_website_check: appointmentHoneypot
     });
 
@@ -171,7 +209,8 @@ export function AppointmentSection() {
         appointmentDate: '',
         appointmentTime: '10:00 AM - 11:00 AM',
         appointmentMode: 'Online Video Session (Whatsapp/Google Meet)',
-        hp_trap: ''
+        hp_trap: '',
+        user_organization_code: ''
       });
     } catch (err) {
       console.error("Appointment Form Submission Error:", err);
@@ -205,6 +244,17 @@ export function AppointmentSection() {
 
             <form className="space-y-4 text-left flex-1 flex flex-col justify-between" onSubmit={handleEnquirySubmit}>
               
+              {/* Lightweight Zero-Dependency Bot Defense Honeypot Field */}
+              <input
+                type="text"
+                name="user_organization_code"
+                value={enquiryForm.user_organization_code || ''}
+                onChange={(e) => setEnquiryForm(prev => ({ ...prev, user_organization_code: e.target.value }))}
+                tabIndex={-1}
+                autoComplete="off"
+                style={{ position: 'absolute', opacity: 0, zIndex: -1, pointerEvents: 'none', left: '-9999px' }}
+              />
+
               {/* Honeypot field - hidden from humans, traps automated bots */}
               <div style={{ display: 'none', position: 'absolute', left: '-9999px' }} aria-hidden="true">
                 <input
@@ -413,6 +463,17 @@ export function AppointmentSection() {
 
             <form className="space-y-4 text-left flex-1 flex flex-col justify-between" onSubmit={handleAppointmentSubmit}>
               
+              {/* Lightweight Zero-Dependency Bot Defense Honeypot Field */}
+              <input
+                type="text"
+                name="user_organization_code"
+                value={appointmentForm.user_organization_code || ''}
+                onChange={(e) => setAppointmentForm(prev => ({ ...prev, user_organization_code: e.target.value }))}
+                tabIndex={-1}
+                autoComplete="off"
+                style={{ position: 'absolute', opacity: 0, zIndex: -1, pointerEvents: 'none', left: '-9999px' }}
+              />
+
               {/* Honeypot field - hidden from humans, traps automated bots */}
               <div style={{ display: 'none', position: 'absolute', left: '-9999px' }} aria-hidden="true">
                 <input

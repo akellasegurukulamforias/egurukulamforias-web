@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Send, CheckCircle, X } from 'lucide-react';
 import { sanitizePayload, isSpamBot, isRateLimited, isValidPhone, isValidEmail } from '../utils/sanitize';
 
 export function ApplyModal({ isOpen, onClose }) {
+  const formMountedAt = useRef(Date.now());
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -12,7 +13,8 @@ export function ApplyModal({ isOpen, onClose }) {
     prepStage: 'Beginner (Starting Fresh)',
     education: 'Graduation Complete (B.Tech / B.A / B.Sc / B.Com)',
     statement: '',
-    hp_trap: '' // Hidden honeypot trap field
+    hp_trap: '', // Hidden honeypot trap field
+    user_organization_code: ''
   });
   const [honeypot, setHoneypot] = useState('');
   const [validationError, setValidationError] = useState('');
@@ -28,9 +30,11 @@ export function ApplyModal({ isOpen, onClose }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // 1. Strict Validation Rules (Mobile Number & Email Address)
-    if (!isValidPhone(formData.phone)) {
-      setValidationError("⚠️ Please enter a valid 10-digit mobile number (must start with 6, 7, 8, or 9).");
+    // 1. Strict 10-Digit Mobile Regex Validation
+    const contactNumber = (formData.phone || '').trim();
+    if (!/^[6-9]\d{9}$/.test(contactNumber)) {
+      alert("Please enter a valid 10-digit Indian mobile number.");
+      setValidationError("⚠️ Please enter a valid 10-digit Indian mobile number.");
       return;
     }
     if (!isValidEmail(formData.email)) {
@@ -39,29 +43,43 @@ export function ApplyModal({ isOpen, onClose }) {
     }
     setValidationError('');
 
-    // 2. Anti-Spam Honeypot Verification (Silently simulate success for the bot without writing to backend)
-    if ((honeypot && honeypot.trim() !== '') || isSpamBot(formData.hp_trap)) {
+    // 2. Anti-Spam Honeypot Verification
+    if (
+      (formData.user_organization_code && formData.user_organization_code.trim() !== '') ||
+      (honeypot && honeypot.trim() !== '') ||
+      isSpamBot(formData.hp_trap)
+    ) {
       setStatus('success');
       return;
     }
 
-    // 3. Client-Side Rate Limiting (3-Second Cooldown between submits)
+    // 3. 3-Second Fill Timer Defense
+    const elapsed_ms = Date.now() - formMountedAt.current;
+    if (elapsed_ms < 3000) {
+      alert("Please take a moment to review your details before submitting.");
+      setValidationError("⚠️ Please take a moment to review your details before submitting.");
+      return;
+    }
+
+    // 4. Client-Side Rate Limiting (3-Second Cooldown between submits)
     if (isRateLimited('ApplyModalForm', 3000)) {
       return;
     }
 
     setStatus('loading');
 
-    // 3. Input Sanitization
+    // 5. Input Sanitization
     const sanitizedPayload = sanitizePayload({
       fullName: formData.fullName,
       email: formData.email,
-      phone: formData.phone,
+      phone: contactNumber,
       city: formData.city,
       program: formData.program,
       prepStage: formData.prepStage,
       education: formData.education,
       statement: formData.statement,
+      user_organization_code: formData.user_organization_code || '',
+      elapsed_ms: elapsed_ms,
       hp_website_check: honeypot
     });
 
@@ -86,7 +104,8 @@ export function ApplyModal({ isOpen, onClose }) {
         prepStage: 'Beginner (Starting Fresh)',
         education: 'Graduation Complete (B.Tech / B.A / B.Sc / B.Com)',
         statement: '',
-        hp_trap: ''
+        hp_trap: '',
+        user_organization_code: ''
       });
     } catch (err) {
       console.error("Application Submission Error:", err);
@@ -127,6 +146,17 @@ export function ApplyModal({ isOpen, onClose }) {
 
         <form className="apply-form space-y-6" onSubmit={handleSubmit}>
           
+          {/* Lightweight Zero-Dependency Bot Defense Honeypot Field */}
+          <input
+            type="text"
+            name="user_organization_code"
+            value={formData.user_organization_code || ''}
+            onChange={(e) => setFormData(prev => ({ ...prev, user_organization_code: e.target.value }))}
+            tabIndex={-1}
+            autoComplete="off"
+            style={{ position: 'absolute', opacity: 0, zIndex: -1, pointerEvents: 'none', left: '-9999px' }}
+          />
+
           {/* Honeypot field - hidden from humans, traps automated bots */}
           <div style={{ display: 'none', position: 'absolute', left: '-9999px' }} aria-hidden="true">
             <input

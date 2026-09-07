@@ -1,14 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Send, CheckCircle, Phone, MessageSquare } from 'lucide-react';
 import { sanitizePayload, isSpamBot, isRateLimited, isValidPhone, isValidEmail } from '../utils/sanitize';
 
 export function ContactSection() {
+  const formMountedAt = useRef(Date.now());
   const [formData, setFormData] = useState({
     name: '',
     mobile: '',
     email: '',
     message: '',
-    hp_trap: '' // Hidden honeypot field
+    hp_trap: '', // Hidden honeypot field
+    user_organization_code: ''
   });
   const [honeypot, setHoneypot] = useState('');
   const [validationError, setValidationError] = useState('');
@@ -22,9 +24,11 @@ export function ContactSection() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // 1. Strict Validation Rules (Mobile Number & Email Address)
-    if (!isValidPhone(formData.mobile)) {
-      setValidationError("⚠️ Please enter a valid 10-digit mobile number (must start with 6, 7, 8, or 9).");
+    // 1. Strict 10-Digit Mobile Regex Validation
+    const contactNumber = (formData.mobile || '').trim();
+    if (!/^[6-9]\d{9}$/.test(contactNumber)) {
+      alert("Please enter a valid 10-digit Indian mobile number.");
+      setValidationError("⚠️ Please enter a valid 10-digit Indian mobile number.");
       return;
     }
     if (!isValidEmail(formData.email)) {
@@ -33,26 +37,40 @@ export function ContactSection() {
     }
     setValidationError('');
 
-    // 2. Anti-Spam Honeypot Verification (Silently simulate success for the bot without writing to backend)
-    if ((honeypot && honeypot.trim() !== '') || isSpamBot(formData.hp_trap)) {
+    // 2. Anti-Spam Honeypot Verification
+    if (
+      (formData.user_organization_code && formData.user_organization_code.trim() !== '') ||
+      (honeypot && honeypot.trim() !== '') ||
+      isSpamBot(formData.hp_trap)
+    ) {
       setStatus('success');
       return;
     }
 
-    // 3. Client-Side Rate Limiting (3-Second Cooldown)
+    // 3. 3-Second Fill Timer Defense
+    const elapsed_ms = Date.now() - formMountedAt.current;
+    if (elapsed_ms < 3000) {
+      alert("Please take a moment to review your details before submitting.");
+      setValidationError("⚠️ Please take a moment to review your details before submitting.");
+      return;
+    }
+
+    // 4. Client-Side Rate Limiting (3-Second Cooldown)
     if (isRateLimited('ContactForm', 3000)) {
       return;
     }
 
     setStatus('loading');
 
-    // 3. Input Sanitization
+    // 5. Input Sanitization
     const sanitizedPayload = sanitizePayload({
       formType: "contact",
       name: formData.name,
-      mobile: formData.mobile,
+      mobile: contactNumber,
       email: formData.email,
       message: formData.message,
+      user_organization_code: formData.user_organization_code || '',
+      elapsed_ms: elapsed_ms,
       hp_website_check: honeypot
     });
 
@@ -68,7 +86,7 @@ export function ContactSection() {
 
       setStatus('success');
       setHoneypot('');
-      setFormData({ name: '', mobile: '', email: '', message: '', hp_trap: '' });
+      setFormData({ name: '', mobile: '', email: '', message: '', hp_trap: '', user_organization_code: '' });
     } catch (err) {
       console.error("Form Submission Error:", err);
       setStatus('error');
@@ -99,6 +117,17 @@ export function ContactSection() {
           <div className="lg:col-span-7 card-parchment-3d p-6 sm:p-8 space-y-6">
             <form onSubmit={handleSubmit} className="contact-form space-y-5">
               
+              {/* Lightweight Zero-Dependency Bot Defense Honeypot Field */}
+              <input
+                type="text"
+                name="user_organization_code"
+                value={formData.user_organization_code || ''}
+                onChange={(e) => setFormData(prev => ({ ...prev, user_organization_code: e.target.value }))}
+                tabIndex={-1}
+                autoComplete="off"
+                style={{ position: 'absolute', opacity: 0, zIndex: -1, pointerEvents: 'none', left: '-9999px' }}
+              />
+
               {/* Honeypot field - hidden from humans, traps automated bots */}
               <div style={{ display: 'none', position: 'absolute', left: '-9999px' }} aria-hidden="true">
                 <input

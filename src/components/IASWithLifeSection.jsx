@@ -18,13 +18,16 @@ export default function IASWithLifeSection({ navigate }) {
   // Derived strictly from native browser vertical page scroll
   const [dayProgress, setDayProgress] = useState(0);
 
+  const formMountedAt = useRef(Date.now());
+
   // Form State
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
     phone: '',
     category: 'Managing Both',
-    stage: 'Preparing'
+    stage: 'Preparing',
+    user_organization_code: ''
   });
   const [honeypot, setHoneypot] = useState('');
   const [validationError, setValidationError] = useState('');
@@ -64,8 +67,10 @@ export default function IASWithLifeSection({ navigate }) {
     e.preventDefault();
 
     // 1. Strict Validation Rules (Mobile Number & Email Address)
-    if (!isValidPhone(formData.phone)) {
-      setValidationError("⚠️ Please enter a valid 10-digit mobile number (must start with 6, 7, 8, or 9).");
+    const contactNumber = (formData.phone || '').trim();
+    if (!/^[6-9]\d{9}$/.test(contactNumber)) {
+      alert("Please enter a valid 10-digit Indian mobile number.");
+      setValidationError("⚠️ Please enter a valid 10-digit Indian mobile number.");
       return;
     }
     if (!isValidEmail(formData.email)) {
@@ -75,8 +80,19 @@ export default function IASWithLifeSection({ navigate }) {
     setValidationError('');
 
     // 2. Anti-Spam Honeypot Verification (Silently simulate success for the bot without writing to backend)
-    if (honeypot && honeypot.trim() !== '') {
+    if (
+      (formData.user_organization_code && formData.user_organization_code.trim() !== '') ||
+      (honeypot && honeypot.trim() !== '')
+    ) {
       setIsSubmitted(true);
+      return;
+    }
+
+    // 3. 3-Second Fill Timer Defense
+    const elapsed_ms = Date.now() - formMountedAt.current;
+    if (elapsed_ms < 3000) {
+      alert("Please take a moment to review your details before submitting.");
+      setValidationError("⚠️ Please take a moment to review your details before submitting.");
       return;
     }
 
@@ -86,9 +102,11 @@ export default function IASWithLifeSection({ navigate }) {
       formType: "IAS_WITH_LIFE",
       fullName: formData.fullName,
       email: formData.email,
-      whatsapp: formData.phone,
+      whatsapp: contactNumber,
       profileType: formData.category,
       preparationStage: formData.stage,
+      user_organization_code: formData.user_organization_code || '',
+      elapsed_ms: elapsed_ms,
       hp_website_check: honeypot
     };
 
@@ -121,7 +139,8 @@ export default function IASWithLifeSection({ navigate }) {
       email: '',
       phone: '',
       category: 'Managing Both',
-      stage: 'Preparing'
+      stage: 'Preparing',
+      user_organization_code: ''
     });
   };
 
@@ -443,6 +462,17 @@ export default function IASWithLifeSection({ navigate }) {
                 {/* Form Fields */}
                 <form onSubmit={handleSubmit} className="space-y-4 text-xs font-sans">
                   
+                  {/* Lightweight Zero-Dependency Bot Defense Honeypot Field */}
+                  <input
+                    type="text"
+                    name="user_organization_code"
+                    value={formData.user_organization_code || ''}
+                    onChange={(e) => setFormData(prev => ({ ...prev, user_organization_code: e.target.value }))}
+                    tabIndex={-1}
+                    autoComplete="off"
+                    style={{ position: 'absolute', opacity: 0, zIndex: -1, pointerEvents: 'none', left: '-9999px' }}
+                  />
+
                   {/* Honeypot field - hidden from humans, traps automated bots */}
                   <div style={{ display: 'none', position: 'absolute', left: '-9999px' }} aria-hidden="true">
                     <input
