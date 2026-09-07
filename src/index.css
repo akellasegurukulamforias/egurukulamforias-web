@@ -902,14 +902,16 @@ h1, h2, h3, .section-title, .font-serif-header {
 /* ==========================================================================
    DOCUMENT ARTICLE CONTENT - HIGH-FIDELITY EDITORIAL TYPOGRAPHY
    ========================================================================== */
-.doc-article-content {
+.doc-article-content,
+.editorial-article-body {
   font-family: 'Plus Jakarta Sans', sans-serif !important;
   color: #292524 !important; /* stone-800 */
   line-height: 1.8 !important;
   font-size: 1.125rem !important; /* 18px */
 }
 
-.doc-article-content p {
+.doc-article-content p,
+.editorial-article-body p {
   margin-bottom: 1.25rem !important;
   line-height: 1.8 !important;
   color: #292524 !important;
@@ -924,7 +926,17 @@ h1, h2, h3, .section-title, .font-serif-header {
 .doc-article-content .editorial-heading-divider,
 .doc-article-content .editorial-subheading,
 .doc-article-content .title,
-.doc-article-content .subtitle {
+.doc-article-content .subtitle,
+.editorial-article-body h1,
+.editorial-article-body h2,
+.editorial-article-body h3,
+.editorial-article-body h4,
+.editorial-article-body h5,
+.editorial-article-body h6,
+.editorial-article-body .editorial-heading-divider,
+.editorial-article-body .editorial-subheading,
+.editorial-article-body .title,
+.editorial-article-body .subtitle {
   font-family: 'Playfair Display', 'Cinzel', serif !important;
   color: #6C1D18 !important;
   font-weight: 700 !important;
@@ -939,34 +951,49 @@ h1, h2, h3, .section-title, .font-serif-header {
 }
 
 .doc-article-content h1,
-.doc-article-content .editorial-heading-divider {
+.doc-article-content .editorial-heading-divider,
+.editorial-article-body h1,
+.editorial-article-body .editorial-heading-divider {
   font-size: 1.875rem !important;
   text-align: center !important;
 }
 
-.doc-article-content h2 {
+.doc-article-content h2,
+.editorial-article-body h2 {
   font-size: 1.5rem !important;
 }
 
 .doc-article-content h3,
-.doc-article-content .editorial-subheading {
+.doc-article-content .editorial-subheading,
+.editorial-article-body h3,
+.editorial-article-body .editorial-subheading {
   font-size: 1.25rem !important;
   color: #8B261E !important;
 }
 
-.doc-article-content h4 {
+.doc-article-content h4,
+.editorial-article-body h4 {
   font-size: 1.125rem !important;
   color: #9C442B !important;
 }
 
-.doc-article-content hr {
+.doc-article-content h5,
+.editorial-article-body h5 {
+  font-size: 1.05rem !important;
+  color: #8B261E !important;
+}
+
+.doc-article-content hr,
+.editorial-article-body hr {
   border: 0 !important;
   border-top: 1.5px solid #D5C3B0 !important;
   margin: 1.75rem 0 !important;
 }
 
 .doc-article-content strong,
-.doc-article-content b {
+.doc-article-content b,
+.editorial-article-body strong,
+.editorial-article-body b {
   font-family: 'Plus Jakarta Sans', sans-serif !important;
   font-weight: 700 !important;
   color: #1c1917 !important; /* stone-900 */
@@ -975,11 +1002,14 @@ h1, h2, h3, .section-title, .font-serif-header {
 }
 
 .doc-article-content em,
-.doc-article-content i {
+.doc-article-content i,
+.editorial-article-body em,
+.editorial-article-body i {
   font-style: italic !important;
 }
 
-.doc-article-content ul {
+.doc-article-content ul,
+.editorial-article-body ul {
   list-style-type: disc !important;
   list-style-position: outside !important;
   padding-left: 2rem !important;
@@ -987,7 +1017,8 @@ h1, h2, h3, .section-title, .font-serif-header {
   margin-bottom: 1.25rem !important;
 }
 
-.doc-article-content ol {
+.doc-article-content ol,
+.editorial-article-body ol {
   list-style-type: decimal !important;
   list-style-position: outside !important;
   padding-left: 2rem !important;
@@ -995,14 +1026,25 @@ h1, h2, h3, .section-title, .font-serif-header {
   margin-bottom: 1.25rem !important;
 }
 
-.doc-article-content li {
+.doc-article-content li,
+.editorial-article-body li {
   line-height: 1.75 !important;
   color: #292524 !important;
   margin-bottom: 0.5rem !important;
   padding-left: 0.25rem !important;
+  margin-left: 1.25rem !important;
+  list-style-type: disc !important;
+  display: list-item !important;
 }
 
-.doc-article-content img {
+.doc-article-content li p,
+.editorial-article-body li p {
+  margin-bottom: 0.25rem !important;
+  display: inline !important;
+}
+
+.doc-article-content img,
+.editorial-article-body img {
   border-radius: 1rem !important; /* rounded-2xl */
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1) !important; /* shadow-md */
   border: 1px solid rgba(213, 195, 176, 0.5) !important;
@@ -1016,7 +1058,8 @@ h1, h2, h3, .section-title, .font-serif-header {
   display: block !important;
 }
 
-.doc-article-content blockquote {
+.doc-article-content blockquote,
+.editorial-article-body blockquote {
   border-left: 4px solid #8C3A27 !important;
   padding-left: 1.25rem !important;
   padding-top: 0.75rem !important;
@@ -1030,7 +1073,8 @@ h1, h2, h3, .section-title, .font-serif-header {
   border-radius: 0 0.75rem 0.75rem 0 !important;
 }
 
-.doc-article-content table {
+.doc-article-content table,
+.editorial-article-body table {
   width: 100% !important;
   border-collapse: collapse !important;
   margin-top: 1.5rem !important;
@@ -1040,25 +1084,31 @@ h1, h2, h3, .section-title, .font-serif-header {
 }
 
 .doc-article-content th,
-.doc-article-content td {
+.doc-article-content td,
+.editorial-article-body th,
+.editorial-article-body td {
   border: 1px solid #D5C3B0 !important;
   padding: 0.75rem !important;
   font-size: 0.95rem !important;
 }
 
-.doc-article-content th {
+.doc-article-content th,
+.editorial-article-body th {
   background-color: #FAF6EE !important;
   font-weight: 700 !important;
   color: #6C1D18 !important;
 }
 
-.doc-article-content a {
+.doc-article-content a,
+.editorial-article-body a {
   color: #8C3A27 !important;
+  font-weight: 600 !important;
   text-decoration: underline !important;
   text-underline-offset: 3px !important;
   transition: color 0.2s ease !important;
 }
 
-.doc-article-content a:hover {
+.doc-article-content a:hover,
+.editorial-article-body a:hover {
   color: #6C1D18 !important;
 }

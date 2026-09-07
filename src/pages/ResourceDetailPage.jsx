@@ -41,12 +41,12 @@ function cleanDocHtml(rawHtml) {
     }
   });
 
-  // 4. Convert Google Docs title/subtitle paragraphs or centered headers into consistent editorial headings
-  html = html.replace(/<p[^>]*class=["'][^"']*\b(?:title|subtitle|header|headline)\b[^"']*["'][^>]*>([\s\S]*?)<\/p>/gi, '<h2 class="editorial-heading-divider text-center">$1</h2>');
-  html = html.replace(/<p[^>]*(?:text-align:\s*center|align=["']center["'])[^>]*>([\s\S]*?)<\/p>/gi, '<h2 class="editorial-heading-divider text-center">$1</h2>');
+  // 4. Convert Google Docs title/subtitle paragraphs or centered headers (including text-center classes) into consistent editorial headings
+  html = html.replace(/<p[^>]*class=["'][^"']*\b(?:title|subtitle|header|headline)\b[^"']*["'][^>]*>\s*(?:<b>|<strong>)?([\s\S]*?)(?:<\/b>|<\/strong>)?\s*<\/p>/gi, '<h2 class="editorial-heading-divider text-center">$1</h2>');
+  html = html.replace(/<p[^>]*(?:text-align:\s*center|align=["']center["']|\btext-center\b)[^>]*>\s*(?:<b>|<strong>)?([\s\S]*?)(?:<\/b>|<\/strong>)?\s*<\/p>/gi, '<h2 class="editorial-heading-divider text-center">$1</h2>');
 
   // 5. Convert standalone bold/strong heading questions or section labels into styled subheadings with divider lines
-  html = html.replace(/<p[^>]*>\s*(?:<b>|<strong>|<span[^>]*font-weight[^>]*>)\s*([^<]{3,120}?(?:\?|:))\s*(?:<\/b>|<\/strong>|<\/span>)\s*<\/p>/gi, '<h3 class="editorial-subheading">$1</h3>');
+  html = html.replace(/<p[^>]*>\s*(?:<b>|<strong>|<span[^>]*font-weight[^>]*>)\s*([^<]{3,140}?(?:\?|:)?)\s*(?:<\/b>|<\/strong>|<\/span>)\s*<\/p>/gi, '<h3 class="editorial-subheading">$1</h3>');
 
   // 6. Ensure all images are responsive, centered, have shadow, and load with referrerPolicy="no-referrer"
   html = html.replace(/<img\s+([^>]*?)>/gi, (match, attributes) => {
@@ -435,7 +435,7 @@ export default function ResourceDetailPage({ slug, navigate }) {
         {/* 5. FULL ARTICLE CONTENT CONTAINER WITH PROSE & UNCONSTRAINED SPACING */}
         {fullContentHtml ? (
           <div 
-            className="doc-article-content max-w-none text-stone-800 font-sans leading-relaxed my-8 [&_ul]:pl-6 [&_ul]:space-y-2 [&_li]:list-disc [&_li]:pl-1"
+            className="doc-article-content editorial-article-body prose prose-stone max-w-none text-stone-800 text-base md:text-lg leading-relaxed font-sans select-text my-8 [&_h1]:text-2xl sm:[&_h1]:text-3xl [&_h1]:font-bold [&_h1]:font-serif [&_h1]:text-[#6C1D18] [&_h1]:mt-8 [&_h1]:mb-4 [&_h1]:border-b [&_h1]:border-[#D5C3B0]/60 [&_h1]:pb-2 [&_h2]:text-xl sm:[&_h2]:text-2xl [&_h2]:font-bold [&_h2]:font-serif [&_h2]:text-[#6C1D18] [&_h2]:mt-7 [&_h2]:mb-3 [&_h2]:border-b [&_h2]:border-[#D5C3B0]/40 [&_h2]:pb-1.5 [&_h3]:text-lg sm:[&_h3]:text-xl [&_h3]:font-bold [&_h3]:font-serif [&_h3]:text-[#8B261E] [&_h3]:mt-6 [&_h3]:mb-2 [&_p]:mb-5 [&_p]:leading-relaxed [&_p]:text-[#2C221E] [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:space-y-2 [&_ul]:mb-5 [&_ul]:text-[#3D3028] [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:space-y-2 [&_ol]:mb-5 [&_ol]:text-[#3D3028] [&_li]:leading-relaxed [&_strong]:font-bold [&_strong]:text-[#140C08] [&_b]:font-bold [&_b]:text-[#140C08] [&_blockquote]:border-l-4 [&_blockquote]:border-[#8C3A27] [&_blockquote]:pl-5 [&_blockquote]:italic [&_blockquote]:text-[#5C4028] [&_blockquote]:my-6 [&_blockquote]:bg-[#8C3A27]/5 [&_blockquote]:py-3 [&_blockquote]:pr-4 [&_blockquote]:rounded-r-xl [&_img]:rounded-2xl [&_img]:shadow-lg [&_img]:mx-auto [&_img]:my-6 [&_img]:max-h-[500px] [&_img]:object-contain [&_img]:block [&_img]:border [&_img]:border-[#D5C3B0]/40 [&_table]:w-full [&_table]:border-collapse [&_table]:my-6 [&_table]:rounded-xl [&_table]:overflow-hidden [&_td]:border [&_td]:border-[#D5C3B0] [&_td]:p-3 [&_td]:text-sm [&_th]:border [&_th]:border-[#D5C3B0] [&_th]:p-3 [&_th]:bg-[#FAF6EE] [&_th]:font-bold [&_th]:text-[#6C1D18] [&_th]:text-sm [&_a]:text-[#8C3A27] hover:[&_a]:text-[#6C1D18] [&_a]:underline [&_a]:underline-offset-2"
             dangerouslySetInnerHTML={{ __html: fullContentHtml }} 
             onClick={handleContentClick}
           />
