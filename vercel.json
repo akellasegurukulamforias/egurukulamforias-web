@@ -18,6 +18,14 @@
       "destination": "/apple-touch-icon:slug$1"
     },
     {
+      "source": "/resources/:slug*",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/current-affairs/:slug*",
+      "destination": "/index.html"
+    },
+    {
       "source": "/((?!sitemap\\.xml|robots\\.txt|favicon|apple-touch-icon|.*\\.[\\w]+$).*)",
       "destination": "/index.html"
     }

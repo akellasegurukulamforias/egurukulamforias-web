@@ -1,0 +1,504 @@
+import React, { useMemo, useEffect } from 'react';
+import { 
+  ArrowLeft, 
+  Calendar, 
+  Tag, 
+  Clock, 
+  ChevronLeft, 
+  ChevronRight, 
+  ShieldAlert,
+  Loader2,
+  BookOpen
+} from 'lucide-react';
+import { useCMSData } from '../hooks/useCMSData';
+import { sortCurrentAffairsByDate, formatDisplayDate, parseDateToTimestamp } from '../utils/dateUtils';
+import { createSlug, getDirectImageUrl, getSecondaryImageUrl } from './CurrentAffairsReader';
+
+/**
+ * Clean and optimize raw HTML for high-fidelity native editorial typography
+ */
+function cleanDocHtml(rawHtml) {
+  if (!rawHtml || typeof rawHtml !== 'string') return '';
+
+  let html = rawHtml;
+
+  // 1. Extract inner body content if a complete HTML page is provided
+  const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+  if (bodyMatch && bodyMatch[1]) {
+    html = bodyMatch[1];
+  }
+
+  // 2. Strip <style> and <script> blocks to preserve our master typography
+  html = html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+  html = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+
+  // 3. Remove Google's redirection wrappers
+  html = html.replace(/href=["']https:\/\/www\.google\.com\/url\?q=([^&"']+)[^"']*["']/gi, (match, dest) => {
+    try {
+      return `href="${decodeURIComponent(dest)}" target="_blank" rel="noopener noreferrer"`;
+    } catch (e) {
+      return `href="${dest}" target="_blank" rel="noopener noreferrer"`;
+    }
+  });
+
+  // 4. Convert Google Docs title/subtitle paragraphs or centered headers into consistent editorial headings
+  html = html.replace(/<p[^>]*class=["'][^"']*\b(?:title|subtitle|header|headline)\b[^"']*["'][^>]*>([\s\S]*?)<\/p>/gi, '<h2 class="editorial-heading-divider text-center">$1</h2>');
+  html = html.replace(/<p[^>]*(?:text-align:\s*center|align=["']center["'])[^>]*>([\s\S]*?)<\/p>/gi, '<h2 class="editorial-heading-divider text-center">$1</h2>');
+
+  // 5. Convert standalone bold/strong heading questions or section labels into styled subheadings with divider lines
+  html = html.replace(/<p[^>]*>\s*(?:<b>|<strong>|<span[^>]*font-weight[^>]*>)\s*([^<]{3,120}?(?:\?|:))\s*(?:<\/b>|<\/strong>|<\/span>)\s*<\/p>/gi, '<h3 class="editorial-subheading">$1</h3>');
+
+  // 6. Ensure all images are responsive, centered, have shadow, and load with referrerPolicy="no-referrer"
+  html = html.replace(/<img\s+([^>]*?)>/gi, (match, attributes) => {
+    let cleanAttrs = attributes;
+    cleanAttrs = cleanAttrs.replace(/\b(width|height)=["'][^"']*["']/gi, '');
+    
+    if (!/referrerpolicy/i.test(cleanAttrs)) {
+      cleanAttrs += ' referrerpolicy="no-referrer"';
+    }
+    if (!/loading/i.test(cleanAttrs)) {
+      cleanAttrs += ' loading="lazy"';
+    }
+
+    return `<img ${cleanAttrs} class="max-w-full rounded-2xl shadow-md my-6 mx-auto block object-contain border border-[#D5C3B0]/40" />`;
+  });
+
+  // 7. Clean empty paragraph tags
+  html = html.replace(/<p[^>]*>\s*(?:&nbsp;|<br\s*\/?>|\s)*<\/p>/gi, '');
+
+  return html;
+}
+
+/**
+ * Estimate reading time in minutes based on word count
+ */
+function estimateReadingTime(content) {
+  if (!content || typeof content !== 'string') return '3 min read';
+  const cleanText = content.replace(/<[^>]*>/g, ' ');
+  const words = cleanText.trim().split(/\s+/).filter(Boolean).length;
+  const minutes = Math.max(1, Math.ceil(words / 200));
+  return `${minutes} min read`;
+}
+
+// Convert date string to ISO YYYY-MM-DD
+function formatToYMD(dateVal) {
+  if (!dateVal) return new Date().toISOString().split('T')[0];
+  if (typeof dateVal === 'string') {
+    const trimmed = dateVal.trim();
+    const dmyMatch = trimmed.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})/);
+    if (dmyMatch) {
+      return `${dmyMatch[3]}-${String(dmyMatch[2]).padStart(2, '0')}-${String(dmyMatch[1]).padStart(2, '0')}`;
+    }
+    const ymdMatch = trimmed.match(/^(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})/);
+    if (ymdMatch) {
+      return `${ymdMatch[1]}-${String(ymdMatch[2]).padStart(2, '0')}-${String(ymdMatch[3]).padStart(2, '0')}`;
+    }
+  }
+  const timestamp = parseDateToTimestamp(dateVal);
+  if (timestamp > 0) {
+    const d = new Date(timestamp);
+    return d.toISOString().split('T')[0];
+  }
+  return new Date().toISOString().split('T')[0];
+}
+
+// Helper to normalize string keys by stripping non-alphanumeric characters
+const normalizeKey = (str) => String(str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+export default function ResourceDetailPage({ slug, navigate }) {
+  const { data, loading: cmsLoading } = useCMSData();
+
+  // Helper to check active status
+  const isItemActive = (obj) => {
+    if (!obj || typeof obj !== 'object') return false;
+    if (obj.Active === false || obj.active === false || obj.Is_Active === false || obj.is_active === false) return false;
+    if (obj.Status && String(obj.Status).toLowerCase() === 'inactive') return false;
+    if (obj.status && String(obj.status).toLowerCase() === 'inactive') return false;
+    return true;
+  };
+
+  // Sorted list of active resources (latest first)
+  const sortedResources = useMemo(() => {
+    const list = Array.isArray(data?.resources) ? data.resources.filter(isItemActive) : [];
+    return sortCurrentAffairsByDate(list);
+  }, [data?.resources]);
+
+  const targetSlug = slug || '';
+  const targetNorm = normalizeKey(targetSlug);
+
+  // Resilient article matching: direct slug, normalized slug, normalized title, or docId
+  const currentIndex = useMemo(() => {
+    if (!sortedResources || sortedResources.length === 0) return -1;
+    return sortedResources.findIndex(art => {
+      const artTitle = art.Title || art.title || '';
+      const artSlug = art.slug || art.Slug || createSlug(artTitle);
+      const docId = art.docId || art.Doc_ID || art.id || '';
+
+      return (
+        artSlug === targetSlug ||
+        normalizeKey(artSlug) === targetNorm ||
+        normalizeKey(artTitle) === targetNorm ||
+        (docId && normalizeKey(docId) === targetNorm)
+      );
+    });
+  }, [sortedResources, targetSlug, targetNorm]);
+
+  const article = currentIndex !== -1 ? sortedResources[currentIndex] : null;
+  const prevArticle = currentIndex > 0 ? sortedResources[currentIndex - 1] : null;
+  const nextArticle = currentIndex >= 0 && currentIndex < sortedResources.length - 1 ? sortedResources[currentIndex + 1] : null;
+
+  // Extract article fields
+  const title = article?.Title || article?.title || 'Study Resource';
+  const date = formatDisplayDate(article?.Date || article?.date) || 'Recent';
+  const category = article?.Category || article?.category || 'Study Material';
+  const rawBanner = article?.Banner_Image || article?.banner_image || article?.Banner || article?.banner || article?.Image || article?.image;
+  const bannerImage = getDirectImageUrl(rawBanner);
+  const shortSummary = article?.Short_Summary || article?.short_summary || article?.Summary || article?.summary || article?.Description || article?.description || '';
+
+  // Extract static Full_Content payload
+  const rawFullContent = 
+    article?.Full_Content || 
+    article?.full_content || 
+    article?.Article_HTML || 
+    article?.article_html || 
+    article?.HTML_Content || 
+    article?.html_content || 
+    article?.Content_HTML || 
+    article?.content_html || 
+    article?.HTML || 
+    article?.html || 
+    article?.Content || 
+    article?.content || 
+    article?.Article || 
+    article?.article || 
+    '';
+
+  const fullContentHtml = rawFullContent ? cleanDocHtml(rawFullContent) : '';
+  const readingTime = estimateReadingTime(fullContentHtml || shortSummary);
+
+  const navigateToResource = (art) => {
+    if (!art) return;
+    const artTitle = art.Title || art.title || '';
+    const artSlug = art.slug || art.Slug || createSlug(artTitle);
+    navigate(`/resources/${artSlug}`);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // SEO & Dynamic Metadata: Document Title, Meta Description, JSON-LD Schema
+  useEffect(() => {
+    if (article && title) {
+      // 1. Set document title
+      document.title = `${title} | e-Gurukulam for IAS`;
+
+      // 2. Set / update meta description
+      let metaDesc = document.querySelector('meta[name="description"]');
+      if (!metaDesc) {
+        metaDesc = document.createElement('meta');
+        metaDesc.setAttribute('name', 'description');
+        document.head.appendChild(metaDesc);
+      }
+      const descContent = shortSummary || `${title} - In-depth study resource and analytical notes by e-Gurukulam for IAS.`;
+      metaDesc.setAttribute('content', descContent);
+
+      // 3. Inject standard Article Schema.org JSON-LD in head
+      const schemaId = 'resource-schema-jsonld';
+      let schemaScript = document.getElementById(schemaId);
+      if (!schemaScript) {
+        schemaScript = document.createElement('script');
+        schemaScript.id = schemaId;
+        schemaScript.type = 'application/ld+json';
+        document.head.appendChild(schemaScript);
+      }
+
+      const articleSlug = article.slug || article.Slug || createSlug(title);
+      const isoDate = formatToYMD(article.Date || article.date);
+
+      const schemaData = {
+        '@context': 'https://schema.org',
+        '@type': 'Article',
+        'headline': title,
+        'description': descContent,
+        'image': bannerImage ? [bannerImage] : [],
+        'datePublished': isoDate,
+        'dateModified': isoDate,
+        'author': [{
+          '@type': 'Person',
+          'name': 'Akella Raghavendra',
+          'url': 'https://egurukulamforias.com/about'
+        }],
+        'publisher': {
+          '@type': 'Organization',
+          'name': 'e-Gurukulam for IAS',
+          'logo': {
+            '@type': 'ImageObject',
+            'url': 'https://egurukulamforias.com/favicon-192x192.png'
+          }
+        },
+        'mainEntityOfPage': {
+          '@type': 'WebPage',
+          '@id': `https://egurukulamforias.com/resources/${articleSlug}`
+        }
+      };
+      schemaScript.textContent = JSON.stringify(schemaData);
+
+      // 4. GA4 Page View tracking
+      if (typeof window !== 'undefined' && typeof window.gtag === 'function') {
+        window.gtag('config', 'G-T5W96019N1', {
+          page_path: window.location.pathname,
+          page_location: window.location.href,
+          page_title: document.title,
+        });
+      }
+    }
+
+    return () => {
+      // Clean up JSON-LD on unmount
+      const schemaScript = document.getElementById('resource-schema-jsonld');
+      if (schemaScript) {
+        schemaScript.remove();
+      }
+    };
+  }, [article, title, shortSummary, bannerImage]);
+
+  // Intercept clicks on internal links within article HTML to prevent full page reloads
+  const handleContentClick = (e) => {
+    const anchor = e.target.closest('a');
+    if (!anchor) return;
+
+    const href = anchor.getAttribute('href');
+    if (!href || href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:')) return;
+
+    try {
+      const url = new URL(href, window.location.origin);
+      const isInternal = 
+        url.origin === window.location.origin || 
+        url.hostname.includes('egurukulamforias') ||
+        url.hostname === 'localhost' ||
+        url.hostname === '127.0.0.1';
+
+      if (isInternal) {
+        e.preventDefault();
+        const targetPath = url.pathname + url.search + url.hash;
+        navigate(targetPath);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    } catch (err) {
+      if (href.startsWith('/')) {
+        e.preventDefault();
+        navigate(href);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }
+  };
+
+  // 1. SKELETON LOADER FOR DIRECT DEEP-LINK ENTRANCE (WHILE CMS DATA IS LOADING)
+  if (cmsLoading && !article) {
+    return (
+      <div className="min-h-screen bg-[#FFFDF8] text-[#221814] py-12 px-4 sm:px-6 lg:px-8 select-text">
+        <div className="max-w-4xl mx-auto space-y-8 animate-fade-in text-left">
+          {/* Top Sticky Breadcrumb Placeholder */}
+          <div className="bg-[#FAF6EE] p-5 sm:p-6 rounded-3xl border border-[#D5C3B0] shadow-sm flex items-center justify-between">
+            <div className="h-4 bg-[#D5C3B0]/40 rounded-md w-36 animate-pulse"></div>
+            <div className="h-4 bg-[#D5C3B0]/30 rounded-md w-24 animate-pulse"></div>
+          </div>
+
+          {/* Title Placeholder */}
+          <div className="space-y-3 pb-6 border-b border-[#D5C3B0]/60 animate-pulse">
+            <div className="h-8 sm:h-12 bg-[#D5C3B0]/50 rounded-xl w-4/5"></div>
+            <div className="h-6 sm:h-8 bg-[#D5C3B0]/30 rounded-xl w-2/3"></div>
+          </div>
+
+          {/* Hero Banner Placeholder */}
+          <div className="w-full h-64 sm:h-96 rounded-3xl bg-[#D5C3B0]/20 border border-[#D5C3B0] animate-pulse flex items-center justify-center">
+            <div className="flex items-center gap-2.5 text-xs font-serif italic text-[#8C3A27] font-bold">
+              <Loader2 className="w-5 h-5 animate-spin" />
+              <span>Loading resource analysis...</span>
+            </div>
+          </div>
+
+          {/* Summary Box Placeholder */}
+          <div className="p-6 rounded-2xl bg-[#F4ECE1] border-l-4 border-[#8C3A27] space-y-2 animate-pulse">
+            <div className="h-4 bg-[#D5C3B0]/40 rounded-md w-full"></div>
+            <div className="h-4 bg-[#D5C3B0]/40 rounded-md w-5/6"></div>
+          </div>
+
+          {/* Multi-Paragraph Shimmer */}
+          <div className="space-y-4 pt-4 animate-pulse">
+            <div className="h-6 bg-[#D5C3B0]/40 rounded-md w-1/3 my-4"></div>
+            <div className="h-4 bg-[#D5C3B0]/30 rounded-md w-full"></div>
+            <div className="h-4 bg-[#D5C3B0]/30 rounded-md w-11/12"></div>
+            <div className="h-4 bg-[#D5C3B0]/30 rounded-md w-4/5"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 2. RESOURCE NOT FOUND STATE (CMS FETCH COMPLETED AND SLUG DOES NOT MATCH)
+  if (!cmsLoading && !article) {
+    return (
+      <div className="min-h-screen bg-[#FFFDF8] text-[#221814] py-16 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-xl mx-auto space-y-6 text-center bg-[#FAF6EE] p-8 sm:p-12 rounded-3xl border border-[#D5C3B0] shadow-sm">
+          <ShieldAlert className="w-12 h-12 text-[#8C3A27] mx-auto opacity-80" />
+          <h2 className="font-serif-header text-2xl sm:text-3xl font-extrabold text-[#221814]">
+            Resource Not Found
+          </h2>
+          <p className="text-xs sm:text-sm font-serif italic text-[#5C4028] font-semibold leading-relaxed">
+            The requested study resource could not be located or may have been archived.
+          </p>
+          <div className="pt-2">
+            <button
+              type="button"
+              onClick={() => navigate('/resources')}
+              className="btn-terracotta-pill text-xs py-3 px-6 font-serif font-bold cursor-pointer inline-flex items-center gap-2"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Back to Resources</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 3. FULL EDITORIAL RESOURCE VIEW
+  return (
+    <div className="min-h-screen bg-[#FFFDF8] text-[#221814] py-12 px-4 sm:px-6 lg:px-8 select-text">
+      <div className="max-w-4xl mx-auto space-y-8 animate-fade-in text-left">
+        
+        {/* 1. STICKY "← Back to Resources" NAVIGATION BAR */}
+        <div className="sticky top-16 z-20 bg-[#FAF6EE]/95 backdrop-blur-md p-4 sm:p-5 rounded-3xl border border-[#D5C3B0] shadow-sm flex flex-wrap items-center justify-between gap-4">
+          <button
+            type="button"
+            onClick={() => navigate('/resources')}
+            className="inline-flex items-center gap-2 text-xs sm:text-sm font-serif font-bold text-[#8C3A27] hover:text-[#732D1B] transition-colors cursor-pointer group"
+          >
+            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+            <span>Back to Resources</span>
+          </button>
+
+          {/* Badges: Category tags & Date */}
+          <div className="flex items-center gap-2 text-xs">
+            {category && (
+              <span className="inline-flex items-center gap-1.5 font-mono text-[#8C3A27] font-bold bg-[#8C3A27]/10 px-3 py-1 rounded-md border border-[#8C3A27]/20">
+                <Tag className="w-3.5 h-3.5" />
+                <span>{category}</span>
+              </span>
+            )}
+            {date && (
+              <span className="inline-flex items-center gap-1.5 font-serif text-[#7A6B5D] italic font-semibold">
+                <Calendar className="w-3.5 h-3.5 text-[#8C3A27]" />
+                <span>{date}</span>
+              </span>
+            )}
+            <span className="inline-flex items-center gap-1.5 font-mono text-[#7A6B5D] font-medium bg-[#140C08]/5 px-2.5 py-0.5 rounded-md hidden sm:inline-flex">
+              <Clock className="w-3.5 h-3.5 text-[#C5A059]" />
+              <span>{readingTime}</span>
+            </span>
+          </div>
+        </div>
+
+        {/* 2. TITLE: BOLD BURGUNDY (#6C1D18) SERIF HEADLINE */}
+        <h1 className="text-[#6C1D18] font-serif text-3xl md:text-5xl font-bold mb-6 pb-6 border-b border-[#D5C3B0]/60 leading-tight tracking-tight">
+          {title}
+        </h1>
+
+        {/* 3. HERO BANNER IMAGE */}
+        {bannerImage && (
+          <div className="w-full overflow-hidden rounded-3xl border border-[#D5C3B0] shadow-xl max-h-[480px] bg-black/5">
+            <img 
+              src={bannerImage} 
+              alt={title} 
+              loading="lazy"
+              referrerPolicy="no-referrer"
+              className="w-full h-auto object-cover max-h-[480px] mx-auto block"
+              onError={(e) => {
+                const secondary = getSecondaryImageUrl(rawBanner);
+                if (secondary && e.target.src !== secondary) {
+                  e.target.src = secondary;
+                } else {
+                  e.target.onerror = null;
+                  e.target.style.display = 'none';
+                }
+              }}
+            />
+          </div>
+        )}
+
+        {/* 4. SUMMARY HIGHLIGHT CONTAINER */}
+        {shortSummary && (
+          <div className="p-5 sm:p-6 rounded-2xl bg-[#F4ECE1] border-l-4 border-[#8C3A27] text-[#3D3028] font-serif italic text-base sm:text-lg leading-relaxed shadow-2xs">
+            {shortSummary}
+          </div>
+        )}
+
+        {/* 5. FULL ARTICLE CONTENT CONTAINER WITH PROSE & UNCONSTRAINED SPACING */}
+        {fullContentHtml ? (
+          <div 
+            className="doc-article-content max-w-none text-stone-800 font-sans leading-relaxed my-8 [&_ul]:pl-6 [&_ul]:space-y-2 [&_li]:list-disc [&_li]:pl-1"
+            dangerouslySetInnerHTML={{ __html: fullContentHtml }} 
+            onClick={handleContentClick}
+          />
+        ) : (
+          <div className="py-12 text-center space-y-3 bg-[#FAF6EE] p-8 rounded-3xl border border-[#D5C3B0]">
+            <ShieldAlert className="w-10 h-10 text-[#8C3A27] mx-auto opacity-80" />
+            <h3 className="font-serif-header text-xl font-bold text-[#221814]">
+              Resource Content Briefing Finalizing
+            </h3>
+            <p className="text-xs sm:text-sm font-serif italic text-[#5C4028] font-semibold">
+              The full analytical briefing for this study resource is being finalized by our faculty.
+            </p>
+          </div>
+        )}
+
+        {/* 6. BOTTOM NAVIGATION (ALL RESOURCES + READ NEXT) */}
+        <div className="bg-[#FAF6EE] p-5 sm:p-6 rounded-3xl border border-[#D5C3B0] shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
+          
+          {/* Left: All Resources Return Button */}
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            <button
+              type="button"
+              onClick={() => navigate('/resources')}
+              className="btn-terracotta-outline-pill text-xs py-2.5 px-6 font-serif font-bold cursor-pointer shrink-0 w-full sm:w-auto"
+            >
+              <span>← All Study Resources</span>
+            </button>
+
+            {prevArticle && (
+              <button
+                type="button"
+                onClick={() => navigateToResource(prevArticle)}
+                className="hidden md:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0]/60 hover:border-[#8C3A27] transition-all group cursor-pointer text-xs font-serif font-bold text-[#221814] hover:text-[#8C3A27]"
+                title={prevArticle.Title || prevArticle.title}
+              >
+                <ChevronLeft className="w-4 h-4 text-[#8C3A27] group-hover:-translate-x-0.5 transition-transform" />
+                <span>Previous</span>
+              </button>
+            )}
+          </div>
+
+          {/* Right: READ NEXT Card */}
+          {nextArticle && (
+            <button
+              type="button"
+              onClick={() => navigateToResource(nextArticle)}
+              className="flex items-center justify-end text-right gap-3 p-3 sm:p-3.5 px-5 rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0]/60 hover:border-[#8C3A27] transition-all group cursor-pointer w-full sm:w-auto max-w-md shadow-2xs hover:shadow-xs sm:ml-auto"
+            >
+              <div className="space-y-0.5">
+                <span className="text-[10px] font-mono uppercase font-bold text-[#8C3A27] tracking-wider block">
+                  READ NEXT
+                </span>
+                <p className="text-xs sm:text-sm font-serif font-bold text-[#221814] line-clamp-1 group-hover:text-[#8C3A27] transition-colors">
+                  {nextArticle.Title || nextArticle.title}
+                </p>
+              </div>
+              <ChevronRight className="w-5 h-5 text-[#8C3A27] shrink-0 group-hover:translate-x-1 transition-transform" />
+            </button>
+          )}
+
+        </div>
+
+      </div>
+    </div>
+  );
+}

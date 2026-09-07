@@ -1,7 +1,7 @@
 import { sortCurrentAffairsByDate } from '../utils/dateUtils';
 
 export const CMS_API_ENDPOINT = 'https://script.google.com/macros/s/AKfycbyOt8dZ7S9ot1Zy3GyyXgsDTPsrF016odbaXhf9DXXPMllvQzmQvKabubXZFzRra51x/exec';
-export const LOCAL_STORAGE_KEY = 'egk_cms_data_v6'; // Bumped to v6 for sorted current affairs order (latest first)
+export const LOCAL_STORAGE_KEY = 'egk_cms_data_v7'; // Bumped to v7 for dynamic resources workflow
 
 // Robust Google Drive & Web Image URL Formatter
 export function formatCMSImageUrl(url) {
@@ -56,6 +56,15 @@ export function getCMSImageLink(item) {
   return formatCMSImageUrl(rawUrl);
 }
 
+// Helper to check active status
+export function isItemActive(obj) {
+  if (!obj || typeof obj !== 'object') return false;
+  if (obj.Active === false || obj.active === false || obj.Is_Active === false || obj.is_active === false) return false;
+  if (obj.Status && obj.Status.toString().toLowerCase() === 'inactive') return false;
+  if (obj.status && obj.status.toString().toLowerCase() === 'inactive') return false;
+  return true;
+}
+
 // Synchronously read cached data from localStorage for instant 0ms initial render
 export function getCachedCMSData() {
   try {
@@ -65,6 +74,9 @@ export function getCachedCMSData() {
       if (parsed && typeof parsed === 'object') {
         if (Array.isArray(parsed.currentAffairs)) {
           parsed.currentAffairs = sortCurrentAffairsByDate(parsed.currentAffairs);
+        }
+        if (Array.isArray(parsed.resources)) {
+          parsed.resources = sortCurrentAffairsByDate(parsed.resources);
         }
         return parsed;
       }
@@ -102,14 +114,6 @@ export async function fetchCMSData(forceRevalidate = false) {
 
       const rawData = await response.json();
 
-      // Helper to check active status
-      const isItemActive = (obj) => {
-        if (!obj || typeof obj !== 'object') return false;
-        if (obj.Active === false || obj.active === false || obj.Is_Active === false || obj.is_active === false) return false;
-        if (obj.Status && obj.Status.toString().toLowerCase() === 'inactive') return false;
-        if (obj.status && obj.status.toString().toLowerCase() === 'inactive') return false;
-        return true;
-      };
 
       const rawSocial = Array.isArray(rawData.socialPlatforms)
         ? rawData.socialPlatforms
@@ -144,7 +148,7 @@ export async function fetchCMSData(forceRevalidate = false) {
         activePopup: rawData.activePopup && typeof rawData.activePopup === 'object' ? rawData.activePopup : null,
         liveTicker: Array.isArray(rawData.liveTicker) ? rawData.liveTicker : [],
         currentAffairs: sortCurrentAffairsByDate(Array.isArray(rawData.currentAffairs) ? rawData.currentAffairs : []),
-        resources: Array.isArray(rawData.resources) ? rawData.resources : [],
+        resources: sortCurrentAffairsByDate(Array.isArray(rawData.resources) ? rawData.resources : []),
         socialPlatforms,
         testSeries: Array.isArray(rawData.testSeries) 
           ? rawData.testSeries 

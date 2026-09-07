@@ -157,9 +157,9 @@ const STATIC_ROUTES = [
   }
 ];
 
-async function fetchCurrentAffairsArticles() {
+async function fetchCMSArticlesAndResources() {
   try {
-    console.log('[Sitemap] Fetching active current affairs from Google Apps Script CMS...');
+    console.log('[Sitemap] Fetching active current affairs and resources from Google Apps Script CMS...');
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 12000);
 
@@ -175,10 +175,14 @@ async function fetchCurrentAffairsArticles() {
     }
 
     const data = await response.json();
-    const rawList = Array.isArray(data.currentAffairs) ? data.currentAffairs : [];
-    const activeList = rawList.filter(isItemActive);
-    console.log(`[Sitemap] Successfully fetched ${activeList.length} active current affairs articles from live CMS.`);
-    return activeList;
+    const rawAffairs = Array.isArray(data.currentAffairs) ? data.currentAffairs : [];
+    const rawResources = Array.isArray(data.resources) ? data.resources : [];
+
+    const activeAffairs = rawAffairs.filter(isItemActive);
+    const activeResources = rawResources.filter(isItemActive);
+
+    console.log(`[Sitemap] Fetched ${activeAffairs.length} active current affairs and ${activeResources.length} active resources from live CMS.`);
+    return { currentAffairs: activeAffairs, resources: activeResources };
   } catch (err) {
     console.warn(`[Sitemap] Warning: Could not fetch from live CMS endpoint (${err.message}). Using local backup data.`);
     try {
@@ -187,13 +191,13 @@ async function fetchCurrentAffairsArticles() {
         const backupList = JSON.parse(rawBackup);
         if (Array.isArray(backupList)) {
           console.log(`[Sitemap] Loaded ${backupList.length} articles from local backup file.`);
-          return backupList.filter(isItemActive);
+          return { currentAffairs: backupList.filter(isItemActive), resources: [] };
         }
       }
     } catch (readErr) {
       console.error('[Sitemap] Failed to read local backup:', readErr.message);
     }
-    return [];
+    return { currentAffairs: [], resources: [] };
   }
 }
 
@@ -215,11 +219,13 @@ async function generateSitemap() {
     }
   }
 
-  // 2. Fetch and Append Dynamic Current Affairs Articles
-  const articles = await fetchCurrentAffairsArticles();
+  // 2. Fetch and Append Dynamic Current Affairs Articles & Resources
+  const { currentAffairs, resources } = await fetchCMSArticlesAndResources();
   let articleCount = 0;
+  let resourceCount = 0;
 
-  for (const art of articles) {
+  // Append Current Affairs
+  for (const art of currentAffairs) {
     const title = art.Title || art.title || '';
     const rawSlug = art.slug || art.Slug || createSlug(title);
     if (!rawSlug) continue;
@@ -239,6 +245,30 @@ async function generateSitemap() {
         priority: '0.8'
       });
       articleCount++;
+    }
+  }
+
+  // Append Resources
+  for (const res of resources) {
+    const title = res.Title || res.title || '';
+    const rawSlug = res.slug || res.Slug || createSlug(title);
+    if (!rawSlug) continue;
+
+    const slug = encodeURIComponent(String(rawSlug).trim().toLowerCase());
+    const fullUrl = `${BASE_URL}/resources/${slug}`;
+
+    if (!seenUrls.has(fullUrl)) {
+      seenUrls.add(fullUrl);
+      const rawDate = res.Date || res.date || res.Published_Date || res.published_date;
+      const lastmod = formatToYMD(rawDate);
+
+      urlEntries.push({
+        loc: fullUrl,
+        lastmod: lastmod,
+        changefreq: 'daily',
+        priority: '0.8'
+      });
+      resourceCount++;
     }
   }
 
@@ -266,7 +296,7 @@ async function generateSitemap() {
   }
 
   fs.writeFileSync(SITEMAP_PATH, xmlContent, 'utf8');
-  console.log(`[Sitemap] Generated sitemap.xml with ${urlEntries.length} total URLs (${STATIC_ROUTES.length} static + ${articleCount} current affairs).`);
+  console.log(`[Sitemap] Generated sitemap.xml with ${urlEntries.length} total URLs (${STATIC_ROUTES.length} static + ${articleCount} current affairs + ${resourceCount} resources).`);
   console.log(`[Sitemap] Output saved to: ${SITEMAP_PATH}`);
 
   // 5. Also sync to dist/ if dist/ folder already exists (e.g. in post-build steps)

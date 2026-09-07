@@ -17,51 +17,16 @@ import {
   Loader2,
   Tag,
   Download,
+  Calendar,
   ChevronLeft,
   ChevronRight
 } from 'lucide-react';
 import coursesData from '../data/courses.json';
 import { useCMSData } from '../hooks/useCMSData';
-import { getCMSImageLink, formatCMSImageUrl, getSecondaryCMSImageUrl } from '../services/cmsService';
+import { getCMSImageLink, formatCMSImageUrl, getSecondaryCMSImageUrl, isItemActive } from '../services/cmsService';
+import { createSlug, getDirectImageUrl, getSecondaryImageUrl } from './CurrentAffairsReader';
+import { sortCurrentAffairsByDate, formatDisplayDate } from '../utils/dateUtils';
 import PdfViewerModal from '../components/PdfViewerModal';
-
-// Helper to convert Google Drive viewing links into direct high-resolution image URLs
-const getDirectImageUrl = (url) => {
-  if (!url || typeof url !== 'string') return null;
-  if (url.includes("drive.google.com")) {
-    const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
-    if (match && match[1]) {
-      return `https://lh3.googleusercontent.com/d/${match[1]}`;
-    }
-  }
-  return url;
-};
-
-// Helper to convert Google Drive links into direct view links (opens in Google Drive native viewer)
-const getDirectViewUrl = (url) => {
-  if (!url || typeof url !== 'string') return '#';
-  const trimmed = url.trim();
-  if (trimmed.includes("drive.google.com")) {
-    const match = trimmed.match(/\/d\/([a-zA-Z0-9_-]+)/) || trimmed.match(/id=([a-zA-Z0-9_-]+)/);
-    if (match && match[1]) {
-      return `https://drive.google.com/file/d/${match[1]}/view?usp=sharing`;
-    }
-  }
-  return trimmed;
-};
-
-// Helper to convert Google Drive links into direct download links
-const getDirectDownloadUrl = (url) => {
-  if (!url) return '#';
-  if (typeof url !== 'string') return url;
-  if (url.includes("drive.google.com")) {
-    const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
-    if (match && match[1]) {
-      return `https://drive.google.com/uc?export=download&id=${match[1]}`;
-    }
-  }
-  return url;
-};
 
 export default function ResourcesPage({ navigate }) {
   const { data: cmsData, loading: cmsLoading } = useCMSData();
@@ -73,7 +38,7 @@ export default function ResourcesPage({ navigate }) {
   // Available Category Filter Pills
   const categories = [
     { id: 'ALL', label: 'All Courses' },
-    { id: 'FREE DOWNLOADS', label: 'Free Downloads', isScrollTarget: true },
+    { id: 'VIDEO_COURSES', label: 'Video Courses & Programs', isScrollTarget: true },
     { id: 'UPSC CIVIL SERVICES', label: 'UPSC Civil Services' },
     { id: 'GROUPS & STATE', label: 'APPSC & TGPSC Groups' },
     { id: 'FOUNDATION', label: 'Foundation & Orientation' },
@@ -83,27 +48,47 @@ export default function ResourcesPage({ navigate }) {
   ];
 
   const handleCategoryClick = (cat) => {
-    if (cat.id === 'FREE DOWNLOADS' || cat.isScrollTarget) {
-      const vaultElem = document.getElementById('downloads-vault-section');
-      if (vaultElem) {
-        vaultElem.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (cat.id === 'VIDEO_COURSES' || cat.isScrollTarget) {
+      const elem = document.getElementById('courses-catalog-section');
+      if (elem) {
+        elem.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
-      setSelectedCategory('FREE DOWNLOADS');
+      setSelectedCategory('ALL');
       return;
     }
+
     setSelectedCategory(cat.id);
+
+    if (cat.id !== 'ALL') {
+      const elem = document.getElementById('courses-catalog-section');
+      if (elem) {
+        elem.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
   };
 
   // Filter courses based on active category & search query
   const filteredCourses = useMemo(() => {
     return coursesData.filter(course => {
-      const matchesCategory = selectedCategory === 'ALL' || selectedCategory === 'FREE DOWNLOADS' || course.category === selectedCategory;
+      const matchesCategory = selectedCategory === 'ALL' || selectedCategory === 'VIDEO_COURSES' || course.category === selectedCategory;
       const matchesSearch = searchQuery === '' || 
         course.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         course.description.toLowerCase().includes(searchQuery.toLowerCase());
       return matchesCategory && matchesSearch;
     });
   }, [selectedCategory, searchQuery]);
+
+  // Active Resources from Google Sheet CMS sorted latest first
+  const activeResources = useMemo(() => {
+    const list = Array.isArray(cmsData?.resources) ? cmsData.resources.filter(isItemActive) : [];
+    return sortCurrentAffairsByDate(list);
+  }, [cmsData?.resources]);
+
+  const handleOpenResource = (item) => {
+    const title = item.Title || item.title || '';
+    const slug = item.slug || item.Slug || createSlug(title);
+    navigate(`/resources/${slug}`);
+  };
 
   return (
     <div className="space-y-0 relative min-h-screen bg-[#FFFDF8]">
@@ -165,7 +150,7 @@ export default function ResourcesPage({ navigate }) {
               className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto py-1.5 flex-1 min-w-0 scroll-smooth scrollbar-thin scrollbar-thumb-[#8C3A27]/30 scrollbar-track-transparent"
             >
               {categories.map((cat) => {
-                const isFreeDownloads = cat.id === 'FREE DOWNLOADS';
+                const isVideoCourses = cat.id === 'VIDEO_COURSES' || cat.isScrollTarget;
                 const isActive = selectedCategory === cat.id;
 
                 return (
@@ -173,7 +158,7 @@ export default function ResourcesPage({ navigate }) {
                     key={cat.id}
                     onClick={() => handleCategoryClick(cat)}
                     className={`whitespace-nowrap px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-full text-[11px] sm:text-xs font-serif font-bold tracking-wide transition-all shrink-0 cursor-pointer flex items-center gap-1.5 ${
-                      isFreeDownloads
+                      isVideoCourses
                         ? isActive
                           ? 'bg-[#8C3A27] text-white shadow-sm ring-2 ring-[#D4AF37]'
                           : 'bg-[#8C3A27]/10 text-[#8C3A27] border border-[#8C3A27]/40 hover:bg-[#8C3A27] hover:text-white'
@@ -182,7 +167,7 @@ export default function ResourcesPage({ navigate }) {
                           : 'bg-[#FAF6EE] text-[#3D3028] border border-[#D5C3B0] hover:border-[#8C3A27] hover:bg-[#F4ECE1]'
                     }`}
                   >
-                    {isFreeDownloads && <Download className="w-3.5 h-3.5 shrink-0" />}
+                    {isVideoCourses && <Video className="w-3.5 h-3.5 shrink-0" />}
                     <span>{cat.label}</span>
                   </button>
                 );
@@ -206,12 +191,156 @@ export default function ResourcesPage({ navigate }) {
         </div>
       </section>
 
-      {/* 4. COURSES CATALOG GRID */}
-      <section className="section-clean-parchment py-12 px-4 sm:px-6 lg:px-8 border-b border-[#D5C3B0]/30">
+      {/* 4. DYNAMIC GOOGLE SHEET CMS STUDY RESOURCES & ARTICLES SECTION */}
+      <section id="downloads-vault-section" className="py-12 md:py-16 px-4 sm:px-6 lg:px-8 bg-[#FAF6EE] border-b border-[#D5C3B0]/40 scroll-mt-24">
         <div className="max-w-7xl mx-auto space-y-8">
           
 
 
+          {/* LOADING STATE */}
+          {cmsLoading && (
+            <div className="py-12 text-center space-y-3">
+              <Loader2 className="w-8 h-8 text-[#8C3A27] animate-spin mx-auto" />
+              <p className="text-xs font-serif italic text-[#7A6B5D] font-bold">
+                Fetching study resources from Content CMS...
+              </p>
+            </div>
+          )}
+
+          {/* CONTENT GRID */}
+          {!cmsLoading && activeResources && activeResources.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {activeResources.map((item, idx) => {
+                const title = item.Title || item.title || 'Untitled Resource';
+                const date = formatDisplayDate(item.Date || item.date) || 'Recent';
+                const category = item.Category || item.category || 'Study Material';
+                const shortSummary = item.Short_Summary || item.short_summary || item.Summary || item.summary || item.Description || item.description || '';
+                const rawBanner = 
+                  item.Banner_Image || item.banner_image ||
+                  item.Banner || item.banner ||
+                  item.Poster_Image || item.poster_image ||
+                  item.Poster_Image_Link || item.poster_image_link ||
+                  item.Image || item.image ||
+                  item.Thumbnail || item.thumbnail;
+                const bannerImage = getDirectImageUrl(rawBanner);
+
+                return (
+                  <div 
+                    key={idx} 
+                    className="card-parchment-3d rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0] overflow-hidden flex flex-col justify-between hover:border-[#8C3A27] transition-all shadow-sm group text-left cursor-pointer"
+                    onClick={() => handleOpenResource(item)}
+                  >
+                    {/* Banner Image or Thematic Header */}
+                    {bannerImage ? (
+                      <div className="w-full h-48 overflow-hidden bg-black/5 relative">
+                        <img 
+                          src={bannerImage} 
+                          alt={title} 
+                          loading="lazy"
+                          referrerPolicy="no-referrer"
+                          className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-500"
+                          onError={(e) => {
+                            const secondary = getSecondaryImageUrl(rawBanner);
+                            if (secondary && e.target.src !== secondary) {
+                              e.target.src = secondary;
+                            } else {
+                              e.target.onerror = null;
+                              e.target.style.display = 'none';
+                            }
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-full h-36 bg-gradient-to-br from-[#F4ECE1] to-[#EAE0D5] border-b border-[#D5C3B0]/60 p-5 flex flex-col justify-between relative overflow-hidden">
+                        <div className="flex items-center justify-between">
+                          <BookOpen className="w-6 h-6 text-[#8C3A27] opacity-80" />
+                          <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#8C3A27] bg-[#8C3A27]/10 px-2 py-0.5 rounded-md border border-[#8C3A27]/20">
+                            STUDY RESOURCE
+                          </span>
+                        </div>
+                        <div className="font-serif-header text-base font-bold text-[#6C1D18] truncate">
+                          {title}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="p-6 space-y-3 flex-1">
+                      {/* Date & Category Badge */}
+                      <div className="flex items-center justify-between text-xs gap-2">
+                        <span className="inline-flex items-center gap-1.5 font-mono text-[#8C3A27] font-bold bg-[#8C3A27]/10 px-2.5 py-1 rounded-md border border-[#8C3A27]/20">
+                          <Tag className="w-3 h-3" />
+                          <span>{category}</span>
+                        </span>
+                        <span className="inline-flex items-center gap-1 font-serif text-[#7A6B5D] italic font-semibold">
+                          <Calendar className="w-3 h-3" />
+                          <span>{date}</span>
+                        </span>
+                      </div>
+
+                      {/* Title */}
+                      <h3 className="font-serif-header text-lg font-bold text-[#221814] leading-snug group-hover:text-[#8C3A27] transition-colors">
+                        {title}
+                      </h3>
+
+                      {/* Short Summary */}
+                      {shortSummary && (
+                        <p className="text-xs sm:text-sm text-[#3D3028] font-sans font-medium leading-relaxed line-clamp-3">
+                          {shortSummary}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Action Button */}
+                    <div className="p-6 pt-0">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenResource(item);
+                        }}
+                        className="w-full inline-flex items-center justify-center gap-2 btn-terracotta-outline-pill text-xs py-2.5 px-4 font-serif font-bold transition-all cursor-pointer group/btn hover:bg-[#8C3A27] hover:text-white"
+                      >
+                        <BookOpen className="w-3.5 h-3.5" />
+                        <span>READ RESOURCE →</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : !cmsLoading && (
+            /* EMPTY STATE FALLBACK */
+            <div className="card-parchment-3d p-8 text-center max-w-xl mx-auto space-y-3 bg-[#FFFDF8] border border-[#D5C3B0] rounded-2xl">
+              <FileText className="w-10 h-10 text-[#8C3A27] mx-auto opacity-80" />
+              <h4 className="font-serif-header text-lg font-bold text-[#221814]">
+                Study Resources Updating
+              </h4>
+              <p className="text-xs sm:text-sm font-serif italic text-[#5C4028] font-bold leading-relaxed">
+                Comprehensive study notes and articles are synchronized directly from our Content CMS. Check back regularly or explore our courses below.
+              </p>
+            </div>
+          )}
+
+        </div>
+      </section>
+
+      {/* GLOWING GHEE LAMP / FLAME DIVIDER */}
+      <SectionDivider />
+
+      {/* 5. COURSES CATALOG GRID */}
+      <section id="courses-catalog-section" className="section-clean-parchment py-12 px-4 sm:px-6 lg:px-8 border-b border-[#D5C3B0]/30 scroll-mt-24">
+        <div className="max-w-7xl mx-auto space-y-8">
+          
+          {/* Section Header with Title & Tagline */}
+          <div className="text-center space-y-2 max-w-3xl mx-auto pb-6 border-b border-[#D5C3B0]/60">
+            <h2 className="font-serif-header text-3xl sm:text-4xl font-extrabold text-[#221814]">
+              Video Courses &amp; Learning Programs
+            </h2>
+            <p className="text-xs sm:text-sm text-[#3D3028] font-sans font-medium">
+              Comprehensive recorded video lectures, subject masterclasses, and structured preparation modules
+            </p>
+          </div>
+          
           {filteredCourses.length === 0 ? (
             <div className="text-center py-16 card-parchment-3d max-w-lg mx-auto space-y-4">
               <BookOpen className="w-12 h-12 text-[#8C3A27] mx-auto opacity-50" />
@@ -323,173 +452,6 @@ export default function ResourcesPage({ navigate }) {
                   </div>
                 </div>
               ))}
-            </div>
-          )}
-
-        </div>
-      </section>
-
-      {/* GLOWING GHEE LAMP / FLAME DIVIDER */}
-      <SectionDivider />
-
-      {/* DYNAMIC GOOGLE SHEET CMS DIGITAL RESOURCES SECTION */}
-      <section id="downloads-vault-section" className="py-12 md:py-16 px-4 sm:px-6 lg:px-8 bg-[#FAF6EE] border-b border-[#D5C3B0]/40 scroll-mt-24">
-        <div className="max-w-7xl mx-auto space-y-8">
-          
-          <div className="text-center space-y-2 max-w-3xl mx-auto pb-6 border-b border-[#D5C3B0]/60">
-            <h2 className="font-serif-header text-3xl sm:text-4xl font-extrabold text-[#221814]">
-              Downloads Vault
-            </h2>
-            <p className="text-xs sm:text-sm text-[#3D3028] font-sans font-medium">
-              Access official study guides, syllabus micro-notes, and PDF resources
-            </p>
-          </div>
-
-          {/* LOADING STATE */}
-          {cmsLoading && (
-            <div className="py-12 text-center space-y-3">
-              <Loader2 className="w-8 h-8 text-[#8C3A27] animate-spin mx-auto" />
-              <p className="text-xs font-serif italic text-[#7A6B5D] font-bold">
-                Fetching digital resources from Content CMS...
-              </p>
-            </div>
-          )}
-
-          {/* CONTENT GRID */}
-          {!cmsLoading && cmsData.resources && cmsData.resources.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {cmsData.resources.map((item, idx) => {
-                const title = item.Title || item.title || 'Untitled Resource';
-                const category = item.Category || item.category || 'Study Material';
-                const description = item.Description || item.description || item.Summary || item.summary || '';
-                const driveLink = item.Drive_Link || item.drive_link || item.Drive || item.drive || item.Link || item.link;
-
-                const rawPoster = 
-                  item.Poster_Image_Link || item.poster_image_link ||
-                  item.Poster_Image || item.poster_image ||
-                  item.Banner_Image || item.banner_image ||
-                  item.Poster_Link || item.poster_link ||
-                  item.Image_Link || item.image_link ||
-                  item.Poster || item.poster ||
-                  item.Image || item.image ||
-                  item.Thumbnail || item.thumbnail ||
-                  item.Cover || item.cover ||
-                  item.Photo || item.photo ||
-                  item.Pic || item.pic ||
-                  item.URL || item.url;
-
-                const posterUrl = formatCMSImageUrl(rawPoster);
-                const isFree = item.Is_Free !== false && item.is_free !== false && item.Free !== false;
-
-                return (
-                  <div 
-                    key={idx} 
-                    className="card-parchment-3d p-6 rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0] space-y-4 flex flex-col justify-between hover:border-[#8C3A27] transition-all shadow-sm text-left overflow-hidden"
-                  >
-                    <div className="space-y-3">
-                      {/* Top Poster Image or Parchment Book Header */}
-                      {posterUrl ? (
-                        <div className="w-full h-44 rounded-xl overflow-hidden bg-[#FAF6EE] border border-[#D5C3B0]/40 -mt-1 mb-3 flex items-center justify-center">
-                          <img 
-                            src={posterUrl} 
-                            alt={title}
-                            loading="eager"
-                            referrerPolicy="no-referrer"
-                            fetchPriority="high"
-                            decoding="async"
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              const secondary = getSecondaryCMSImageUrl(rawPoster);
-                              if (secondary && e.target.src !== secondary) {
-                                e.target.src = secondary;
-                              } else {
-                                e.target.onerror = null;
-                                e.target.parentElement.style.display = 'none';
-                              }
-                            }}
-                          />
-                        </div>
-                      ) : (
-                        <div className="w-full h-28 rounded-xl bg-gradient-to-br from-[#F4ECE1] to-[#EAE0D5] border border-[#D5C3B0]/60 -mt-1 mb-3 p-4 flex flex-col justify-between relative overflow-hidden">
-                          <div className="flex items-center justify-between">
-                            <BookOpen className="w-6 h-6 text-[#8C3A27] opacity-80" />
-                            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#8C3A27] bg-[#8C3A27]/10 px-2 py-0.5 rounded-md border border-[#8C3A27]/20">
-                              PDF RESOURCE
-                            </span>
-                          </div>
-                          <div className="font-serif-header text-sm font-bold text-[#6C1D18] truncate">
-                            {title}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Category Badge */}
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="inline-flex items-center gap-1.5 font-mono text-[#8C3A27] font-bold bg-[#8C3A27]/10 px-2.5 py-1 rounded-md border border-[#8C3A27]/20">
-                          <Tag className="w-3 h-3" />
-                          <span>{category}</span>
-                        </span>
-                        <FileText className="w-4 h-4 text-[#8C3A27] opacity-60" />
-                      </div>
-
-                      {/* Title */}
-                      <h3 className="font-serif-header text-lg font-bold text-[#221814] leading-snug">
-                        {title}
-                      </h3>
-
-                      {/* Description */}
-                      {description && (
-                        <p className="text-xs sm:text-sm text-[#3D3028] font-sans font-medium leading-relaxed line-clamp-3">
-                          {description}
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Action Buttons: View (Protected Reader) & Download (Free Direct Download) */}
-                    {driveLink && (
-                      <div className="pt-3 border-t border-[#D5C3B0]/40 flex items-center gap-2">
-                        {/* View Button */}
-                        <a
-                          href={getDirectViewUrl(driveLink)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex-1 inline-flex items-center justify-center gap-1.5 btn-terracotta-pill text-xs py-2 px-3 font-serif font-bold transition-all cursor-pointer shadow-xs text-center"
-                          title="View PDF document in Google Drive"
-                        >
-                          <BookOpen className="w-3.5 h-3.5" />
-                          <span>View ↗</span>
-                        </a>
-
-                        {/* Direct Free Download Button */}
-                        {isFree && (
-                          <a
-                            href={getDirectDownloadUrl(driveLink)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            download
-                            className="flex-1 inline-flex items-center justify-center gap-1.5 bg-[#FAF6EE] hover:bg-[#8C3A27] text-[#3D3028] hover:text-white border border-[#D5C3B0] hover:border-[#8C3A27] text-xs py-2 px-3 rounded-full font-serif font-bold transition-all cursor-pointer shadow-xs text-center"
-                            title="Download PDF directly"
-                          >
-                            <Download className="w-3.5 h-3.5" />
-                            <span>Download</span>
-                          </a>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          ) : !cmsLoading && (
-            /* EMPTY STATE FALLBACK */
-            <div className="card-parchment-3d p-8 text-center max-w-xl mx-auto space-y-3 bg-[#FFFDF8] border border-[#D5C3B0] rounded-2xl">
-              <FileText className="w-10 h-10 text-[#8C3A27] mx-auto opacity-80" />
-              <h4 className="font-serif-header text-lg font-bold text-[#221814]">
-                Digital Resource Vault Active
-              </h4>
-              <p className="text-xs sm:text-sm font-serif italic text-[#5C4028] font-bold leading-relaxed">
-                Daily PDF downloads and study notes are synchronized from our Content CMS. Check back regularly or access full course materials below.
-              </p>
             </div>
           )}
 

@@ -15,6 +15,7 @@ import BlogPage from './pages/BlogPage';
 import ResourcesPage from './pages/ResourcesPage';
 import ConnectPage from './pages/ConnectPage';
 import CurrentAffairsDetailPage from './pages/CurrentAffairsDetailPage';
+import ResourceDetailPage from './pages/ResourceDetailPage';
 
 export default function App() {
   const [currentPath, setCurrentPath] = useState(window.location.pathname || '/');
@@ -79,6 +80,16 @@ export default function App() {
         // keep raw slug
       }
       return <CurrentAffairsDetailPage slug={slug} navigate={navigate} />;
+    }
+
+    if (normalizedPath.startsWith('/resources/')) {
+      let slug = normalizedPath.replace('/resources/', '');
+      try {
+        slug = decodeURIComponent(slug);
+      } catch (e) {
+        // keep raw slug
+      }
+      return <ResourceDetailPage slug={slug} navigate={navigate} />;
     }
 
     switch (normalizedPath) {
