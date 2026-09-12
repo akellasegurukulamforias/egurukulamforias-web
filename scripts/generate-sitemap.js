@@ -150,6 +150,12 @@ const STATIC_ROUTES = [
     lastmod: getTodayYMD()
   },
   {
+    path: '/resources/upsc-syllabus',
+    priority: '0.8',
+    changefreq: 'daily',
+    lastmod: getTodayYMD()
+  },
+  {
     path: '/contact',
     priority: '0.7',
     changefreq: 'monthly',
@@ -255,7 +261,13 @@ async function generateSitemap() {
     if (!rawSlug) continue;
 
     const slug = encodeURIComponent(String(rawSlug).trim().toLowerCase());
-    const fullUrl = `${BASE_URL}/resources/${slug}`;
+    const isSyllabus = 
+      /syllabus/i.test(title) || 
+      /syllabus/i.test(res.Category || res.category || '') || 
+      /syllabus/i.test(res.Subcategory || res.subcategory || '');
+    const fullUrl = isSyllabus 
+      ? `${BASE_URL}/resources/upsc-syllabus/${slug}`
+      : `${BASE_URL}/resources/${slug}`;
 
     if (!seenUrls.has(fullUrl)) {
       seenUrls.add(fullUrl);

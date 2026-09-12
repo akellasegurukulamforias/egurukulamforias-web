@@ -1,7 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { SectionDivider, CityscapeArtwork } from '../components/Artworks';
 import { 
   ArrowRight, 
+  ArrowLeft,
   Search, 
   BookOpen, 
   Video, 
@@ -19,21 +20,35 @@ import {
   Download,
   Calendar,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Folder,
+  FolderOpen,
+  Layers,
+  GraduationCap
 } from 'lucide-react';
 import coursesData from '../data/courses.json';
 import { useCMSData } from '../hooks/useCMSData';
-import { getCMSImageLink, formatCMSImageUrl, getSecondaryCMSImageUrl, isItemActive } from '../services/cmsService';
+import { getCMSImageLink, formatCMSImageUrl, getSecondaryCMSImageUrl, isItemActive, isSyllabusResource } from '../services/cmsService';
 import { createSlug, getDirectImageUrl, getSecondaryImageUrl } from './CurrentAffairsReader';
 import { sortCurrentAffairsByDate, formatDisplayDate } from '../utils/dateUtils';
 import PdfViewerModal from '../components/PdfViewerModal';
 
-export default function ResourcesPage({ navigate }) {
+export default function ResourcesPage({ navigate, folder }) {
   const { data: cmsData, loading: cmsLoading } = useCMSData();
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
+  const [syllabusSearchQuery, setSyllabusSearchQuery] = useState('');
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [selectedPdf, setSelectedPdf] = useState(null);
+
+  // Set document title dynamically based on folder context
+  useEffect(() => {
+    if (folder === 'upsc-syllabus') {
+      document.title = 'UPSC Civil Services Syllabus Directory & Micro-Notes | e-Gurukulam for IAS';
+    } else {
+      document.title = 'Digital Learning & Study Resources | e-Gurukulam for IAS';
+    }
+  }, [folder]);
 
   // Available Category Filter Pills
   const categories = [
@@ -84,11 +99,297 @@ export default function ResourcesPage({ navigate }) {
     return sortCurrentAffairsByDate(list);
   }, [cmsData?.resources]);
 
+  // Dynamically partition resources into Syllabus and Non-Syllabus
+  const { syllabusResources, nonSyllabusResources } = useMemo(() => {
+    const syllabus = [];
+    const others = [];
+    activeResources.forEach(item => {
+      if (isSyllabusResource(item)) {
+        syllabus.push(item);
+      } else {
+        others.push(item);
+      }
+    });
+    return { syllabusResources: syllabus, nonSyllabusResources: others };
+  }, [activeResources]);
+
+  // Filtered Non-Syllabus Resources for main feed
+  const filteredNonSyllabusResources = useMemo(() => {
+    if (!searchQuery.trim()) return nonSyllabusResources;
+    const q = searchQuery.toLowerCase();
+    return nonSyllabusResources.filter(item => {
+      const title = (item.Title || item.title || '').toLowerCase();
+      const cat = (item.Category || item.category || '').toLowerCase();
+      const subcat = (item.Subcategory || item.subcategory || item.Sub_Category || item.sub_category || '').toLowerCase();
+      const desc = (item.Short_Summary || item.short_summary || item.Summary || item.summary || item.Description || item.description || '').toLowerCase();
+      return title.includes(q) || cat.includes(q) || subcat.includes(q) || desc.includes(q);
+    });
+  }, [nonSyllabusResources, searchQuery]);
+
+  // Determine whether the UPSC Syllabus Folder Card should be visible on the main feed
+  const showSyllabusFolderInMain = useMemo(() => {
+    if (syllabusResources.length === 0) return false;
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    if ('upsc syllabus'.includes(q) || 'syllabus'.includes(q)) return true;
+    return syllabusResources.some(item => {
+      const title = (item.Title || item.title || '').toLowerCase();
+      const cat = (item.Category || item.category || '').toLowerCase();
+      const subcat = (item.Subcategory || item.subcategory || item.Sub_Category || item.sub_category || '').toLowerCase();
+      return title.includes(q) || cat.includes(q) || subcat.includes(q);
+    });
+  }, [syllabusResources, searchQuery]);
+
+  // Filtered Syllabus Resources for dedicated /resources/upsc-syllabus view
+  const filteredSyllabusResources = useMemo(() => {
+    if (!syllabusSearchQuery.trim()) return syllabusResources;
+    const q = syllabusSearchQuery.toLowerCase();
+    return syllabusResources.filter(item => {
+      const title = (item.Title || item.title || '').toLowerCase();
+      const cat = (item.Category || item.category || '').toLowerCase();
+      const subcat = (item.Subcategory || item.subcategory || item.Sub_Category || item.sub_category || '').toLowerCase();
+      const desc = (item.Short_Summary || item.short_summary || item.Summary || item.summary || item.Description || item.description || '').toLowerCase();
+      return title.includes(q) || cat.includes(q) || subcat.includes(q) || desc.includes(q);
+    });
+  }, [syllabusResources, syllabusSearchQuery]);
+
   const handleOpenResource = (item) => {
     const title = item.Title || item.title || '';
-    const slug = item.slug || item.Slug || createSlug(title);
-    navigate(`/resources/${slug}`);
+    const slug = item.slug || item.Slug || item.id || item.ID || createSlug(title);
+    if (isSyllabusResource(item)) {
+      navigate(`/resources/upsc-syllabus/${slug}`);
+    } else {
+      navigate(`/resources/${slug}`);
+    }
   };
+
+  // ==========================================================================
+  // DEDICATED UPSC SYLLABUS FOLDER DRILL-DOWN VIEW (/resources/upsc-syllabus)
+  // ==========================================================================
+  if (folder === 'upsc-syllabus') {
+    return (
+      <div className="space-y-0 relative min-h-screen bg-[#FFFDF8]">
+        {/* 1. TOP STICKY BREADCRUMB & BACK NAVIGATION */}
+        <section className="sticky top-16 z-20 bg-[#FAF6EE]/95 backdrop-blur-md p-4 sm:p-5 border-b border-[#D5C3B0] shadow-xs">
+          <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
+            <button
+              type="button"
+              onClick={() => navigate('/resources')}
+              className="inline-flex items-center gap-2 text-xs sm:text-sm font-serif font-bold text-[#8C3A27] hover:text-[#732D1B] transition-colors cursor-pointer group"
+            >
+              <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+              <span>Back to All Resources</span>
+            </button>
+
+            <div className="flex items-center gap-2 text-xs">
+              <span className="font-mono text-[#8C3A27] font-bold bg-[#8C3A27]/10 px-3 py-1 rounded-md border border-[#8C3A27]/20 flex items-center gap-1.5">
+                <FolderOpen className="w-3.5 h-3.5" />
+                <span>UPSC SYLLABUS DIRECTORY</span>
+              </span>
+              <span className="font-serif text-[#7A6B5D] italic font-semibold hidden sm:inline">
+                {syllabusResources.length} Syllabi Available
+              </span>
+            </div>
+          </div>
+        </section>
+
+        {/* 2. FOLDER HERO HEADER */}
+        <section className="section-mottled-parchment py-12 md:py-16 text-center px-4 sm:px-6 lg:px-8 border-b border-[#D5C3B0]/40">
+          <div className="max-w-4xl mx-auto space-y-4">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#8C3A27]/10 border border-[#8C3A27]/25 text-[#8C3A27] text-xs font-mono font-bold uppercase tracking-wider shadow-2xs">
+              <Layers className="w-3.5 h-3.5 text-[#8C3A27]" />
+              <span>Curated Folder Hub &bull; {syllabusResources.length} Syllabi Available</span>
+            </div>
+            <h1 className="font-serif-header text-3xl sm:text-4xl md:text-5xl font-extrabold text-[#221814] leading-tight">
+              UPSC Civil Services Syllabus Directory
+            </h1>
+            <p className="font-serif italic text-base sm:text-lg text-[#3D3028] font-semibold max-w-2xl mx-auto leading-relaxed">
+              Comprehensive micro-syllabus breakdowns for UPSC Civil Services Prelims, Mains General Studies (GS I to IV), and Optional subjects with analytical micro-notes and PDF reference documents.
+            </p>
+          </div>
+        </section>
+
+        {/* 3. IN-FOLDER SEARCH & FILTER BAR */}
+        <section className="py-3 px-4 sm:px-6 lg:px-8 bg-[#FBF7F0]/95 backdrop-blur-md border-b border-[#D5C3B0]/30 sticky top-[138px] z-10 shadow-2xs">
+          <div className="max-w-5xl mx-auto flex items-center gap-3">
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[#7A6B5D]" />
+              <input
+                type="text"
+                placeholder="Search syllabus by subject (e.g. Sociology, Anthropology, Mains, Prelims, Pub Ad)..."
+                value={syllabusSearchQuery}
+                onChange={(e) => setSyllabusSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-8 py-2 bg-[#FFFDF8] border border-[#D5C3B0] rounded-xl text-xs sm:text-sm text-[#221814] placeholder-[#7A6B5D] focus:outline-hidden focus:border-[#8C3A27] focus:ring-1 focus:ring-[#8C3A27] transition-all font-medium"
+              />
+              {syllabusSearchQuery && (
+                <button
+                  onClick={() => setSyllabusSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#7A6B5D] hover:text-[#8C3A27]"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+            <span className="text-xs font-mono font-bold text-[#8C3A27] shrink-0 bg-[#8C3A27]/10 px-3 py-2 rounded-xl border border-[#8C3A27]/20 hidden sm:inline-block">
+              {filteredSyllabusResources.length} {filteredSyllabusResources.length === 1 ? 'Subject' : 'Subjects'}
+            </span>
+          </div>
+        </section>
+
+        {/* 4. SYLLABUS CARDS SUB-GRID */}
+        <section className="py-12 px-4 sm:px-6 lg:px-8 bg-[#FAF6EE] min-h-[50vh]">
+          <div className="max-w-7xl mx-auto">
+            {cmsLoading && (
+              <div className="py-12 text-center space-y-3">
+                <Loader2 className="w-8 h-8 text-[#8C3A27] animate-spin mx-auto" />
+                <p className="text-xs font-serif italic text-[#7A6B5D] font-bold">
+                  Loading syllabus subjects from CMS...
+                </p>
+              </div>
+            )}
+
+            {!cmsLoading && filteredSyllabusResources.length === 0 ? (
+              <div className="card-parchment-3d p-8 text-center max-w-md mx-auto space-y-4 bg-[#FFFDF8] border border-[#D5C3B0] rounded-2xl shadow-sm">
+                <FileText className="w-10 h-10 text-[#8C3A27] mx-auto opacity-70" />
+                <h4 className="font-serif-header text-lg font-bold text-[#221814]">No Syllabus Found</h4>
+                <p className="text-xs sm:text-sm text-[#5C4028]">
+                  No syllabus subjects matched &ldquo;{syllabusSearchQuery}&rdquo;. Try clearing your search term or exploring all subjects.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setSyllabusSearchQuery('')}
+                  className="btn-terracotta-pill text-xs py-2 px-5 font-serif font-bold"
+                >
+                  Reset Search
+                </button>
+              </div>
+            ) : !cmsLoading && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredSyllabusResources.map((item, idx) => {
+                  const title = item.Title || item.title || 'Untitled Syllabus';
+                  const date = formatDisplayDate(item.Date || item.date) || 'Current';
+                  const category = item.Category || item.category || 'UPSC Syllabus';
+                  const shortSummary = item.Short_Summary || item.short_summary || item.Summary || item.summary || item.Description || item.description || '';
+                  const rawBanner = 
+                    item.Banner_Image || item.banner_image ||
+                    item.Banner || item.banner ||
+                    item.Poster_Image || item.poster_image ||
+                    item.Poster_Image_Link || item.poster_image_link ||
+                    item.Image || item.image ||
+                    item.Thumbnail || item.thumbnail;
+                  const bannerImage = getDirectImageUrl(rawBanner);
+                  const itemSlug = item.slug || item.Slug || item.id || item.ID || createSlug(title);
+
+                  return (
+                    <div
+                      key={idx}
+                      className="card-parchment-3d rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0] overflow-hidden flex flex-col justify-between hover:border-[#8C3A27] transition-all shadow-sm group text-left cursor-pointer"
+                      onClick={() => navigate(`/resources/upsc-syllabus/${itemSlug}`)}
+                    >
+                      {bannerImage ? (
+                        <div className="w-full h-48 overflow-hidden bg-black/5 relative">
+                          <img
+                            src={bannerImage}
+                            alt={title}
+                            loading="lazy"
+                            referrerPolicy="no-referrer"
+                            className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-500"
+                            onError={(e) => {
+                              const secondary = getSecondaryImageUrl(rawBanner);
+                              if (secondary && e.target.src !== secondary) {
+                                e.target.src = secondary;
+                              } else {
+                                e.target.onerror = null;
+                                e.target.style.display = 'none';
+                              }
+                            }}
+                          />
+                        </div>
+                      ) : (
+                        <div className="w-full h-36 bg-gradient-to-br from-[#F4ECE1] to-[#EAE0D5] border-b border-[#D5C3B0]/60 p-5 flex flex-col justify-between relative overflow-hidden">
+                          <div className="flex items-center justify-between">
+                            <GraduationCap className="w-6 h-6 text-[#8C3A27] opacity-80" />
+                            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#8C3A27] bg-[#8C3A27]/10 px-2 py-0.5 rounded-md border border-[#8C3A27]/20">
+                              UPSC SYLLABUS
+                            </span>
+                          </div>
+                          <div className="font-serif-header text-base font-bold text-[#6C1D18] truncate">
+                            {title}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="p-6 space-y-3 flex-1">
+                        <div className="flex items-center justify-between text-xs gap-2">
+                          <span className="inline-flex items-center gap-1.5 font-mono text-[#8C3A27] font-bold bg-[#8C3A27]/10 px-2.5 py-1 rounded-md border border-[#8C3A27]/20">
+                            <Tag className="w-3 h-3" />
+                            <span>{category}</span>
+                          </span>
+                          <span className="inline-flex items-center gap-1 font-serif text-[#7A6B5D] italic font-semibold">
+                            <Calendar className="w-3 h-3" />
+                            <span>{date}</span>
+                          </span>
+                        </div>
+
+                        <h3 className="font-serif-header text-lg font-bold text-[#221814] leading-snug group-hover:text-[#8C3A27] transition-colors">
+                          {title}
+                        </h3>
+
+                        {shortSummary && (
+                          <p className="text-xs sm:text-sm text-[#3D3028] font-sans font-medium leading-relaxed line-clamp-3">
+                            {shortSummary}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="p-6 pt-0">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/resources/upsc-syllabus/${itemSlug}`);
+                          }}
+                          className="w-full inline-flex items-center justify-center gap-2 btn-terracotta-outline-pill text-xs py-2.5 px-4 font-serif font-bold transition-all cursor-pointer group/btn hover:bg-[#8C3A27] hover:text-white"
+                        >
+                          <BookOpen className="w-3.5 h-3.5" />
+                          <span>VIEW SYLLABUS &rarr;</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* 5. BOTTOM EXPLORATION BANNER */}
+        <section className="py-8 px-4 sm:px-6 lg:px-8 bg-[#FAF6EE] border-t border-[#D5C3B0]/30">
+          <div className="max-w-4xl mx-auto text-center space-y-4">
+            <p className="font-serif italic text-sm sm:text-base text-[#5C4028] font-semibold">
+              Looking for PYQ breakdowns, analytical study articles, or comprehensive video lecture series?
+            </p>
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => navigate('/resources')}
+                className="btn-terracotta-pill text-xs py-2.5 px-6 font-serif font-bold cursor-pointer"
+              >
+                &larr; Return to All Study Resources
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('/courses')}
+                className="btn-terracotta-outline-pill text-xs py-2.5 px-6 font-serif font-bold cursor-pointer"
+              >
+                Explore Video Courses &rarr;
+              </button>
+            </div>
+          </div>
+        </section>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-0 relative min-h-screen bg-[#FFFDF8]">
@@ -208,9 +509,103 @@ export default function ResourcesPage({ navigate }) {
           )}
 
           {/* CONTENT GRID */}
-          {!cmsLoading && activeResources && activeResources.length > 0 ? (
+          {!cmsLoading && (showSyllabusFolderInMain || filteredNonSyllabusResources.length > 0) ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {activeResources.map((item, idx) => {
+              {/* 1. DYNAMIC UPSC SYLLABUS FOLDER HUB CARD */}
+              {showSyllabusFolderInMain && (
+                <div 
+                  className="card-parchment-3d rounded-2xl bg-gradient-to-br from-[#FFFDF8] via-[#FAF6EE] to-[#F5ECE0] border-2 border-[#8C3A27]/30 hover:border-[#8C3A27] overflow-hidden flex flex-col justify-between transition-all shadow-md hover:shadow-xl group text-left cursor-pointer relative ring-1 ring-[#8C3A27]/10"
+                  onClick={() => navigate('/resources/upsc-syllabus')}
+                >
+                  {/* Folder Tab / Visual Layer Header */}
+                  <div className="w-full bg-gradient-to-r from-[#6C1D18] via-[#8C3A27] to-[#732415] p-5 text-white flex flex-col justify-between relative overflow-hidden">
+                    {/* Decorative stacked cards background effect */}
+                    <div className="absolute right-0 bottom-0 opacity-10 translate-x-3 translate-y-3 pointer-events-none">
+                      <Layers className="w-36 h-36 text-white" />
+                    </div>
+
+                    <div className="flex items-center justify-between z-10">
+                      <div className="w-10 h-10 rounded-xl bg-white/15 backdrop-blur-xs flex items-center justify-center border border-white/20 shadow-xs">
+                        <FolderOpen className="w-5 h-5 text-[#F3EBD9]" />
+                      </div>
+                      <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#FAF6EE] bg-black/30 backdrop-blur-xs px-2.5 py-1 rounded-full border border-white/20 flex items-center gap-1">
+                        <Sparkles className="w-3 h-3 text-[#D4AF37]" />
+                        <span>CURATED HUB</span>
+                      </span>
+                    </div>
+
+                    <div className="mt-4 z-10">
+                      <span className="inline-block text-[11px] font-mono font-bold text-[#EED8C9] tracking-wider uppercase mb-1">
+                        DIRECTORY ARCHIVE
+                      </span>
+                      <h3 className="font-serif-header text-xl sm:text-2xl font-bold text-[#FCFAF6] leading-snug drop-shadow-xs">
+                        UPSC Syllabus
+                      </h3>
+                    </div>
+                  </div>
+
+                  {/* Folder Body */}
+                  <div className="p-6 space-y-4 flex-1 flex flex-col justify-between">
+                    <div className="space-y-3">
+                      {/* Total Count Badge */}
+                      <div className="flex items-center justify-between">
+                        <span className="inline-flex items-center gap-1.5 font-mono text-xs font-bold text-[#8C3A27] bg-[#8C3A27]/10 px-2.5 py-1 rounded-md border border-[#8C3A27]/20">
+                          <Layers className="w-3 h-3" />
+                          <span>{syllabusResources.length} Syllabi Available</span>
+                        </span>
+                        <span className="text-[11px] font-serif italic text-[#7A6B5D] font-semibold">
+                          Prelims &bull; Mains &bull; Optionals
+                        </span>
+                      </div>
+
+                      {/* Folder Description */}
+                      <p className="text-xs sm:text-sm text-[#3D3028] font-sans font-medium leading-relaxed">
+                        Comprehensive micro-syllabus breakdowns for UPSC Civil Services Prelims, Mains GS Papers, and Optional subjects with downloadable study guides.
+                      </p>
+
+                      {/* Dynamic Subject Preview Pills */}
+                      <div className="pt-2 flex flex-wrap gap-1.5">
+                        {syllabusResources.slice(0, 4).map((item, i) => {
+                          const rawTitle = item.Title || item.title || 'Syllabus';
+                          const cleanTitle = rawTitle.replace(/upsc|civil\s+services|examination|cse|syllabus/gi, '').trim();
+                          return (
+                            <span 
+                              key={i} 
+                              className="text-[10px] font-mono font-bold bg-[#FAF6EE] text-[#5C4028] px-2 py-0.5 rounded-md border border-[#D5C3B0] truncate max-w-[130px]"
+                              title={rawTitle}
+                            >
+                              {cleanTitle || rawTitle}
+                            </span>
+                          );
+                        })}
+                        {syllabusResources.length > 4 && (
+                          <span className="text-[10px] font-mono font-bold bg-[#8C3A27]/10 text-[#8C3A27] px-2 py-0.5 rounded-md">
+                            +{syllabusResources.length - 4} more
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Folder Action CTA */}
+                    <div className="pt-4 border-t border-[#D5C3B0]/40">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate('/resources/upsc-syllabus');
+                        }}
+                        className="w-full inline-flex items-center justify-center gap-2 btn-terracotta-pill text-xs py-2.5 px-4 font-serif font-bold transition-all cursor-pointer shadow-xs hover:shadow-md"
+                      >
+                        <FolderOpen className="w-3.5 h-3.5" />
+                        <span>EXPLORE SYLLABI FOLDER &rarr;</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 2. NON-SYLLABUS STUDY RESOURCES (PYQs, Notes, Strategy Guides) */}
+              {filteredNonSyllabusResources.map((item, idx) => {
                 const title = item.Title || item.title || 'Untitled Resource';
                 const date = formatDisplayDate(item.Date || item.date) || 'Recent';
                 const category = item.Category || item.category || 'Study Material';
@@ -301,7 +696,7 @@ export default function ResourcesPage({ navigate }) {
                         className="w-full inline-flex items-center justify-center gap-2 btn-terracotta-outline-pill text-xs py-2.5 px-4 font-serif font-bold transition-all cursor-pointer group/btn hover:bg-[#8C3A27] hover:text-white"
                       >
                         <BookOpen className="w-3.5 h-3.5" />
-                        <span>READ RESOURCE →</span>
+                        <span>READ RESOURCE &rarr;</span>
                       </button>
                     </div>
                   </div>
@@ -313,10 +708,12 @@ export default function ResourcesPage({ navigate }) {
             <div className="card-parchment-3d p-8 text-center max-w-xl mx-auto space-y-3 bg-[#FFFDF8] border border-[#D5C3B0] rounded-2xl">
               <FileText className="w-10 h-10 text-[#8C3A27] mx-auto opacity-80" />
               <h4 className="font-serif-header text-lg font-bold text-[#221814]">
-                Study Resources Updating
+                {searchQuery ? 'No Resources Found' : 'Study Resources Updating'}
               </h4>
               <p className="text-xs sm:text-sm font-serif italic text-[#5C4028] font-bold leading-relaxed">
-                Comprehensive study notes and articles are synchronized directly from our Content CMS. Check back regularly or explore our courses below.
+                {searchQuery
+                  ? `No resources matched "${searchQuery}". Try a different keyword or reset filters.`
+                  : 'Comprehensive study notes and articles are synchronized directly from our Content CMS. Check back regularly or explore our courses below.'}
               </p>
             </div>
           )}

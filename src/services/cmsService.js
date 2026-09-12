@@ -65,6 +65,21 @@ export function isItemActive(obj) {
   return true;
 }
 
+// Helper to identify UPSC Syllabus items dynamically
+export function isSyllabusResource(item) {
+  if (!item || typeof item !== 'object') return false;
+  const title = String(item.Title || item.title || '');
+  const category = String(item.Category || item.category || '');
+  const subcategory = String(item.Subcategory || item.subcategory || item.Sub_Category || item.sub_category || '');
+  const tags = String(item.Tags || item.tags || '');
+  return (
+    /syllabus/i.test(title) ||
+    /syllabus/i.test(category) ||
+    /syllabus/i.test(subcategory) ||
+    /syllabus/i.test(tags)
+  );
+}
+
 // Synchronously read cached data from localStorage for instant 0ms initial render
 export function getCachedCMSData() {
   try {

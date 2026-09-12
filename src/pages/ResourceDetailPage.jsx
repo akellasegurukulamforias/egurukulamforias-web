@@ -11,6 +11,7 @@ import {
   BookOpen
 } from 'lucide-react';
 import { useCMSData } from '../hooks/useCMSData';
+import { isSyllabusResource } from '../services/cmsService';
 import { sortCurrentAffairsByDate, formatDisplayDate, parseDateToTimestamp } from '../utils/dateUtils';
 import { createSlug, getDirectImageUrl, getSecondaryImageUrl } from './CurrentAffairsReader';
 
@@ -105,7 +106,7 @@ function formatToYMD(dateVal) {
 // Helper to normalize string keys by stripping non-alphanumeric characters
 const normalizeKey = (str) => String(str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
-export default function ResourceDetailPage({ slug, navigate }) {
+export default function ResourceDetailPage({ slug, folder, navigate }) {
   const { data, loading: cmsLoading } = useCMSData();
 
   // Helper to check active status
@@ -144,8 +145,42 @@ export default function ResourceDetailPage({ slug, navigate }) {
   }, [sortedResources, targetSlug, targetNorm]);
 
   const article = currentIndex !== -1 ? sortedResources[currentIndex] : null;
-  const prevArticle = currentIndex > 0 ? sortedResources[currentIndex - 1] : null;
-  const nextArticle = currentIndex >= 0 && currentIndex < sortedResources.length - 1 ? sortedResources[currentIndex + 1] : null;
+
+  // Determine if this resource is in the syllabus context
+  const isSyllabus = useMemo(() => {
+    if (folder === 'upsc-syllabus') return true;
+    if (article && isSyllabusResource(article)) return true;
+    return false;
+  }, [folder, article]);
+
+  // Context-aware resource list for previous/next navigation
+  const contextResources = useMemo(() => {
+    if (isSyllabus) {
+      const syllabusList = sortedResources.filter(isSyllabusResource);
+      return syllabusList.length > 0 ? syllabusList : sortedResources;
+    }
+    const nonSyllabusList = sortedResources.filter(a => !isSyllabusResource(a));
+    return nonSyllabusList.length > 0 ? nonSyllabusList : sortedResources;
+  }, [sortedResources, isSyllabus]);
+
+  const contextIndex = useMemo(() => {
+    if (!article || !contextResources || contextResources.length === 0) return -1;
+    return contextResources.findIndex(art => {
+      const artTitle = art.Title || art.title || '';
+      const artSlug = art.slug || art.Slug || createSlug(artTitle);
+      const docId = art.docId || art.Doc_ID || art.id || '';
+
+      return (
+        artSlug === targetSlug ||
+        normalizeKey(artSlug) === targetNorm ||
+        normalizeKey(artTitle) === targetNorm ||
+        (docId && normalizeKey(docId) === targetNorm)
+      );
+    });
+  }, [contextResources, article, targetSlug, targetNorm]);
+
+  const prevArticle = contextIndex > 0 ? contextResources[contextIndex - 1] : null;
+  const nextArticle = contextIndex >= 0 && contextIndex < contextResources.length - 1 ? contextResources[contextIndex + 1] : null;
 
   // Extract article fields
   const title = article?.Title || article?.title || 'Study Resource';
@@ -179,8 +214,12 @@ export default function ResourceDetailPage({ slug, navigate }) {
   const navigateToResource = (art) => {
     if (!art) return;
     const artTitle = art.Title || art.title || '';
-    const artSlug = art.slug || art.Slug || createSlug(artTitle);
-    navigate(`/resources/${artSlug}`);
+    const artSlug = art.slug || art.Slug || art.id || art.ID || createSlug(artTitle);
+    if (isSyllabus) {
+      navigate(`/resources/upsc-syllabus/${artSlug}`);
+    } else {
+      navigate(`/resources/${artSlug}`);
+    }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -349,11 +388,11 @@ export default function ResourceDetailPage({ slug, navigate }) {
           <div className="pt-2">
             <button
               type="button"
-              onClick={() => navigate('/resources')}
+              onClick={() => navigate(folder === 'upsc-syllabus' ? '/resources/upsc-syllabus' : '/resources')}
               className="btn-terracotta-pill text-xs py-3 px-6 font-serif font-bold cursor-pointer inline-flex items-center gap-2"
             >
               <ArrowLeft className="w-4 h-4" />
-              <span>Back to Resources</span>
+              <span>{folder === 'upsc-syllabus' ? 'Back to UPSC Syllabus' : 'Back to Resources'}</span>
             </button>
           </div>
         </div>
@@ -366,16 +405,26 @@ export default function ResourceDetailPage({ slug, navigate }) {
     <div className="min-h-screen bg-[#FFFDF8] text-[#221814] py-12 px-4 sm:px-6 lg:px-8 select-text">
       <div className="max-w-4xl mx-auto space-y-8 animate-fade-in text-left">
         
-        {/* 1. STICKY "← Back to Resources" NAVIGATION BAR */}
+        {/* 1. STICKY BACK NAVIGATION BAR */}
         <div className="sticky top-16 z-20 bg-[#FAF6EE]/95 backdrop-blur-md p-4 sm:p-5 rounded-3xl border border-[#D5C3B0] shadow-sm flex flex-wrap items-center justify-between gap-4">
-          <button
-            type="button"
-            onClick={() => navigate('/resources')}
-            className="inline-flex items-center gap-2 text-xs sm:text-sm font-serif font-bold text-[#8C3A27] hover:text-[#732D1B] transition-colors cursor-pointer group"
-          >
-            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-            <span>Back to Resources</span>
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => navigate(isSyllabus ? '/resources/upsc-syllabus' : '/resources')}
+              className="inline-flex items-center gap-2 text-xs sm:text-sm font-serif font-bold text-[#8C3A27] hover:text-[#732D1B] transition-colors cursor-pointer group"
+            >
+              <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+              <span>{isSyllabus ? 'Back to UPSC Syllabus' : 'Back to Resources'}</span>
+            </button>
+
+            {isSyllabus && (
+              <div className="hidden md:flex items-center gap-1.5 text-xs font-serif font-medium text-[#7A6B5D] pl-3 border-l border-[#D5C3B0]/60">
+                <span onClick={() => navigate('/resources')} className="hover:text-[#8C3A27] cursor-pointer">Resources</span>
+                <span>/</span>
+                <span onClick={() => navigate('/resources/upsc-syllabus')} className="hover:text-[#8C3A27] cursor-pointer text-[#8C3A27] font-bold">UPSC Syllabus</span>
+              </div>
+            )}
+          </div>
 
           {/* Badges: Category tags & Date */}
           <div className="flex items-center gap-2 text-xs">
@@ -454,15 +503,25 @@ export default function ResourceDetailPage({ slug, navigate }) {
         {/* 6. BOTTOM NAVIGATION (ALL RESOURCES + READ NEXT) */}
         <div className="bg-[#FAF6EE] p-5 sm:p-6 rounded-3xl border border-[#D5C3B0] shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
           
-          {/* Left: All Resources Return Button */}
+          {/* Left: Return Buttons */}
           <div className="flex items-center gap-3 w-full sm:w-auto">
             <button
               type="button"
-              onClick={() => navigate('/resources')}
+              onClick={() => navigate(isSyllabus ? '/resources/upsc-syllabus' : '/resources')}
               className="btn-terracotta-outline-pill text-xs py-2.5 px-6 font-serif font-bold cursor-pointer shrink-0 w-full sm:w-auto"
             >
-              <span>← All Study Resources</span>
+              <span>{isSyllabus ? '← UPSC Syllabus Directory' : '← All Study Resources'}</span>
             </button>
+
+            {isSyllabus && (
+              <button
+                type="button"
+                onClick={() => navigate('/resources')}
+                className="hidden lg:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0]/60 hover:border-[#8C3A27] transition-all cursor-pointer text-xs font-serif font-bold text-[#7A6B5D] hover:text-[#8C3A27]"
+              >
+                <span>All Resources</span>
+              </button>
+            )}
 
             {prevArticle && (
               <button

@@ -82,6 +82,20 @@ export default function App() {
       return <CurrentAffairsDetailPage slug={slug} navigate={navigate} />;
     }
 
+    if (normalizedPath === '/resources/upsc-syllabus') {
+      return <ResourcesPage folder="upsc-syllabus" navigate={navigate} />;
+    }
+
+    if (normalizedPath.startsWith('/resources/upsc-syllabus/')) {
+      let slug = normalizedPath.replace('/resources/upsc-syllabus/', '');
+      try {
+        slug = decodeURIComponent(slug);
+      } catch (e) {
+        // keep raw slug
+      }
+      return <ResourceDetailPage slug={slug} folder="upsc-syllabus" navigate={navigate} />;
+    }
+
     if (normalizedPath.startsWith('/resources/')) {
       let slug = normalizedPath.replace('/resources/', '');
       try {
