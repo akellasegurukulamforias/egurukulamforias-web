@@ -204,7 +204,7 @@ export default function ResourcesPage({ navigate, folder }) {
               UPSC Civil Services Syllabus Directory
             </h1>
             <p className="font-serif italic text-base sm:text-lg text-[#3D3028] font-semibold max-w-2xl mx-auto leading-relaxed">
-              Comprehensive micro-syllabus breakdowns for UPSC Civil Services Prelims, Mains General Studies (GS I to IV), and Optional subjects with analytical micro-notes and PDF reference documents.
+              Comprehensive micro-syllabus breakdowns for UPSC Civil Services Prelims, Mains General Studies (GS I to IV), and Optional subjects.
             </p>
           </div>
         </section>
