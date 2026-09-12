@@ -187,7 +187,7 @@ export default function ResourcesPage({ navigate, folder }) {
                 <span>UPSC SYLLABUS DIRECTORY</span>
               </span>
               <span className="font-serif text-[#7A6B5D] italic font-semibold hidden sm:inline">
-                {syllabusResources.length} Syllabi Available
+                {syllabusResources.length} Syllabus Available
               </span>
             </div>
           </div>
@@ -198,7 +198,7 @@ export default function ResourcesPage({ navigate, folder }) {
           <div className="max-w-4xl mx-auto space-y-4">
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#8C3A27]/10 border border-[#8C3A27]/25 text-[#8C3A27] text-xs font-mono font-bold uppercase tracking-wider shadow-2xs">
               <Layers className="w-3.5 h-3.5 text-[#8C3A27]" />
-              <span>Curated Folder Hub &bull; {syllabusResources.length} Syllabi Available</span>
+              <span>Curated Folder Hub &bull; {syllabusResources.length} Syllabus Available</span>
             </div>
             <h1 className="font-serif-header text-3xl sm:text-4xl md:text-5xl font-extrabold text-[#221814] leading-tight">
               UPSC Civil Services Syllabus Directory
@@ -535,10 +535,10 @@ export default function ResourcesPage({ navigate, folder }) {
                     </div>
 
                     <div className="mt-4 z-10">
-                      <span className="inline-block text-[11px] font-mono font-bold text-[#EED8C9] tracking-wider uppercase mb-1">
-                        DIRECTORY ARCHIVE
-                      </span>
-                      <h3 className="font-serif-header text-xl sm:text-2xl font-bold text-[#FCFAF6] leading-snug drop-shadow-xs">
+                      <h3 
+                        className="font-serif-header text-xl sm:text-2xl font-bold !text-white leading-snug drop-shadow-xs"
+                        style={{ color: '#FFFFFF' }}
+                      >
                         UPSC Syllabus
                       </h3>
                     </div>
@@ -551,7 +551,7 @@ export default function ResourcesPage({ navigate, folder }) {
                       <div className="flex items-center justify-between">
                         <span className="inline-flex items-center gap-1.5 font-mono text-xs font-bold text-[#8C3A27] bg-[#8C3A27]/10 px-2.5 py-1 rounded-md border border-[#8C3A27]/20">
                           <Layers className="w-3 h-3" />
-                          <span>{syllabusResources.length} Syllabi Available</span>
+                          <span>{syllabusResources.length} Syllabus Available</span>
                         </span>
                         <span className="text-[11px] font-serif italic text-[#7A6B5D] font-semibold">
                           Prelims &bull; Mains &bull; Optionals
@@ -560,14 +560,17 @@ export default function ResourcesPage({ navigate, folder }) {
 
                       {/* Folder Description */}
                       <p className="text-xs sm:text-sm text-[#3D3028] font-sans font-medium leading-relaxed">
-                        Comprehensive micro-syllabus breakdowns for UPSC Civil Services Prelims, Mains GS Papers, and Optional subjects with downloadable study guides.
+                        Comprehensive micro-syllabus breakdowns for UPSC Civil Services Prelims, Mains GS Papers, and Optional subjects.
                       </p>
 
                       {/* Dynamic Subject Preview Pills */}
                       <div className="pt-2 flex flex-wrap gap-1.5">
                         {syllabusResources.slice(0, 4).map((item, i) => {
                           const rawTitle = item.Title || item.title || 'Syllabus';
-                          const cleanTitle = rawTitle.replace(/upsc|civil\s+services|examination|cse|syllabus/gi, '').trim();
+                          const cleanTitle = rawTitle
+                            .replace(/upsc|civil\s+services|examination|cse|syllabus/gi, '')
+                            .replace(/[()]/g, '')
+                            .trim();
                           return (
                             <span 
                               key={i} 
@@ -597,7 +600,7 @@ export default function ResourcesPage({ navigate, folder }) {
                         className="w-full inline-flex items-center justify-center gap-2 btn-terracotta-pill text-xs py-2.5 px-4 font-serif font-bold transition-all cursor-pointer shadow-xs hover:shadow-md"
                       >
                         <FolderOpen className="w-3.5 h-3.5" />
-                        <span>EXPLORE SYLLABI FOLDER &rarr;</span>
+                        <span>EXPLORE SYLLABUS FOLDER &rarr;</span>
                       </button>
                     </div>
                   </div>
