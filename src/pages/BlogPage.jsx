@@ -9,21 +9,48 @@ import {
 import { useCMSData } from '../hooks/useCMSData';
 import { createSlug, getDirectImageUrl } from './CurrentAffairsReader';
 import { sortCurrentAffairsByDate, formatDisplayDate } from '../utils/dateUtils';
+import RisingDawnLoader from '../components/RisingDawnLoader';
 
 export default function BlogPage({ navigate }) {
   const CURRENT_AFFAIRS_URL = "https://www.iasmentoring.com/current_affairs.html";
   const { data, loading } = useCMSData();
 
+  // Support both data?.articles and data?.currentAffairs with safe nullish fallback
+  const rawArticles = Array.isArray(data?.articles)
+    ? data.articles
+    : Array.isArray(data?.currentAffairs)
+      ? data.currentAffairs
+      : [];
+
   // Ensure current affairs dispatches are strictly ordered by date descending (latest first)
   const sortedCurrentAffairs = useMemo(() => {
-    return sortCurrentAffairsByDate(data?.currentAffairs || []);
-  }, [data?.currentAffairs]);
+    return sortCurrentAffairsByDate(rawArticles.filter(item => item && typeof item === 'object'));
+  }, [rawArticles]);
 
   const handleOpenArticle = (item) => {
-    const title = item.Title || item.title || '';
-    const slug = item.Slug || item.slug || createSlug(title);
-    navigate(`/current-affairs/${slug}`);
+    if (!item || typeof item !== 'object') return;
+    const title = item?.Title || item?.title || 'Current Affairs';
+    const rawSlug = item?.Slug || item?.slug || createSlug(title);
+    let slug = rawSlug;
+    try {
+      slug = decodeURIComponent(rawSlug);
+    } catch (e) {
+      slug = rawSlug;
+    }
+    navigate(`/current-affairs/${encodeURIComponent(slug || createSlug(title))}`);
   };
+
+  // If initial load is in progress and no cached items exist yet, display branded rising dawn loader
+  if (loading && sortedCurrentAffairs.length === 0) {
+    return (
+      <RisingDawnLoader
+        isReady={false}
+        label="Hydrating Daily Dispatches..."
+        sublabel="e-Gurukulam for IAS • The Dawn of Knowledge"
+        fullScreen={true}
+      />
+    );
+  }
 
   return (
     <div className="space-y-0 relative min-h-screen bg-[#FFFDF8]">
@@ -61,12 +88,21 @@ export default function BlogPage({ navigate }) {
           {!loading && sortedCurrentAffairs.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {sortedCurrentAffairs.map((item, idx) => {
-                const title = item.Title || item.title || 'Untitled Dispatch';
-                const date = formatDisplayDate(item.Date || item.date) || 'Today';
-                const category = item.Category || item.category || 'General Studies';
-                const shortSummary = item.Short_Summary || item.short_summary || item.Summary || item.summary || item.Description || item.description || '';
-                const rawBanner = item.Banner_Image || item.banner_image || item.Banner || item.banner || item.Image || item.image;
+                if (!item || typeof item !== 'object') return null;
+                const title = item?.Title || item?.title || 'Current Affairs';
+                const date = formatDisplayDate(item?.Date || item?.date) || '';
+                const category = item?.Category || item?.category || 'General Studies';
+                const shortSummary = item?.Short_Summary || item?.short_summary || item?.Summary || item?.summary || item?.Description || item?.description || item?.content || '';
+                const rawBanner = item?.Banner_Image || item?.banner_image || item?.Banner || item?.banner || item?.Image || item?.image;
                 const bannerImage = getDirectImageUrl(rawBanner);
+
+                // Safe tags handling
+                const rawTags = item?.tags || item?.Tags;
+                const tags = Array.isArray(rawTags)
+                  ? rawTags
+                  : typeof rawTags === 'string'
+                    ? rawTags.split(',').map(t => t.trim()).filter(Boolean)
+                    : [];
 
                 return (
                   <div 
@@ -140,7 +176,7 @@ export default function BlogPage({ navigate }) {
             <div className="card-parchment-3d p-8 text-center max-w-xl mx-auto space-y-3 bg-[#FFFDF8] border border-[#D5C3B0] rounded-2xl">
               <BookOpen className="w-10 h-10 text-[#8C3A27] mx-auto opacity-80" />
               <h4 className="font-serif-header text-lg font-bold text-[#221814]">
-                Today's Dispatches Updating
+                No Current Affairs published yet
               </h4>
               <p className="text-xs sm:text-sm font-serif italic text-[#5C4028] font-bold leading-relaxed">
                 Daily current affairs cards are updated every morning from our Content CMS. Click below to explore the complete current affairs portal.

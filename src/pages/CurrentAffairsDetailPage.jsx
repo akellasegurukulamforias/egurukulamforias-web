@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   ArrowLeft, 
   Calendar, 
@@ -17,72 +17,98 @@ import {
   getDirectImageUrl, 
   getSecondaryImageUrl 
 } from './CurrentAffairsReader';
-import ParticleConvergenceLoader from '../components/ParticleConvergenceLoader';
+import RisingDawnLoader from '../components/RisingDawnLoader';
+
+/**
+ * Safely decode URI components without throwing URIError on malformed sequences
+ */
+function safeDecode(val) {
+  if (!val || typeof val !== 'string') return '';
+  try {
+    return decodeURIComponent(val);
+  } catch (e) {
+    try {
+      return unescape(val);
+    } catch (err) {
+      return val;
+    }
+  }
+}
 
 /**
  * Clean and optimize raw HTML for high-fidelity native editorial typography
+ * Wrapped in try/catch with fallback to raw content
  */
 function cleanDocHtml(rawHtml) {
   if (!rawHtml || typeof rawHtml !== 'string') return '';
 
-  let html = rawHtml;
+  try {
+    let html = rawHtml;
 
-  // 1. Extract inner body content if a complete HTML page is provided
-  const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
-  if (bodyMatch && bodyMatch[1]) {
-    html = bodyMatch[1];
+    // 1. Extract inner body content if a complete HTML page is provided
+    const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+    if (bodyMatch && bodyMatch[1]) {
+      html = bodyMatch[1];
+    }
+
+    // 2. Strip <style> and <script> blocks to preserve our master typography
+    html = html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+    html = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+
+    // 3. Remove Google's redirection wrappers
+    html = html.replace(/href=["']https:\/\/www\.google\.com\/url\?q=([^&"']+)[^"']*["']/gi, (match, dest) => {
+      try {
+        return `href="${decodeURIComponent(dest)}" target="_blank" rel="noopener noreferrer"`;
+      } catch (e) {
+        return `href="${dest}" target="_blank" rel="noopener noreferrer"`;
+      }
+    });
+
+    // 4. Convert Google Docs title/subtitle paragraphs or centered headers (including text-center classes) into consistent editorial headings
+    html = html.replace(/<p[^>]*class=["'][^"']*\b(?:title|subtitle|header|headline)\b[^"']*["'][^>]*>\s*(?:<b>|<strong>)?([\s\S]*?)(?:<\/b>|<\/strong>)?\s*<\/p>/gi, '<h2 class="editorial-heading-divider text-center">$1</h2>');
+    html = html.replace(/<p[^>]*(?:text-align:\s*center|align=["']center["']|\btext-center\b)[^>]*>\s*(?:<b>|<strong>)?([\s\S]*?)(?:<\/b>|<\/strong>)?\s*<\/p>/gi, '<h2 class="editorial-heading-divider text-center">$1</h2>');
+
+    // 5. Convert standalone bold/strong heading questions or section labels into styled subheadings with divider lines
+    html = html.replace(/<p[^>]*>\s*(?:<b>|<strong>|<span[^>]*font-weight[^>]*>)\s*([^<]{3,140}?(?:\?|:)?)\s*(?:<\/b>|<\/strong>|<\/span>)\s*<\/p>/gi, '<h3 class="editorial-subheading">$1</h3>');
+
+    // 6. Ensure all images are responsive, centered, have shadow, and load with referrerPolicy="no-referrer"
+    html = html.replace(/<img\s+([^>]*?)>/gi, (match, attributes) => {
+      let cleanAttrs = attributes || '';
+      cleanAttrs = cleanAttrs.replace(/\b(width|height)=["'][^"']*["']/gi, '');
+      
+      if (!/referrerpolicy/i.test(cleanAttrs)) {
+        cleanAttrs += ' referrerpolicy="no-referrer"';
+      }
+      if (!/loading/i.test(cleanAttrs)) {
+        cleanAttrs += ' loading="lazy"';
+      }
+
+      return `<img ${cleanAttrs} class="max-w-full rounded-2xl shadow-md my-6 mx-auto block object-contain border border-[#D5C3B0]/40" />`;
+    });
+
+    // 7. Clean empty paragraph tags
+    html = html.replace(/<p[^>]*>\s*(?:&nbsp;|<br\s*\/?>|\s)*<\/p>/gi, '');
+
+    return html;
+  } catch (err) {
+    console.warn("cleanDocHtml parsing encountered an error, falling back to safe content:", err);
+    return String(rawHtml).replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
   }
-
-  // 2. Strip <style> and <script> blocks to preserve our master typography
-  html = html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
-  html = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
-
-  // 3. Remove Google's redirection wrappers
-  html = html.replace(/href=["']https:\/\/www\.google\.com\/url\?q=([^&"']+)[^"']*["']/gi, (match, dest) => {
-    try {
-      return `href="${decodeURIComponent(dest)}" target="_blank" rel="noopener noreferrer"`;
-    } catch (e) {
-      return `href="${dest}" target="_blank" rel="noopener noreferrer"`;
-    }
-  });
-
-  // 4. Convert Google Docs title/subtitle paragraphs or centered headers (including text-center classes) into consistent editorial headings
-  html = html.replace(/<p[^>]*class=["'][^"']*\b(?:title|subtitle|header|headline)\b[^"']*["'][^>]*>\s*(?:<b>|<strong>)?([\s\S]*?)(?:<\/b>|<\/strong>)?\s*<\/p>/gi, '<h2 class="editorial-heading-divider text-center">$1</h2>');
-  html = html.replace(/<p[^>]*(?:text-align:\s*center|align=["']center["']|\btext-center\b)[^>]*>\s*(?:<b>|<strong>)?([\s\S]*?)(?:<\/b>|<\/strong>)?\s*<\/p>/gi, '<h2 class="editorial-heading-divider text-center">$1</h2>');
-
-  // 5. Convert standalone bold/strong heading questions or section labels into styled subheadings with divider lines
-  html = html.replace(/<p[^>]*>\s*(?:<b>|<strong>|<span[^>]*font-weight[^>]*>)\s*([^<]{3,140}?(?:\?|:)?)\s*(?:<\/b>|<\/strong>|<\/span>)\s*<\/p>/gi, '<h3 class="editorial-subheading">$1</h3>');
-
-  // 6. Ensure all images are responsive, centered, have shadow, and load with referrerPolicy="no-referrer"
-  html = html.replace(/<img\s+([^>]*?)>/gi, (match, attributes) => {
-    let cleanAttrs = attributes;
-    cleanAttrs = cleanAttrs.replace(/\b(width|height)=["'][^"']*["']/gi, '');
-    
-    if (!/referrerpolicy/i.test(cleanAttrs)) {
-      cleanAttrs += ' referrerpolicy="no-referrer"';
-    }
-    if (!/loading/i.test(cleanAttrs)) {
-      cleanAttrs += ' loading="lazy"';
-    }
-
-    return `<img ${cleanAttrs} class="max-w-full rounded-2xl shadow-md my-6 mx-auto block object-contain border border-[#D5C3B0]/40" />`;
-  });
-
-  // 7. Clean empty paragraph tags
-  html = html.replace(/<p[^>]*>\s*(?:&nbsp;|<br\s*\/?>|\s)*<\/p>/gi, '');
-
-  return html;
 }
 
 /**
  * Estimate reading time in minutes based on word count
  */
 function estimateReadingTime(content) {
-  if (!content || typeof content !== 'string') return '3 min read';
-  const cleanText = content.replace(/<[^>]*>/g, ' ');
-  const words = cleanText.trim().split(/\s+/).filter(Boolean).length;
-  const minutes = Math.max(1, Math.ceil(words / 200));
-  return `${minutes} min read`;
+  try {
+    if (!content || typeof content !== 'string') return '3 min read';
+    const cleanText = content.replace(/<[^>]*>/g, ' ');
+    const words = cleanText.trim().split(/\s+/).filter(Boolean).length;
+    const minutes = Math.max(1, Math.ceil(words / 200));
+    return `${minutes} min read`;
+  } catch (e) {
+    return '3 min read';
+  }
 }
 
 // Helper to normalize string keys by stripping non-alphanumeric characters
@@ -95,33 +121,61 @@ export default function CurrentAffairsDetailPage({ slug, navigate }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isFetched, setIsFetched] = useState(false);
 
+  // 2. Catching Route Hydration Delays: If router query/slug is not yet hydrated, remain in loading state
+  const rawSlug = slug || '';
+  const decodedSlug = safeDecode(rawSlug);
+  const isRouterReady = Boolean(rawSlug && typeof rawSlug === 'string' && rawSlug.trim().length > 0);
+
+  // Support both data?.articles and data?.currentAffairs with safe nullish fallback
+  const rawArticles = Array.isArray(data?.articles)
+    ? data.articles
+    : Array.isArray(data?.currentAffairs)
+      ? data.currentAffairs
+      : [];
+
   // Sorted list of articles (latest first)
   const sortedArticles = useMemo(() => {
-    return sortCurrentAffairsByDate(data?.currentAffairs || []);
-  }, [data?.currentAffairs]);
+    return sortCurrentAffairsByDate(rawArticles.filter(item => item && typeof item === 'object'));
+  }, [rawArticles]);
 
-  const targetSlug = slug || '';
-  const targetNorm = normalizeKey(targetSlug);
+  const targetSlug = rawSlug;
+  const targetDecoded = decodedSlug;
+  const targetNorm = normalizeKey(targetDecoded || targetSlug);
 
-  // Resilient article matching: direct slug, normalized slug, normalized title, or docId
+  // Resilient article matching: decoded slug, raw slug, generated slug, normalized title, or docId
   const currentIndex = useMemo(() => {
-    if (!sortedArticles || sortedArticles.length === 0) return -1;
+    if (!isRouterReady || !sortedArticles || sortedArticles.length === 0) return -1;
     return sortedArticles.findIndex(art => {
-      const artTitle = art.Title || art.title || '';
-      const artSlug = art.Slug || art.slug || createSlug(artTitle);
-      const docId = art.docId || art.Doc_ID || art.id || '';
+      if (!art || typeof art !== 'object') return false;
+      const artTitle = art?.Title || art?.title || '';
+      const artRawSlug = art?.Slug || art?.slug || '';
+      const artDecodedSlug = safeDecode(artRawSlug);
+      const artGeneratedSlug = createSlug(artTitle);
+      const docId = art?.docId || art?.Doc_ID || art?.id || '';
 
-      return (
-        artSlug === targetSlug ||
-        normalizeKey(artSlug) === targetNorm ||
-        normalizeKey(artTitle) === targetNorm ||
-        (docId && normalizeKey(docId) === targetNorm)
+      return Boolean(
+        (artDecodedSlug && targetDecoded && artDecodedSlug.toLowerCase() === targetDecoded.toLowerCase()) ||
+        (artRawSlug && targetSlug && artRawSlug.toLowerCase() === targetSlug.toLowerCase()) ||
+        (artGeneratedSlug && targetDecoded && artGeneratedSlug.toLowerCase() === targetDecoded.toLowerCase()) ||
+        (artGeneratedSlug && targetSlug && artGeneratedSlug.toLowerCase() === targetSlug.toLowerCase()) ||
+        (targetNorm && normalizeKey(artRawSlug) === targetNorm) ||
+        (targetNorm && normalizeKey(artTitle) === targetNorm) ||
+        (targetNorm && docId && normalizeKey(docId) === targetNorm)
       );
     });
-  }, [sortedArticles, targetSlug, targetNorm]);
+  }, [isRouterReady, sortedArticles, targetSlug, targetDecoded, targetNorm]);
 
   const article = currentIndex !== -1 ? sortedArticles[currentIndex] : null;
-  const resource = article;
+
+  // Unconditionally declared at top level before any early returns:
+  const categoryBadges = useMemo(() => {
+    const rawCategory = article?.Category || article?.category;
+    if (!rawCategory) return [];
+    return String(rawCategory)
+      .split(/[|\n]+/)
+      .map(c => c.trim())
+      .filter(Boolean);
+  }, [article?.Category, article?.category]);
 
   // 1. State Initialization: Reset isLoading(true) and isFetched(false) when slug changes
   useEffect(() => {
@@ -131,13 +185,13 @@ export default function CurrentAffairsDetailPage({ slug, navigate }) {
 
   // 2. Explicit Route Resolution Guard & Catching Route Hydration Delays
   useEffect(() => {
-    if (!slug || typeof slug !== 'string' || !slug.trim()) {
+    if (!isRouterReady) {
       setIsLoading(true);
       setIsFetched(false);
       return;
     }
 
-    if (resource) {
+    if (article) {
       setIsLoading(false);
       setIsFetched(true);
     } else if (!cmsLoading && cmsFetched) {
@@ -147,51 +201,13 @@ export default function CurrentAffairsDetailPage({ slug, navigate }) {
       setIsLoading(true);
       setIsFetched(false);
     }
-  }, [resource, cmsLoading, cmsFetched, slug]);
-  const prevArticle = currentIndex > 0 ? sortedArticles[currentIndex - 1] : null;
-  const nextArticle = currentIndex >= 0 && currentIndex < sortedArticles.length - 1 ? sortedArticles[currentIndex + 1] : null;
-
-  // Extract article fields
-  const title = article?.Title || article?.title || 'Current Affairs Editorial Analysis';
-  const date = formatDisplayDate(article?.Date || article?.date) || 'Today';
-  const category = article?.Category || article?.category || 'General Studies';
-  const rawBanner = article?.Banner_Image || article?.banner_image || article?.Banner || article?.banner || article?.Image || article?.image;
-  const bannerImage = getDirectImageUrl(rawBanner);
-  const shortSummary = article?.Short_Summary || article?.short_summary || article?.Summary || article?.summary || article?.Description || article?.description || '';
-
-  // Extract static Full_Content payload
-  const rawFullContent = 
-    article?.Full_Content || 
-    article?.full_content || 
-    article?.Article_HTML || 
-    article?.article_html || 
-    article?.HTML_Content || 
-    article?.html_content || 
-    article?.Content_HTML || 
-    article?.content_html || 
-    article?.HTML || 
-    article?.html || 
-    article?.Content || 
-    article?.content || 
-    article?.Article || 
-    article?.article || 
-    '';
-
-  const fullContentHtml = rawFullContent ? cleanDocHtml(rawFullContent) : '';
-  const readingTime = estimateReadingTime(fullContentHtml || shortSummary);
-
-  const navigateToArticle = (art) => {
-    if (!art) return;
-    const artTitle = art.Title || art.title || '';
-    const artSlug = art.Slug || art.slug || createSlug(artTitle);
-    navigate(`/current-affairs/${artSlug}`);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
+  }, [isRouterReady, article, cmsLoading, cmsFetched]);
 
   // Sync document title & trigger GA4 page view when article loads
   useEffect(() => {
-    if (article && title) {
-      document.title = `${title} | e-Gurukulam for IAS`;
+    if (article) {
+      const docTitle = article?.Title || article?.title || 'Current Affairs';
+      document.title = `${docTitle} | e-Gurukulam for IAS`;
       if (typeof window !== 'undefined' && typeof window.gtag === 'function') {
         window.gtag('config', 'G-T5W96019N1', {
           page_path: window.location.pathname,
@@ -200,7 +216,7 @@ export default function CurrentAffairsDetailPage({ slug, navigate }) {
         });
       }
     }
-  }, [article, title]);
+  }, [article]);
 
   // Intercept clicks on internal links within article HTML to prevent full page reloads
   const handleContentClick = (e) => {
@@ -233,34 +249,42 @@ export default function CurrentAffairsDetailPage({ slug, navigate }) {
     }
   };
 
-  // 3. Catching Route Hydration Delays
-  const isRouterReady = Boolean(slug && typeof slug === 'string' && slug.trim().length > 0);
+  const navigateToArticle = (art) => {
+    if (!art || typeof art !== 'object') return;
+    const artTitle = art?.Title || art?.title || 'Current Affairs';
+    const rawArtSlug = art?.Slug || art?.slug || createSlug(artTitle);
+    const decodedArtSlug = safeDecode(rawArtSlug) || createSlug(artTitle);
+    navigate(`/current-affairs/${encodeURIComponent(decodedArtSlug)}`);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
-  // 1. GLOBAL ROUTE GUARD: PARTICLE CONVERGENCE LOADER WHILE CMS DATA IS HYDRATING
-  // If isLoading OR !isFetched, OR router is not ready: NEVER render Not Found screen!
+  // 1. GLOBAL ROUTE GUARD: BRANDED RISING DAWN / LIGHT LOADER WHILE DATA IS HYDRATING
+  // If router query/slug is not yet hydrated (isRouterReady === false), remain in loading state
+  // If actively loading or fetch not settled, return branded rising light/dawn loader
   if (!isRouterReady || isLoading || !isFetched) {
     return (
-      <ParticleConvergenceLoader
+      <RisingDawnLoader
         isReady={false}
         label="Hydrating Editorial Dispatch..."
-        sublabel="e-Gurukulam for IAS • Tradition of Wisdom & Modern Rigor"
+        sublabel="e-Gurukulam for IAS • The Dawn of Knowledge"
         fullScreen={true}
       />
     );
   }
 
-  // 2. DISPATCH NOT FOUND STATE (STRICT INVARIANT: ONLY AFTER CMS QUERY IS COMPLETE)
-  // If isFetched AND !isLoading AND !resource: Render "Dispatch Not Found"
-  if (isFetched && !isLoading && !resource) {
+  // 2. DISPATCH NOT FOUND STATE (STRICT INVARIANT: ONLY AFTER CMS QUERY IS FULLY COMPLETE)
+  if (isFetched && !isLoading && !article) {
     return (
       <div className="min-h-screen bg-[#FFFDF8] text-[#221814] py-16 px-4 sm:px-6 lg:px-8">
         <div className="max-w-xl mx-auto space-y-6 text-center bg-[#FAF6EE] p-8 sm:p-12 rounded-3xl border border-[#D5C3B0] shadow-sm">
           <ShieldAlert className="w-12 h-12 text-[#8C3A27] mx-auto opacity-80" />
           <h2 className="font-serif-header text-2xl sm:text-3xl font-extrabold text-[#221814]">
-            Dispatch Not Found
+            {sortedArticles.length === 0 ? "No Current Affairs published yet" : "Dispatch Not Found"}
           </h2>
           <p className="text-xs sm:text-sm font-serif italic text-[#5C4028] font-semibold leading-relaxed">
-            The requested Current Affairs article could not be located or may have been archived.
+            {sortedArticles.length === 0 
+              ? "We are currently preparing today's analytical dispatches. Please check back shortly." 
+              : "The requested Current Affairs article could not be located or may have been archived."}
           </p>
           <div className="pt-2">
             <button
@@ -276,6 +300,59 @@ export default function CurrentAffairsDetailPage({ slug, navigate }) {
       </div>
     );
   }
+
+  // Defensive fallback: If article is not yet loaded or is undefined, return branded loader
+  if (!article) {
+    return (
+      <RisingDawnLoader
+        isReady={false}
+        label="Hydrating Editorial Dispatch..."
+        sublabel="e-Gurukulam for IAS • The Dawn of Knowledge"
+        fullScreen={true}
+      />
+    );
+  }
+
+  // ONLY REACHED ONCE ARTICLE IS GUARANTEED TO BE LOADED AND NON-NULL:
+  // Extract article fields safely with optional chaining and safe defaults
+  const title = article?.Title || article?.title || 'Current Affairs';
+  const date = formatDisplayDate(article?.Date || article?.date) || '';
+  const category = article?.Category || article?.category || 'General Studies';
+  const rawBanner = article?.Banner_Image || article?.banner_image || article?.Banner || article?.banner || article?.Image || article?.image;
+  const bannerImage = getDirectImageUrl(rawBanner);
+  const shortSummary = article?.Short_Summary || article?.short_summary || article?.Summary || article?.summary || article?.Description || article?.description || '';
+
+  // Safe tags handling: array or string with safe default
+  const rawTags = article?.tags || article?.Tags;
+  const tags = Array.isArray(rawTags)
+    ? rawTags
+    : typeof rawTags === 'string'
+      ? rawTags.split(',').map(t => t.trim()).filter(Boolean)
+      : [];
+
+  // Extract static Full_Content payload safely
+  const rawFullContent = 
+    article?.Full_Content || 
+    article?.full_content || 
+    article?.Article_HTML || 
+    article?.article_html || 
+    article?.HTML_Content || 
+    article?.html_content || 
+    article?.Content_HTML || 
+    article?.content_html || 
+    article?.HTML || 
+    article?.html || 
+    article?.Content || 
+    article?.content || 
+    article?.Article || 
+    article?.article || 
+    '';
+
+  const fullContentHtml = rawFullContent ? cleanDocHtml(rawFullContent) : '';
+  const readingTime = estimateReadingTime(fullContentHtml || shortSummary);
+
+  const prevArticle = currentIndex > 0 && sortedArticles[currentIndex - 1] ? sortedArticles[currentIndex - 1] : null;
+  const nextArticle = currentIndex >= 0 && currentIndex < sortedArticles.length - 1 && sortedArticles[currentIndex + 1] ? sortedArticles[currentIndex + 1] : null;
 
   // 3. FULL EDITORIAL DISPATCH VIEW
   return (
@@ -294,13 +371,13 @@ export default function CurrentAffairsDetailPage({ slug, navigate }) {
           </button>
 
           {/* Badges: Category tags & Date */}
-          <div className="flex items-center gap-2 text-xs">
-            {category && (
-              <span className="inline-flex items-center gap-1.5 font-mono text-[#8C3A27] font-bold bg-[#8C3A27]/10 px-3 py-1 rounded-md border border-[#8C3A27]/20">
+          <div className="flex items-center gap-2 text-xs flex-wrap">
+            {categoryBadges.map((cat, idx) => (
+              <span key={idx} className="inline-flex items-center gap-1.5 font-mono text-[#8C3A27] font-bold bg-[#8C3A27]/10 px-3 py-1 rounded-md border border-[#8C3A27]/20">
                 <Tag className="w-3.5 h-3.5" />
-                <span>{category}</span>
+                <span>{cat}</span>
               </span>
-            )}
+            ))}
             {date && (
               <span className="inline-flex items-center gap-1.5 font-serif text-[#7A6B5D] italic font-semibold">
                 <Calendar className="w-3.5 h-3.5 text-[#8C3A27]" />
@@ -311,6 +388,11 @@ export default function CurrentAffairsDetailPage({ slug, navigate }) {
               <Clock className="w-3.5 h-3.5 text-[#C5A059]" />
               <span>{readingTime}</span>
             </span>
+            {tags?.map((t, idx) => (
+              <span key={idx} className="inline-flex items-center font-mono text-[#8C3A27] font-semibold bg-[#8C3A27]/10 px-2.5 py-1 rounded-md text-xs border border-[#8C3A27]/20">
+                #{t}
+              </span>
+            ))}
           </div>
         </div>
 
@@ -385,7 +467,7 @@ export default function CurrentAffairsDetailPage({ slug, navigate }) {
                 type="button"
                 onClick={() => navigateToArticle(prevArticle)}
                 className="hidden md:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0]/60 hover:border-[#8C3A27] transition-all group cursor-pointer text-xs font-serif font-bold text-[#221814] hover:text-[#8C3A27]"
-                title={prevArticle.Title || prevArticle.title}
+                title={prevArticle?.Title || prevArticle?.title || 'Previous Dispatch'}
               >
                 <ChevronLeft className="w-4 h-4 text-[#8C3A27] group-hover:-translate-x-0.5 transition-transform" />
                 <span>Previous</span>
@@ -405,7 +487,7 @@ export default function CurrentAffairsDetailPage({ slug, navigate }) {
                   READ NEXT
                 </span>
                 <p className="text-xs sm:text-sm font-serif font-bold text-[#221814] line-clamp-1 group-hover:text-[#8C3A27] transition-colors">
-                  {nextArticle.Title || nextArticle.title}
+                  {nextArticle?.Title || nextArticle?.title || 'Next Dispatch'}
                 </p>
               </div>
               <ChevronRight className="w-5 h-5 text-[#8C3A27] shrink-0 group-hover:translate-x-1 transition-transform" />

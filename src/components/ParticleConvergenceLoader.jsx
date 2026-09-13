@@ -16,16 +16,13 @@ export default function ParticleConvergenceLoader({
 }) {
   // If data was already available synchronously on initial mount, skip completely (0ms bypass)
   const initiallyReady = useRef(isReady);
-  if (initiallyReady.current) {
-    return null;
-  }
-
   const canvasRef = useRef(null);
   const [isDissolving, setIsDissolving] = useState(false);
   const [isExited, setIsExited] = useState(false);
 
   // Trigger smooth fade-out and unmount once isReady becomes true
   useEffect(() => {
+    if (initiallyReady.current) return;
     if (isReady && !isDissolving) {
       setIsDissolving(true);
       const timer = setTimeout(() => {
@@ -37,7 +34,7 @@ export default function ParticleConvergenceLoader({
   }, [isReady, isDissolving, onFinished]);
 
   useEffect(() => {
-    if (isExited) return;
+    if (initiallyReady.current || isExited) return;
 
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -339,7 +336,7 @@ export default function ParticleConvergenceLoader({
     };
   }, [isExited]);
 
-  if (isExited) return null;
+  if (initiallyReady.current || isExited) return null;
 
   return (
     <div

@@ -66,16 +66,18 @@ export function parseDateToTimestamp(dateVal) {
 export function sortCurrentAffairsByDate(items) {
   if (!Array.isArray(items)) return [];
 
-  return [...items].sort((a, b) => {
-    const dateA = a?.Date || a?.date || a?.Published_Date || a?.published_date || a?.Created_At || a?.created_at || '';
-    const dateB = b?.Date || b?.date || b?.Published_Date || b?.published_date || b?.Created_At || b?.created_at || '';
+  return items
+    .filter(item => item && typeof item === 'object')
+    .sort((a, b) => {
+      const dateA = a?.Date || a?.date || a?.Published_Date || a?.published_date || a?.Created_At || a?.created_at || '';
+      const dateB = b?.Date || b?.date || b?.Published_Date || b?.published_date || b?.Created_At || b?.created_at || '';
 
-    const timeA = parseDateToTimestamp(dateA);
-    const timeB = parseDateToTimestamp(dateB);
+      const timeA = parseDateToTimestamp(dateA);
+      const timeB = parseDateToTimestamp(dateB);
 
-    return timeB - timeA; // Descending order (latest timestamp first)
-  });
+      return timeB - timeA; // Descending order (latest timestamp first)
+    });
 }
 
-export { formatDisplayDate } from './formatDate';
+export { formatDisplayDate } from './formatDate.js';
 

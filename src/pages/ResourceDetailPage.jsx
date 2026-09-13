@@ -42,53 +42,58 @@ import ParticleConvergenceLoader from '../components/ParticleConvergenceLoader';
 function cleanDocHtml(rawHtml) {
   if (!rawHtml || typeof rawHtml !== 'string') return '';
 
-  let html = rawHtml;
+  try {
+    let html = rawHtml;
 
-  // 1. Extract inner body content if a complete HTML page is provided
-  const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
-  if (bodyMatch && bodyMatch[1]) {
-    html = bodyMatch[1];
+    // 1. Extract inner body content if a complete HTML page is provided
+    const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+    if (bodyMatch && bodyMatch[1]) {
+      html = bodyMatch[1];
+    }
+
+    // 2. Strip <style> and <script> blocks to preserve our master typography
+    html = html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+    html = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+
+    // 3. Remove Google's redirection wrappers
+    html = html.replace(/href=["']https:\/\/www\.google\.com\/url\?q=([^&"']+)[^"']*["']/gi, (match, dest) => {
+      try {
+        return `href="${decodeURIComponent(dest)}" target="_blank" rel="noopener noreferrer"`;
+      } catch (e) {
+        return `href="${dest}" target="_blank" rel="noopener noreferrer"`;
+      }
+    });
+
+    // 4. Convert Google Docs title/subtitle paragraphs or centered headers (including text-center classes) into consistent editorial headings
+    html = html.replace(/<p[^>]*class=["'][^"']*\b(?:title|subtitle|header|headline)\b[^"']*["'][^>]*>\s*(?:<b>|<strong>)?([\s\S]*?)(?:<\/b>|<\/strong>)?\s*<\/p>/gi, '<h2 class="editorial-heading-divider text-center">$1</h2>');
+    html = html.replace(/<p[^>]*(?:text-align:\s*center|align=["']center["']|\btext-center\b)[^>]*>\s*(?:<b>|<strong>)?([\s\S]*?)(?:<\/b>|<\/strong>)?\s*<\/p>/gi, '<h2 class="editorial-heading-divider text-center">$1</h2>');
+
+    // 5. Convert standalone bold/strong heading questions or section labels into styled subheadings with divider lines
+    html = html.replace(/<p[^>]*>\s*(?:<b>|<strong>|<span[^>]*font-weight[^>]*>)\s*([^<]{3,140}?(?:\?|:)?)\s*(?:<\/b>|<\/strong>|<\/span>)\s*<\/p>/gi, '<h3 class="editorial-subheading">$1</h3>');
+
+    // 6. Ensure all images are responsive, centered, have shadow, and load with referrerPolicy="no-referrer"
+    html = html.replace(/<img\s+([^>]*?)>/gi, (match, attributes) => {
+      let cleanAttrs = attributes || '';
+      cleanAttrs = cleanAttrs.replace(/\b(width|height)=["'][^"']*["']/gi, '');
+      
+      if (!/referrerpolicy/i.test(cleanAttrs)) {
+        cleanAttrs += ' referrerpolicy="no-referrer"';
+      }
+      if (!/loading/i.test(cleanAttrs)) {
+        cleanAttrs += ' loading="lazy"';
+      }
+
+      return `<img ${cleanAttrs} class="max-w-full rounded-2xl shadow-md my-6 mx-auto block object-contain border border-[#D5C3B0]/40" />`;
+    });
+
+    // 7. Clean empty paragraph tags
+    html = html.replace(/<p[^>]*>\s*(?:&nbsp;|<br\s*\/?>|\s)*<\/p>/gi, '');
+
+    return html;
+  } catch (err) {
+    console.warn("cleanDocHtml parsing encountered an error in ResourceDetailPage, falling back to safe content:", err);
+    return String(rawHtml).replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
   }
-
-  // 2. Strip <style> and <script> blocks to preserve our master typography
-  html = html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
-  html = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
-
-  // 3. Remove Google's redirection wrappers
-  html = html.replace(/href=["']https:\/\/www\.google\.com\/url\?q=([^&"']+)[^"']*["']/gi, (match, dest) => {
-    try {
-      return `href="${decodeURIComponent(dest)}" target="_blank" rel="noopener noreferrer"`;
-    } catch (e) {
-      return `href="${dest}" target="_blank" rel="noopener noreferrer"`;
-    }
-  });
-
-  // 4. Convert Google Docs title/subtitle paragraphs or centered headers (including text-center classes) into consistent editorial headings
-  html = html.replace(/<p[^>]*class=["'][^"']*\b(?:title|subtitle|header|headline)\b[^"']*["'][^>]*>\s*(?:<b>|<strong>)?([\s\S]*?)(?:<\/b>|<\/strong>)?\s*<\/p>/gi, '<h2 class="editorial-heading-divider text-center">$1</h2>');
-  html = html.replace(/<p[^>]*(?:text-align:\s*center|align=["']center["']|\btext-center\b)[^>]*>\s*(?:<b>|<strong>)?([\s\S]*?)(?:<\/b>|<\/strong>)?\s*<\/p>/gi, '<h2 class="editorial-heading-divider text-center">$1</h2>');
-
-  // 5. Convert standalone bold/strong heading questions or section labels into styled subheadings with divider lines
-  html = html.replace(/<p[^>]*>\s*(?:<b>|<strong>|<span[^>]*font-weight[^>]*>)\s*([^<]{3,140}?(?:\?|:)?)\s*(?:<\/b>|<\/strong>|<\/span>)\s*<\/p>/gi, '<h3 class="editorial-subheading">$1</h3>');
-
-  // 6. Ensure all images are responsive, centered, have shadow, and load with referrerPolicy="no-referrer"
-  html = html.replace(/<img\s+([^>]*?)>/gi, (match, attributes) => {
-    let cleanAttrs = attributes;
-    cleanAttrs = cleanAttrs.replace(/\b(width|height)=["'][^"']*["']/gi, '');
-    
-    if (!/referrerpolicy/i.test(cleanAttrs)) {
-      cleanAttrs += ' referrerpolicy="no-referrer"';
-    }
-    if (!/loading/i.test(cleanAttrs)) {
-      cleanAttrs += ' loading="lazy"';
-    }
-
-    return `<img ${cleanAttrs} class="max-w-full rounded-2xl shadow-md my-6 mx-auto block object-contain border border-[#D5C3B0]/40" />`;
-  });
-
-  // 7. Clean empty paragraph tags
-  html = html.replace(/<p[^>]*>\s*(?:&nbsp;|<br\s*\/?>|\s)*<\/p>/gi, '');
-
-  return html;
 }
 
 /**
@@ -1407,7 +1412,7 @@ export default function ResourceDetailPage({ slug, folder, year, stage, stream, 
                 type="button"
                 onClick={() => navigateToResource(prevArticle)}
                 className="hidden md:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0]/60 hover:border-[#8C3A27] transition-all group cursor-pointer text-xs font-serif font-bold text-[#221814] hover:text-[#8C3A27]"
-                title={prevArticle.Title || prevArticle.title}
+                title={prevArticle?.Title || prevArticle?.title || 'Previous Resource'}
               >
                 <ChevronLeft className="w-4 h-4 text-[#8C3A27] group-hover:-translate-x-0.5 transition-transform" />
                 <span>Previous</span>
@@ -1427,7 +1432,7 @@ export default function ResourceDetailPage({ slug, folder, year, stage, stream, 
                   READ NEXT
                 </span>
                 <p className="text-xs sm:text-sm font-serif font-bold text-[#221814] line-clamp-1 group-hover:text-[#8C3A27] transition-colors">
-                  {nextArticle.Title || nextArticle.title}
+                  {nextArticle?.Title || nextArticle?.title || 'Next Resource'}
                 </p>
               </div>
               <ChevronRight className="w-5 h-5 text-[#8C3A27] shrink-0 group-hover:translate-x-1 transition-transform" />

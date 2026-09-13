@@ -2,6 +2,7 @@
 // Native Current Affairs Editorial Reader Page with Markdown & PDF Support
 import React, { useState } from 'react';
 import { ArrowLeft, Calendar, Tag, Loader2, BookOpen, ShieldAlert, Maximize2, Download } from 'lucide-react';
+import { FaWhatsapp, FaTelegramPlane } from 'react-icons/fa';
 import ReactMarkdown from 'react-markdown';
 import { useCMSData } from '../hooks/useCMSData';
 import { formatDisplayDate } from '../utils/formatDate';
@@ -101,13 +102,41 @@ export default function CurrentAffairsReader({ slug, navigate }) {
   const { data, loading } = useCMSData();
 
   // Find matching article by slug or fallback to history.state
-  const currentAffairsList = data?.currentAffairs || [];
-  const articleFromState = window.history.state?.usr?.article || window.history.state?.article;
+  const currentAffairsList = Array.isArray(data?.articles)
+    ? data.articles
+    : Array.isArray(data?.currentAffairs)
+      ? data.currentAffairs
+      : [];
+  const articleFromState = window?.history?.state?.usr?.article || window?.history?.state?.article;
 
   const item = currentAffairsList.find(art => {
+    if (!art || typeof art !== 'object') return false;
     const artTitle = art.Title || art.title || '';
     return createSlug(artTitle) === slug;
-  }) || articleFromState || currentAffairsList[0];
+  }) || articleFromState || currentAffairsList[0] || null;
+
+  if (!item && !loading) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center p-6 text-center">
+        <div className="max-w-md bg-[#FAF6EE] p-8 rounded-3xl border border-[#D5C3B0] space-y-3">
+          <BookOpen className="w-10 h-10 text-[#8C3A27] mx-auto opacity-80" />
+          <h4 className="font-serif-header text-lg font-bold text-[#221814]">
+            No Current Affairs published yet
+          </h4>
+          <p className="text-xs sm:text-sm font-serif italic text-[#5C4028] font-semibold">
+            Please check back soon for our latest daily editorial briefings.
+          </p>
+          <button
+            type="button"
+            onClick={() => navigate('/blog')}
+            className="btn-terracotta-pill text-xs py-2.5 px-5 font-serif font-bold cursor-pointer"
+          >
+            Back to Current Affairs
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const title = item?.Title || item?.title || 'Current Affairs Editorial';
   const date = formatDisplayDate(item?.Date || item?.date) || 'Today';

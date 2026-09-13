@@ -29,18 +29,23 @@ class ErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, errorInfo) {
+    console.error("Current Affairs Render Error:", error, errorInfo);
     console.error("ErrorBoundary caught an error:", error, errorInfo);
   }
 
   render() {
     if (this.state.hasError) {
+      const error = this.state.error;
       return (
         <div className="min-h-[60vh] flex items-center justify-center p-6 text-center">
-          <div className="max-w-md bg-[#FFFDF8] border-2 border-[#8C3A27]/30 rounded-3xl p-8 shadow-md space-y-4">
-            <h2 className="font-serif-header text-2xl font-bold text-[#6C1D18]">Something went wrong</h2>
-            <p className="text-sm text-[#5C4028] font-serif">
+          <div className="max-w-xl bg-[#FFFDF8] border-2 border-[#8C3A27]/30 rounded-3xl p-8 shadow-md space-y-4 text-left">
+            <h2 className="font-serif-header text-2xl font-bold text-[#6C1D18] text-center">Something went wrong</h2>
+            <p className="text-sm text-[#5C4028] font-serif text-center">
               An unexpected error occurred while loading this view.
             </p>
+            <pre className="text-xs text-red-600 bg-red-50 p-4 rounded overflow-auto mt-4 font-mono whitespace-pre-wrap max-h-72">
+              {error?.stack || error?.message || String(error)}
+            </pre>
             <div className="pt-2 flex items-center justify-center gap-3">
               <button
                 type="button"
@@ -126,6 +131,9 @@ export default function App() {
         slug = decodeURIComponent(slug);
       } catch (e) {
         // keep raw slug
+      }
+      if (!slug || !slug.trim()) {
+        return <BlogPage navigate={navigate} />;
       }
       return <CurrentAffairsDetailPage key={normalizedPath} slug={slug} navigate={navigate} />;
     }

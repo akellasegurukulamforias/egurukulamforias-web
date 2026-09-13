@@ -426,8 +426,18 @@ export async function fetchCMSData(forceRevalidate = false) {
         throw new Error(`CMS HTTP Error: ${response.status}`);
       }
 
-      const rawData = await response.json();
+      const text = await response.text();
+      let rawData;
+      try {
+        rawData = JSON.parse(text);
+      } catch (e) {
+        console.error("Failed to parse response as JSON:", text.slice(0, 200));
+        throw new Error("Invalid data format received from data source.");
+      }
 
+      if (!rawData || typeof rawData !== 'object') {
+        throw new Error("Invalid data format received from data source: payload is not an object.");
+      }
 
       const rawSocial = Array.isArray(rawData.socialPlatforms)
         ? rawData.socialPlatforms

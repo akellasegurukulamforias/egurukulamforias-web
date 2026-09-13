@@ -19,8 +19,15 @@ export async function fetchCompleteArchive() {
   try {
     const response = await fetch(MASTER_CACHE_URL);
     if (response.ok) {
-      const json = await response.json();
-      const articles = json.articles || json;
+      const text = await response.text();
+      let json;
+      try {
+        json = JSON.parse(text);
+      } catch (e) {
+        console.error("Failed to parse response as JSON:", text.slice(0, 200));
+        throw new Error("Invalid data format received from data source.");
+      }
+      const articles = json?.articles || json;
       if (Array.isArray(articles) && articles.length > 0) {
         memoryArticleDataset = articles;
         return { articles, fromCache: true };
