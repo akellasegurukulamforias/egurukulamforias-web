@@ -28,27 +28,200 @@ import {
 } from 'lucide-react';
 import coursesData from '../data/courses.json';
 import { useCMSData } from '../hooks/useCMSData';
-import { getCMSImageLink, formatCMSImageUrl, getSecondaryCMSImageUrl, isItemActive, isSyllabusResource } from '../services/cmsService';
+import { 
+  getCMSImageLink, 
+  formatCMSImageUrl, 
+  getSecondaryCMSImageUrl, 
+  isItemActive, 
+  isSyllabusResource, 
+  isPYQResource, 
+  extractPYQYear, 
+  extractPYQPaperName,
+  extractPYQStage,
+  extractPYQCategory,
+  extractPYQPaperLabel,
+  getPYQPaperUrl,
+  sortPYQPapers,
+  extractPaperNumber,
+  extractOptionalSubject
+} from '../services/cmsService';
 import { createSlug, getDirectImageUrl, getSecondaryImageUrl } from './CurrentAffairsReader';
 import { sortCurrentAffairsByDate, formatDisplayDate } from '../utils/dateUtils';
 import PdfViewerModal from '../components/PdfViewerModal';
 
-export default function ResourcesPage({ navigate, folder }) {
+function PYQPaperCard({ item, navigate }) {
+  const title = item.Title || item.title || 'Untitled Paper';
+  const itemYear = extractPYQYear(item);
+  const itemStage = extractPYQStage(item);
+  const itemCategory = extractPYQCategory(item);
+  const paperLabel = extractPYQPaperLabel(item);
+  const shortSummary = item.Short_Summary || item.short_summary || item.Summary || item.summary || item.Description || item.description || '';
+  const rawBanner = 
+    item.Banner_Image || item.banner_image ||
+    item.Banner || item.banner ||
+    item.Poster_Image || item.poster_image ||
+    item.Poster_Image_Link || item.poster_image_link ||
+    item.Image || item.image ||
+    item.Thumbnail || item.thumbnail;
+  const bannerImage = getDirectImageUrl(rawBanner) || getCMSImageLink(item);
+  const paperTargetUrl = getPYQPaperUrl(item);
+
+  return (
+    <div
+      className="card-parchment-3d rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0] overflow-hidden flex flex-col justify-between hover:border-[#8C3A27] transition-all shadow-sm group text-left cursor-pointer h-full"
+      onClick={() => navigate(paperTargetUrl)}
+    >
+      {bannerImage ? (
+        <div className="aspect-[4/3] w-full overflow-hidden rounded-t-lg bg-black/5 relative">
+          <img
+            src={bannerImage}
+            alt={title}
+            loading="lazy"
+            referrerPolicy="no-referrer"
+            className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-500"
+            onError={(e) => {
+              const secondary = getSecondaryImageUrl(rawBanner) || getSecondaryCMSImageUrl(rawBanner);
+              if (secondary && e.target.src !== secondary) {
+                e.target.src = secondary;
+              } else {
+                e.target.onerror = null;
+                e.target.style.display = 'none';
+              }
+            }}
+          />
+        </div>
+      ) : (
+        <div className="aspect-[4/3] w-full overflow-hidden rounded-t-lg bg-gradient-to-br from-[#6C1D18]/10 via-[#FAF6EE] to-[#EAE0D5] border-b border-[#D5C3B0]/60 p-4 sm:p-5 flex flex-col justify-between relative">
+          <div className="flex items-center justify-between">
+            <span className="font-mono text-xs font-bold text-[#8C3A27] bg-[#8C3A27]/15 px-2.5 py-1 rounded-md border border-[#8C3A27]/25">
+              {itemYear} &bull; {itemStage.toUpperCase()}
+            </span>
+            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#8C3A27] bg-[#8C3A27]/10 px-2 py-0.5 rounded-md border border-[#8C3A27]/20">
+              PYQ
+            </span>
+          </div>
+          <div className="font-serif-header text-base font-bold text-[#6C1D18] truncate">
+            {paperLabel}
+          </div>
+        </div>
+      )}
+
+      <div className="p-4 sm:p-5 space-y-3 flex-1 flex flex-col justify-between">
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-xs gap-2">
+            <span className="inline-flex items-center gap-1.5 font-mono text-[#8C3A27] font-bold bg-[#8C3A27]/10 px-2.5 py-1 rounded-md border border-[#8C3A27]/20 shrink-0">
+              <Tag className="w-3 h-3 shrink-0" />
+              <span>PYQ</span>
+            </span>
+            <span className="inline-flex items-center gap-1 font-serif text-[#7A6B5D] italic font-semibold text-[11px] shrink-0">
+              <Calendar className="w-3 h-3 text-[#8C3A27]" />
+              <span>{itemYear} &bull; {itemStage}</span>
+            </span>
+          </div>
+
+          <h3 className="font-serif-header text-base sm:text-lg font-bold text-[#221814] leading-snug group-hover:text-[#8C3A27] transition-colors line-clamp-2">
+            {title}
+          </h3>
+
+          {shortSummary && (
+            <p className="text-xs sm:text-sm text-[#3D3028] font-sans font-medium leading-relaxed line-clamp-2">
+              {shortSummary}
+            </p>
+          )}
+        </div>
+
+        <div className="pt-2 flex items-center gap-3 text-[11px] text-[#7A6B5D] font-mono border-t border-[#D5C3B0]/30">
+          <span className="flex items-center gap-1">
+            <CheckCircle className="w-3.5 h-3.5 text-[#2E7D32]" />
+            <span>{itemStage} Paper</span>
+          </span>
+        </div>
+      </div>
+
+      <div className="p-4 sm:p-5 pt-0">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            navigate(paperTargetUrl);
+          }}
+          className="w-full inline-flex items-center justify-center gap-2 btn-terracotta-pill text-xs py-2.5 px-4 font-serif font-bold transition-all cursor-pointer shadow-xs hover:shadow-md"
+        >
+          <FileText className="w-3.5 h-3.5" />
+          <span>VIEW QUESTION PAPER &rarr;</span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export default function ResourcesPage({ navigate, folder, pyqYear, pyqStage, pyqStream }) {
   const { data: cmsData, loading: cmsLoading } = useCMSData();
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [syllabusSearchQuery, setSyllabusSearchQuery] = useState('');
+  const [pyqSearchQuery, setPyqSearchQuery] = useState('');
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [selectedPdf, setSelectedPdf] = useState(null);
+
+  // Dynamic Stage & Stream Filter states for PYQs
+  const normalizedInitialStage = useMemo(() => {
+    if (pyqStage) {
+      if (/prelims|preliminary/i.test(pyqStage)) return 'Prelims';
+      if (/mains|main\b/i.test(pyqStage)) return 'Mains';
+    }
+    return 'Mains';
+  }, [pyqStage]);
+
+  const [activeStage, setActiveStage] = useState(normalizedInitialStage);
+
+  useEffect(() => {
+    if (pyqStage) {
+      if (/prelims|preliminary/i.test(pyqStage)) setActiveStage('Prelims');
+      else if (/mains|main\b/i.test(pyqStage)) setActiveStage('Mains');
+    }
+  }, [pyqStage]);
+
+  const normalizedInitialStream = useMemo(() => {
+    if (pyqStream) {
+      const s = pyqStream.toLowerCase();
+      if (s === 'general-studies' || s === 'gs') return 'GENERAL_STUDIES';
+      if (s === 'csat') return 'CSAT';
+      if (s === 'essay') return 'ESSAY';
+      if (s === 'optional') return 'OPTIONAL';
+    }
+    return 'OVERVIEW';
+  }, [pyqStream]);
+
+  const [selectedStream, setSelectedStream] = useState(normalizedInitialStream);
+
+  useEffect(() => {
+    if (pyqStream) {
+      const s = pyqStream.toLowerCase();
+      if (s === 'general-studies' || s === 'gs') setSelectedStream('GENERAL_STUDIES');
+      else if (s === 'csat') setSelectedStream('CSAT');
+      else if (s === 'essay') setSelectedStream('ESSAY');
+      else if (s === 'optional') setSelectedStream('OPTIONAL');
+      else setSelectedStream('OVERVIEW');
+    } else {
+      setSelectedStream('OVERVIEW');
+    }
+  }, [pyqStream]);
 
   // Set document title dynamically based on folder context
   useEffect(() => {
     if (folder === 'upsc-syllabus') {
       document.title = 'UPSC Civil Services Syllabus Directory & Micro-Notes | e-Gurukulam for IAS';
+    } else if (folder === 'pyqs') {
+      if (pyqYear) {
+        document.title = `UPSC Civil Services ${pyqYear} ${activeStage} Question Papers (PYQs) | e-Gurukulam for IAS`;
+      } else {
+        document.title = 'UPSC Civil Services Previous Year Questions (PYQs) Archive | e-Gurukulam for IAS';
+      }
     } else {
       document.title = 'Digital Learning & Study Resources | e-Gurukulam for IAS';
     }
-  }, [folder]);
+  }, [folder, pyqYear, activeStage]);
 
   // Available Category Filter Pills
   const categories = [
@@ -99,21 +272,49 @@ export default function ResourcesPage({ navigate, folder }) {
     return sortCurrentAffairsByDate(list);
   }, [cmsData?.resources]);
 
-  // Dynamically partition resources into Syllabus and Non-Syllabus
-  const { syllabusResources, nonSyllabusResources } = useMemo(() => {
+  // Dynamically partition resources into Syllabus, PYQs, and Non-Syllabus
+  const { syllabusResources, pyqResources, nonSyllabusResources } = useMemo(() => {
     const syllabus = [];
+    const pyqs = [];
     const others = [];
     activeResources.forEach(item => {
-      if (isSyllabusResource(item)) {
+      if (isPYQResource(item)) {
+        pyqs.push(item);
+      } else if (isSyllabusResource(item)) {
         syllabus.push(item);
       } else {
         others.push(item);
       }
     });
-    return { syllabusResources: syllabus, nonSyllabusResources: others };
+    return {
+      syllabusResources: syllabus,
+      pyqResources: sortPYQPapers(pyqs),
+      nonSyllabusResources: others
+    };
   }, [activeResources]);
 
-  // Filtered Non-Syllabus Resources for main feed
+  // Group PYQs by extracted Year
+  const pyqGroupsByYear = useMemo(() => {
+    const map = {};
+    pyqResources.forEach(item => {
+      const year = extractPYQYear(item) || 'General';
+      if (!map[year]) {
+        map[year] = [];
+      }
+      map[year].push(item);
+    });
+    const sortedYears = Object.keys(map).sort((a, b) => {
+      const numA = parseInt(a, 10);
+      const numB = parseInt(b, 10);
+      if (!isNaN(numA) && !isNaN(numB)) return numB - numA;
+      if (!isNaN(numA)) return -1;
+      if (!isNaN(numB)) return 1;
+      return a.localeCompare(b);
+    });
+    return { map, sortedYears };
+  }, [pyqResources]);
+
+  // Filtered Non-Syllabus Non-PYQ Resources for main feed
   const filteredNonSyllabusResources = useMemo(() => {
     if (!searchQuery.trim()) return nonSyllabusResources;
     const q = searchQuery.toLowerCase();
@@ -140,6 +341,20 @@ export default function ResourcesPage({ navigate, folder }) {
     });
   }, [syllabusResources, searchQuery]);
 
+  // Determine whether the Previous Year Questions Folder Card should be visible on the main feed
+  const showPYQFolderInMain = useMemo(() => {
+    if (pyqResources.length === 0) return false;
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    if ('previous year questions'.includes(q) || 'pyq'.includes(q) || 'pyqs'.includes(q) || 'question papers'.includes(q)) return true;
+    return pyqResources.some(item => {
+      const title = (item.Title || item.title || '').toLowerCase();
+      const cat = (item.Category || item.category || '').toLowerCase();
+      const subcat = (item.Subcategory || item.subcategory || item.Sub_Category || item.sub_category || '').toLowerCase();
+      return title.includes(q) || cat.includes(q) || subcat.includes(q);
+    });
+  }, [pyqResources, searchQuery]);
+
   // Filtered Syllabus Resources for dedicated /resources/upsc-syllabus view
   const filteredSyllabusResources = useMemo(() => {
     if (!syllabusSearchQuery.trim()) return syllabusResources;
@@ -153,10 +368,149 @@ export default function ResourcesPage({ navigate, folder }) {
     });
   }, [syllabusResources, syllabusSearchQuery]);
 
+  // Papers for current year (or all if pyqYear not set) sorted naturally
+  const currentYearPapers = useMemo(() => {
+    if (!pyqYear) return pyqResources;
+    const list = pyqResources.filter(item => String(extractPYQYear(item)) === String(pyqYear));
+    return sortPYQPapers(list);
+  }, [pyqResources, pyqYear]);
+
+  // Split current year papers by Stage (Prelims vs Mains)
+  const prelimsPapers = useMemo(() => {
+    const list = currentYearPapers.filter(item => extractPYQStage(item) === 'Prelims');
+    return sortPYQPapers(list);
+  }, [currentYearPapers]);
+
+  const mainsPapers = useMemo(() => {
+    const list = currentYearPapers.filter(item => extractPYQStage(item) === 'Mains');
+    return sortPYQPapers(list);
+  }, [currentYearPapers]);
+
+  // Mains sub-groups: GS Papers strictly 1 -> 4, Essay, Optionals
+  const mainsGSPapers = useMemo(() => {
+    const list = mainsPapers.filter(p => extractPYQCategory(p) === 'General Studies');
+    return sortPYQPapers(list);
+  }, [mainsPapers]);
+
+  const mainsEssayPapers = useMemo(() => {
+    const list = mainsPapers.filter(p => extractPYQCategory(p) === 'Essay');
+    return sortPYQPapers(list);
+  }, [mainsPapers]);
+
+  const mainsOptionalPapers = useMemo(() => {
+    const list = mainsPapers.filter(p => extractPYQCategory(p) === 'Optional');
+    return sortPYQPapers(list);
+  }, [mainsPapers]);
+
+  // Optional subjects grouped by subject (e.g. Anthropology, Sociology), Paper 1 before Paper 2
+  const mainsOptionalBySubject = useMemo(() => {
+    const groups = {};
+    mainsOptionalPapers.forEach(p => {
+      const subj = extractOptionalSubject(p);
+      if (!groups[subj]) groups[subj] = [];
+      groups[subj].push(p);
+    });
+    Object.keys(groups).forEach(subj => {
+      groups[subj] = sortPYQPapers(groups[subj]);
+    });
+    return groups;
+  }, [mainsOptionalPapers]);
+
+  // Auto-switch to stage that actually contains papers if default is empty
+  useEffect(() => {
+    if (pyqYear && !pyqStage) {
+      if (mainsPapers.length > 0) {
+        setActiveStage('Mains');
+      } else if (prelimsPapers.length > 0) {
+        setActiveStage('Prelims');
+      }
+    }
+  }, [pyqYear, pyqStage, mainsPapers.length, prelimsPapers.length]);
+
+  // Available stream filters for active stage (No "All Question Papers" on year page!)
+  const availableStreams = useMemo(() => {
+    if (activeStage === 'Prelims') {
+      const gsCount = prelimsPapers.filter(p => extractPYQCategory(p) === 'General Studies').length;
+      const csatCount = prelimsPapers.filter(p => extractPYQCategory(p) === 'CSAT').length;
+      return [
+        { id: 'OVERVIEW', label: 'Prelims Overview', count: prelimsPapers.length },
+        { id: 'GENERAL_STUDIES', label: 'General Studies (Paper 1)', count: gsCount },
+        { id: 'CSAT', label: 'CSAT (Paper 2)', count: csatCount },
+      ];
+    } else {
+      const gsCount = mainsGSPapers.length;
+      const essayCount = mainsEssayPapers.length;
+      const optCount = mainsOptionalPapers.length;
+      const streams = [
+        { id: 'OVERVIEW', label: 'Mains Overview', count: mainsPapers.length },
+        { id: 'GENERAL_STUDIES', label: 'General Studies (GS 1-4)', count: gsCount },
+      ];
+      if (essayCount > 0) {
+        streams.push({ id: 'ESSAY', label: 'Essay', count: essayCount });
+      }
+      if (optCount > 0) {
+        streams.push({ id: 'OPTIONAL', label: 'Optional Subjects', count: optCount });
+      }
+      return streams;
+    }
+  }, [activeStage, prelimsPapers, mainsPapers, mainsGSPapers.length, mainsEssayPapers.length, mainsOptionalPapers.length]);
+
+  // Filtered PYQ Resources for search and direct lists
+  const filteredPYQResources = useMemo(() => {
+    let list = pyqResources;
+
+    if (pyqYear) {
+      const stageList = activeStage === 'Prelims' ? prelimsPapers : mainsPapers;
+      if (selectedStream === 'OVERVIEW') {
+        list = stageList;
+      } else if (selectedStream === 'GENERAL_STUDIES') {
+        list = stageList.filter(p => extractPYQCategory(p) === 'General Studies');
+      } else if (selectedStream === 'CSAT') {
+        list = stageList.filter(p => extractPYQCategory(p) === 'CSAT');
+      } else if (selectedStream === 'ESSAY') {
+        list = stageList.filter(p => extractPYQCategory(p) === 'Essay');
+      } else if (selectedStream === 'OPTIONAL') {
+        list = stageList.filter(p => extractPYQCategory(p) === 'Optional');
+      }
+    }
+
+    if (!pyqSearchQuery.trim()) return sortPYQPapers(list);
+    const q = pyqSearchQuery.toLowerCase();
+    return sortPYQPapers(list.filter(item => {
+      const title = (item.Title || item.title || '').toLowerCase();
+      const cat = (item.Category || item.category || '').toLowerCase();
+      const subcat = (item.Subcategory || item.subcategory || item.Sub_Category || item.sub_category || '').toLowerCase();
+      const desc = (item.Short_Summary || item.short_summary || item.Summary || item.summary || item.Description || item.description || '').toLowerCase();
+      return title.includes(q) || cat.includes(q) || subcat.includes(q) || desc.includes(q);
+    }));
+  }, [pyqResources, pyqYear, activeStage, selectedStream, prelimsPapers, mainsPapers, pyqSearchQuery]);
+
+  const handleStageClick = (stage) => {
+    setActiveStage(stage);
+    setSelectedStream('OVERVIEW');
+    if (pyqYear) {
+      navigate(`/resources/pyqs/${pyqYear}/${stage.toLowerCase()}`);
+    }
+  };
+
+  const handleStreamClick = (streamId) => {
+    setSelectedStream(streamId);
+    if (pyqYear && activeStage) {
+      if (streamId === 'OVERVIEW') {
+        navigate(`/resources/pyqs/${pyqYear}/${activeStage.toLowerCase()}`);
+      } else {
+        const streamSlug = streamId.toLowerCase().replace('_', '-');
+        navigate(`/resources/pyqs/${pyqYear}/${activeStage.toLowerCase()}/${streamSlug}`);
+      }
+    }
+  };
+
   const handleOpenResource = (item) => {
     const title = item.Title || item.title || '';
     const slug = item.slug || item.Slug || item.id || item.ID || createSlug(title);
-    if (isSyllabusResource(item)) {
+    if (isPYQResource(item)) {
+      navigate(getPYQPaperUrl(item));
+    } else if (isSyllabusResource(item)) {
       navigate(`/resources/upsc-syllabus/${slug}`);
     } else {
       navigate(`/resources/${slug}`);
@@ -391,6 +745,780 @@ export default function ResourcesPage({ navigate, folder }) {
     );
   }
 
+  // ==========================================================================
+  // DEDICATED PREVIOUS YEAR QUESTIONS (PYQS) DRILL-DOWN VIEW (/resources/pyqs & /resources/pyqs/:year)
+  // ==========================================================================
+  if (folder === 'pyqs') {
+    return (
+      <div className="space-y-0 relative min-h-screen bg-[#FFFDF8]">
+        {/* 1. TOP STICKY BREADCRUMB & BACK NAVIGATION */}
+        <section className="sticky top-16 z-20 bg-[#FAF6EE]/95 backdrop-blur-md p-4 sm:p-5 border-b border-[#D5C3B0] shadow-xs">
+          <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  if (pyqYear) {
+                    navigate('/resources/pyqs');
+                  } else {
+                    navigate('/resources');
+                  }
+                }}
+                className="inline-flex items-center gap-2 text-xs sm:text-sm font-serif font-bold text-[#8C3A27] hover:text-[#732D1B] transition-colors cursor-pointer group"
+              >
+                <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                <span>{pyqYear ? 'Back to All PYQ Years' : 'Back to All Resources'}</span>
+              </button>
+
+              {pyqYear ? (
+                <div className="hidden sm:flex items-center gap-1.5 text-xs font-serif font-medium text-[#7A6B5D] pl-3 border-l border-[#D5C3B0]/60">
+                  <span onClick={() => navigate('/resources')} className="hover:text-[#8C3A27] cursor-pointer">Resources</span>
+                  <span>/</span>
+                  <span onClick={() => navigate('/resources/pyqs')} className="hover:text-[#8C3A27] cursor-pointer">PYQs</span>
+                  <span>/</span>
+                  <span onClick={() => navigate(`/resources/pyqs/${pyqYear}`)} className="hover:text-[#8C3A27] cursor-pointer font-bold text-[#8C3A27]">{pyqYear}</span>
+                  <span>/</span>
+                  <span 
+                    onClick={() => navigate(`/resources/pyqs/${pyqYear}/${activeStage.toLowerCase()}`)} 
+                    className={`hover:text-[#8C3A27] cursor-pointer font-bold ${selectedStream === 'OVERVIEW' ? 'text-[#8C3A27]' : 'text-[#7A6B5D]'}`}
+                  >
+                    {activeStage}
+                  </span>
+                  {selectedStream !== 'OVERVIEW' && (
+                    <>
+                      <span>/</span>
+                      <span className="font-bold text-[#8C3A27]">
+                        {availableStreams.find(s => s.id === selectedStream)?.label || selectedStream}
+                      </span>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <div className="hidden sm:flex items-center gap-1.5 text-xs font-serif font-medium text-[#7A6B5D] pl-3 border-l border-[#D5C3B0]/60">
+                  <span onClick={() => navigate('/resources')} className="hover:text-[#8C3A27] cursor-pointer">Resources</span>
+                  <span>/</span>
+                  <span className="text-[#8C3A27] font-bold">Previous Year Questions</span>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2 text-xs">
+              <span className="font-mono text-[#8C3A27] font-bold bg-[#8C3A27]/10 px-3 py-1 rounded-md border border-[#8C3A27]/20 flex items-center gap-1.5">
+                <FolderOpen className="w-3.5 h-3.5" />
+                <span>{pyqYear ? `UPSC ${pyqYear} • ${activeStage.toUpperCase()}` : 'UPSC PYQ EXAM ARCHIVE'}</span>
+              </span>
+              <span className="font-serif text-[#7A6B5D] italic font-semibold hidden sm:inline">
+                {filteredPYQResources.length} {filteredPYQResources.length === 1 ? 'Paper' : 'Papers'} Available
+              </span>
+            </div>
+          </div>
+        </section>
+
+        {/* 2. FOLDER HERO HEADER */}
+        <section className="section-mottled-parchment py-12 md:py-16 text-center px-4 sm:px-6 lg:px-8 border-b border-[#D5C3B0]/40">
+          <div className="max-w-4xl mx-auto space-y-4">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#8C3A27]/10 border border-[#8C3A27]/25 text-[#8C3A27] text-xs font-mono font-bold uppercase tracking-wider shadow-2xs">
+              <Layers className="w-3.5 h-3.5 text-[#8C3A27]" />
+              <span>
+                {pyqYear
+                  ? `Civil Services Examination ${pyqYear} • ${activeStage} Stage • ${filteredPYQResources.length} Papers`
+                  : `Curated PYQ Archive • ${pyqGroupsByYear.sortedYears.length} Years Available`}
+              </span>
+            </div>
+            <h1 className="font-serif-header text-3xl sm:text-4xl md:text-5xl font-extrabold text-[#221814] leading-tight">
+              {pyqYear
+                ? `UPSC Civil Services ${pyqYear} • ${activeStage}`
+                : 'Previous Year Question Papers (PYQs)'}
+            </h1>
+            {pyqYear && (
+              <p className="font-serif italic text-base sm:text-lg text-[#3D3028] font-semibold max-w-2xl mx-auto leading-relaxed">
+                Official {activeStage} question papers conducted during the {pyqYear} examination session.
+              </p>
+            )}
+          </div>
+        </section>
+
+        {/* 3. IN-FOLDER SEARCH & FILTER BAR */}
+        <section className="py-3 px-4 sm:px-6 lg:px-8 bg-[#FBF7F0]/95 backdrop-blur-md border-b border-[#D5C3B0]/30 sticky top-[138px] z-10 shadow-2xs">
+          <div className="max-w-5xl mx-auto flex items-center gap-3">
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[#7A6B5D]" />
+              <input
+                type="text"
+                placeholder={pyqYear ? `Search ${pyqYear} papers (e.g. GS Paper 1, Essay, Optional)...` : "Search PYQs by year or subject (e.g. 2026, GS Paper 1, Mains, Prelims)..."}
+                value={pyqSearchQuery}
+                onChange={(e) => setPyqSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-8 py-2 bg-[#FFFDF8] border border-[#D5C3B0] rounded-xl text-xs sm:text-sm text-[#221814] placeholder-[#7A6B5D] focus:outline-hidden focus:border-[#8C3A27] focus:ring-1 focus:ring-[#8C3A27] transition-all font-medium"
+              />
+              {pyqSearchQuery && (
+                <button
+                  onClick={() => setPyqSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#7A6B5D] hover:text-[#8C3A27]"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+            <span className="text-xs font-mono font-bold text-[#8C3A27] shrink-0 bg-[#8C3A27]/10 px-3 py-2 rounded-xl border border-[#8C3A27]/20 hidden sm:inline-block">
+              {filteredPYQResources.length} {filteredPYQResources.length === 1 ? 'Paper' : 'Papers'}
+            </span>
+          </div>
+        </section>
+
+        {/* 4. CONTENT SECTIONS */}
+        <section className="py-12 px-4 sm:px-6 lg:px-8 bg-[#FAF6EE] min-h-[50vh]">
+          <div className="max-w-7xl mx-auto space-y-12">
+            {cmsLoading && (
+              <div className="py-12 text-center space-y-3">
+                <Loader2 className="w-8 h-8 text-[#8C3A27] animate-spin mx-auto" />
+                <p className="text-xs font-serif italic text-[#7A6B5D] font-bold">
+                  Loading previous year question papers from CMS...
+                </p>
+              </div>
+            )}
+
+            {/* LEVEL 2: IF ON ROOT /resources/pyqs AND NO SEARCH QUERY, DISPLAY YEAR CARDS */}
+            {!cmsLoading && !pyqYear && !pyqSearchQuery && pyqGroupsByYear.sortedYears.length > 0 && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between border-b border-[#D5C3B0]/60 pb-3">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-5 h-5 text-[#8C3A27]" />
+                    <h2 className="font-serif-header text-xl sm:text-2xl font-bold text-[#221814]">
+                      Browse Papers by Examination Year
+                    </h2>
+                  </div>
+                  <span className="text-xs font-mono font-bold text-[#7A6B5D]">
+                    {pyqGroupsByYear.sortedYears.length} Years Documented
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {pyqGroupsByYear.sortedYears.map((year) => {
+                    const papers = pyqGroupsByYear.map[year] || [];
+                    const yrPrelims = papers.filter(p => extractPYQStage(p) === 'Prelims');
+                    const yrMains = papers.filter(p => extractPYQStage(p) === 'Mains');
+
+                    return (
+                      <div
+                        key={year}
+                        className="card-parchment-3d rounded-2xl bg-gradient-to-br from-[#FFFDF8] via-[#FAF6EE] to-[#F5ECE0] border-2 border-[#8C3A27]/30 hover:border-[#8C3A27] overflow-hidden flex flex-col justify-between transition-all shadow-md hover:shadow-xl group text-left cursor-pointer relative ring-1 ring-[#8C3A27]/10"
+                        onClick={() => navigate(`/resources/pyqs/${year}`)}
+                      >
+                        <div className="w-full bg-gradient-to-r from-[#6C1D18] via-[#8C3A27] to-[#732415] p-5 text-white flex flex-col justify-between relative overflow-hidden">
+                          <div className="flex items-center justify-between z-10">
+                            <span className="font-mono text-xl sm:text-2xl font-black tracking-wider text-white">
+                              {year}
+                            </span>
+                            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#FAF6EE] bg-black/30 backdrop-blur-xs px-2.5 py-1 rounded-full border border-white/20">
+                              {papers.length} {papers.length === 1 ? 'PAPER' : 'PAPERS'}
+                            </span>
+                          </div>
+                          <div className="mt-3 z-10 flex items-center gap-2">
+                            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-white/95 bg-white/15 px-2 py-0.5 rounded-md border border-white/20">
+                              Mains: {yrMains.length}
+                            </span>
+                            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-white/95 bg-white/15 px-2 py-0.5 rounded-md border border-white/20">
+                              Prelims: {yrPrelims.length}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="p-6 space-y-4 flex-1 flex flex-col justify-between">
+                          <div className="space-y-2">
+                            <p className="text-xs text-[#7A6B5D] font-mono font-bold uppercase tracking-wider">
+                              Available Papers:
+                            </p>
+                            <div className="space-y-1.5">
+                              {papers.slice(0, 3).map((p, idx) => {
+                                const pName = extractPYQPaperLabel(p) || extractPYQPaperName(p) || p.Title || p.title;
+                                const pStage = extractPYQStage(p);
+                                return (
+                                  <div key={idx} className="text-xs sm:text-sm font-serif font-bold text-[#221814] flex items-center justify-between gap-2 truncate">
+                                    <div className="flex items-center gap-2 truncate">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-[#8C3A27] shrink-0"></span>
+                                      <span className="truncate">{pName}</span>
+                                    </div>
+                                    <span className="text-[10px] font-mono font-bold text-[#7A6B5D] shrink-0">
+                                      {pStage}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                              {papers.length > 3 && (
+                                <p className="text-[11px] font-serif italic text-[#7A6B5D]">
+                                  +{papers.length - 3} more papers
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="pt-4 border-t border-[#D5C3B0]/40 grid grid-cols-2 gap-2">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/resources/pyqs/${year}/prelims`);
+                              }}
+                              className="w-full inline-flex items-center justify-center gap-1 btn-terracotta-outline-pill text-[11px] py-2 px-2 font-serif font-bold transition-all cursor-pointer shadow-2xs hover:bg-[#8C3A27] hover:text-white"
+                            >
+                              <span>Prelims ({yrPrelims.length})</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/resources/pyqs/${year}/mains`);
+                              }}
+                              className="w-full inline-flex items-center justify-center gap-1 btn-terracotta-pill text-[11px] py-2 px-2 font-serif font-bold transition-all cursor-pointer shadow-xs hover:shadow-md"
+                            >
+                              <span>Mains ({yrMains.length}) &rarr;</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* LEVEL 3 & 4: STAGE SELECTION TABS & STREAM FILTER PILLS (SHOWN WHEN YEAR IS SELECTED) */}
+            {pyqYear && (
+              <div className="space-y-6">
+                {/* Level 3: Stage Selection Folder Cards / Tabs */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Prelims Stage Card */}
+                  <button
+                    type="button"
+                    onClick={() => handleStageClick('Prelims')}
+                    className={`p-5 rounded-2xl border-2 transition-all text-left flex items-center justify-between gap-4 cursor-pointer ${
+                      activeStage === 'Prelims'
+                        ? 'bg-gradient-to-br from-[#FFFDF8] via-[#FAF6EE] to-[#F5ECE0] border-[#8C3A27] shadow-md ring-2 ring-[#8C3A27]/20'
+                        : 'bg-[#FAF6EE]/70 border-[#D5C3B0] hover:border-[#8C3A27]/60 hover:bg-[#FAF6EE] shadow-2xs'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3.5">
+                      <div className={`w-11 h-11 rounded-xl flex items-center justify-center font-mono font-black text-sm tracking-wider ${
+                        activeStage === 'Prelims' ? 'bg-[#8C3A27] text-white shadow-2xs' : 'bg-[#D5C3B0]/40 text-[#5C4028]'
+                      }`}>
+                        PRE
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className={`font-serif-header text-base sm:text-lg font-bold ${
+                            activeStage === 'Prelims' ? 'text-[#6C1D18]' : 'text-[#221814]'
+                          }`}>
+                            Prelims Examination
+                          </span>
+                          {activeStage === 'Prelims' && (
+                            <span className="w-2 h-2 rounded-full bg-[#8C3A27]"></span>
+                          )}
+                        </div>
+                        <p className="text-xs font-serif text-[#7A6B5D] italic font-semibold">
+                          Paper 1 (GS) &bull; Paper 2 (CSAT)
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-mono font-bold uppercase tracking-wider ${
+                        activeStage === 'Prelims'
+                          ? 'bg-[#8C3A27]/15 text-[#8C3A27] border border-[#8C3A27]/30'
+                          : 'bg-[#D5C3B0]/30 text-[#5C4028]'
+                      }`}>
+                        {prelimsPapers.length} {prelimsPapers.length === 1 ? 'Paper' : 'Papers'}
+                      </span>
+                    </div>
+                  </button>
+
+                  {/* Mains Stage Card */}
+                  <button
+                    type="button"
+                    onClick={() => handleStageClick('Mains')}
+                    className={`p-5 rounded-2xl border-2 transition-all text-left flex items-center justify-between gap-4 cursor-pointer ${
+                      activeStage === 'Mains'
+                        ? 'bg-gradient-to-br from-[#FFFDF8] via-[#FAF6EE] to-[#F5ECE0] border-[#8C3A27] shadow-md ring-2 ring-[#8C3A27]/20'
+                        : 'bg-[#FAF6EE]/70 border-[#D5C3B0] hover:border-[#8C3A27]/60 hover:bg-[#FAF6EE] shadow-2xs'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3.5">
+                      <div className={`w-11 h-11 rounded-xl flex items-center justify-center font-mono font-black text-sm tracking-wider ${
+                        activeStage === 'Mains' ? 'bg-[#8C3A27] text-white shadow-2xs' : 'bg-[#D5C3B0]/40 text-[#5C4028]'
+                      }`}>
+                        MAIN
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className={`font-serif-header text-base sm:text-lg font-bold ${
+                            activeStage === 'Mains' ? 'text-[#6C1D18]' : 'text-[#221814]'
+                          }`}>
+                            Mains Examination
+                          </span>
+                          {activeStage === 'Mains' && (
+                            <span className="w-2 h-2 rounded-full bg-[#8C3A27]"></span>
+                          )}
+                        </div>
+                        <p className="text-xs font-serif text-[#7A6B5D] italic font-semibold">
+                          GS Papers 1-4 &bull; Essay &bull; Optionals
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-mono font-bold uppercase tracking-wider ${
+                        activeStage === 'Mains'
+                          ? 'bg-[#8C3A27]/15 text-[#8C3A27] border border-[#8C3A27]/30'
+                          : 'bg-[#D5C3B0]/30 text-[#5C4028]'
+                      }`}>
+                        {mainsPapers.length} {mainsPapers.length === 1 ? 'Paper' : 'Papers'}
+                      </span>
+                    </div>
+                  </button>
+                </div>
+
+                {/* Level 4: Stream Selection Pills */}
+                <div className="flex flex-wrap items-center gap-2 pt-1 border-b border-[#D5C3B0]/40 pb-4">
+                  <span className="text-xs font-mono font-bold uppercase tracking-wider text-[#7A6B5D] flex items-center gap-1.5 mr-2">
+                    <Tag className="w-3.5 h-3.5 text-[#8C3A27]" />
+                    <span>Streams:</span>
+                  </span>
+                  {availableStreams.map((st) => {
+                    const isSelected = selectedStream === st.id;
+                    return (
+                      <button
+                        key={st.id}
+                        type="button"
+                        onClick={() => handleStreamClick(st.id)}
+                        className={`px-3.5 py-1.5 rounded-xl text-xs font-serif font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                          isSelected
+                            ? 'bg-[#8C3A27] text-white shadow-xs'
+                            : 'bg-[#FFFDF8] text-[#3D3028] hover:text-[#8C3A27] border border-[#D5C3B0] hover:border-[#8C3A27]'
+                        }`}
+                      >
+                        <span>{st.label}</span>
+                        <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
+                          isSelected ? 'bg-white/20 text-white' : 'bg-[#D5C3B0]/40 text-[#5C4028]'
+                        }`}>
+                          {st.count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* LEVEL 4 & 5: PAPERS SUB-GRID & FOLDERS */}
+            {!cmsLoading && (
+              <div className="space-y-8">
+                {/* A. If Search Query is Active: Show Search Results */}
+                {pyqSearchQuery.trim() ? (
+                  <div className="space-y-6">
+                    <div className="flex items-center justify-between border-b border-[#D5C3B0]/60 pb-3">
+                      <div className="flex items-center gap-2">
+                        <Search className="w-5 h-5 text-[#8C3A27]" />
+                        <h3 className="font-serif-header text-xl font-bold text-[#221814]">
+                          Search Results for &ldquo;{pyqSearchQuery}&rdquo;
+                        </h3>
+                      </div>
+                      <span className="text-xs font-mono font-bold text-[#8C3A27] bg-[#8C3A27]/10 px-2.5 py-1 rounded-md border border-[#8C3A27]/20">
+                        {filteredPYQResources.length} {filteredPYQResources.length === 1 ? 'Paper' : 'Papers'}
+                      </span>
+                    </div>
+
+                    {filteredPYQResources.length === 0 ? (
+                      <div className="card-parchment-3d p-8 text-center max-w-md mx-auto space-y-4 bg-[#FFFDF8] border border-[#D5C3B0] rounded-2xl shadow-sm">
+                        <FileText className="w-10 h-10 text-[#8C3A27] mx-auto opacity-70" />
+                        <h4 className="font-serif-header text-lg font-bold text-[#221814]">No Papers Found</h4>
+                        <p className="text-xs sm:text-sm text-[#5C4028]">
+                          No question papers matched &ldquo;{pyqSearchQuery}&rdquo;. Try clearing keywords.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setPyqSearchQuery('')}
+                          className="btn-terracotta-pill text-xs py-2 px-5 font-serif font-bold"
+                        >
+                          Clear Search
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {filteredPYQResources.map((item, idx) => (
+                          <PYQPaperCard key={idx} item={item} navigate={navigate} />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : pyqYear ? (
+                  /* B. If on Year Slug Page: Follow Stream & Folder Hierarchy Rules (No "All Question Papers"!) */
+                  activeStage === 'Mains' ? (
+                    selectedStream === 'GENERAL_STUDIES' ? (
+                      /* General Studies Folder View: GS 1 to GS 4 ordered 1 -> 4 */
+                      <div className="space-y-6">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#D5C3B0]/60 pb-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-[#8C3A27]/15 flex items-center justify-center text-[#8C3A27] border border-[#8C3A27]/25 shadow-xs">
+                              <FolderOpen className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <h3 className="font-serif-header text-xl sm:text-2xl font-bold text-[#221814]">
+                                General Studies Papers (GS 1 to GS 4)
+                              </h3>
+                              <p className="text-xs text-[#7A6B5D] font-mono">
+                                Compulsory Papers &bull; Paper 1 to Paper 4
+                              </p>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleStreamClick('OVERVIEW')}
+                            className="inline-flex items-center gap-1.5 text-xs font-serif font-bold text-[#8C3A27] hover:text-[#732D1B] bg-[#8C3A27]/10 hover:bg-[#8C3A27]/20 px-3.5 py-2 rounded-xl border border-[#8C3A27]/25 transition-all self-start sm:self-auto cursor-pointer"
+                          >
+                            <ArrowLeft className="w-3.5 h-3.5" />
+                            <span>Back to Mains Folders</span>
+                          </button>
+                        </div>
+
+                        {mainsGSPapers.length === 0 ? (
+                          <div className="card-parchment-3d p-8 text-center max-w-md mx-auto space-y-3 bg-[#FFFDF8] border border-[#D5C3B0] rounded-2xl">
+                            <FileText className="w-10 h-10 text-[#8C3A27] mx-auto opacity-70" />
+                            <h4 className="font-serif-header text-lg font-bold text-[#221814]">No GS Papers Found</h4>
+                            <p className="text-xs sm:text-sm text-[#5C4028]">
+                              General Studies papers for {pyqYear} have not been uploaded yet.
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                            {mainsGSPapers.map((paper, idx) => (
+                              <PYQPaperCard key={idx} item={paper} navigate={navigate} />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ) : selectedStream === 'OPTIONAL' ? (
+                      /* Optional Subjects Folder View: Subject folders with Paper 1 -> Paper 2 ordered inside */
+                      <div className="space-y-6">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#D5C3B0]/60 pb-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-[#2E5A44]/15 flex items-center justify-center text-[#2E5A44] border border-[#2E5A44]/25 shadow-xs">
+                              <BookOpen className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <h3 className="font-serif-header text-xl sm:text-2xl font-bold text-[#221814]">
+                                Optional Subjects Papers
+                              </h3>
+                              <p className="text-xs text-[#7A6B5D] font-mono">
+                                Discipline-Specific Papers &bull; Paper 1 &bull; Paper 2
+                              </p>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleStreamClick('OVERVIEW')}
+                            className="inline-flex items-center gap-1.5 text-xs font-serif font-bold text-[#8C3A27] hover:text-[#732D1B] bg-[#8C3A27]/10 hover:bg-[#8C3A27]/20 px-3.5 py-2 rounded-xl border border-[#8C3A27]/25 transition-all self-start sm:self-auto cursor-pointer"
+                          >
+                            <ArrowLeft className="w-3.5 h-3.5" />
+                            <span>Back to Mains Folders</span>
+                          </button>
+                        </div>
+
+                        {Object.keys(mainsOptionalBySubject).length === 0 ? (
+                          <div className="card-parchment-3d p-8 text-center max-w-md mx-auto space-y-3 bg-[#FFFDF8] border border-[#D5C3B0] rounded-2xl">
+                            <BookOpen className="w-10 h-10 text-[#2E5A44] mx-auto opacity-70" />
+                            <h4 className="font-serif-header text-lg font-bold text-[#221814]">No Optional Papers Found</h4>
+                            <p className="text-xs sm:text-sm text-[#5C4028]">
+                              Optional papers for {pyqYear} have not been uploaded to the archive yet.
+                            </p>
+                          </div>
+                        ) : (
+                          Object.entries(mainsOptionalBySubject).map(([subj, papers], sIdx) => (
+                            <div key={sIdx} className="space-y-4 pt-2">
+                              <div className="flex items-center gap-2 border-b border-[#D5C3B0]/40 pb-2">
+                                <span className="w-2.5 h-2.5 rounded-full bg-[#2E5A44]"></span>
+                                <h4 className="font-serif-header text-lg font-bold text-[#221814]">
+                                  {subj} Optional
+                                </h4>
+                                <span className="text-[11px] font-mono font-bold text-[#2E5A44] bg-[#2E5A44]/10 px-2 py-0.5 rounded-md border border-[#2E5A44]/20">
+                                  {papers.length} {papers.length === 1 ? 'Paper' : 'Papers'} (P1 &bull; P2)
+                                </span>
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {papers.map((paper, pIdx) => (
+                                  <PYQPaperCard key={pIdx} item={paper} navigate={navigate} />
+                                ))}
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    ) : selectedStream === 'ESSAY' ? (
+                      /* Essay View */
+                      <div className="space-y-6">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#D5C3B0]/60 pb-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-[#8C3A27]/15 flex items-center justify-center text-[#8C3A27] border border-[#8C3A27]/25 shadow-xs">
+                              <Sparkles className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <h3 className="font-serif-header text-xl sm:text-2xl font-bold text-[#221814]">
+                                Compulsory Essay Paper
+                              </h3>
+                              <p className="text-xs text-[#7A6B5D] font-mono">
+                                Direct Examination Paper Booklet &bull; UPSC Civil Services Mains {pyqYear}
+                              </p>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleStreamClick('OVERVIEW')}
+                            className="inline-flex items-center gap-1.5 text-xs font-serif font-bold text-[#8C3A27] hover:text-[#732D1B] bg-[#8C3A27]/10 hover:bg-[#8C3A27]/20 px-3.5 py-2 rounded-xl border border-[#8C3A27]/25 transition-all self-start sm:self-auto cursor-pointer"
+                          >
+                            <ArrowLeft className="w-3.5 h-3.5" />
+                            <span>Back to Mains Folders</span>
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                          {mainsEssayPapers.map((paper, idx) => (
+                            <PYQPaperCard key={idx} item={paper} navigate={navigate} />
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      /* Mains Folders Overview (selectedStream === 'OVERVIEW'): Clean, Simple Side-by-Side Grid */
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                          {/* Card 1 (Folder): "General Studies" */}
+                          {mainsGSPapers.length > 0 && (
+                            <div
+                              onClick={() => handleStreamClick('GENERAL_STUDIES')}
+                              className="card-parchment-3d rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0] hover:border-[#8C3A27] p-6 flex flex-col justify-between transition-all shadow-sm hover:shadow-md group text-left cursor-pointer h-full"
+                            >
+                              <div className="space-y-4">
+                                <div className="flex items-center justify-between">
+                                  <div className="w-12 h-12 rounded-xl bg-[#8C3A27]/10 border border-[#8C3A27]/25 flex items-center justify-center text-[#8C3A27] shadow-2xs group-hover:bg-[#8C3A27] group-hover:text-white transition-colors">
+                                    <Folder className="w-6 h-6" />
+                                  </div>
+                                  <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[#8C3A27] bg-[#8C3A27]/10 px-2.5 py-1 rounded-md border border-[#8C3A27]/20">
+                                    {mainsGSPapers.length} Papers (GS 1 to {mainsGSPapers.length})
+                                  </span>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                  <h3 className="font-serif-header text-xl font-bold text-[#221814] group-hover:text-[#8C3A27] transition-colors">
+                                    General Studies
+                                  </h3>
+                                  <p className="text-xs sm:text-sm text-[#5C4028] font-sans font-medium leading-relaxed">
+                                    Compulsory Papers GS 1, GS 2, GS 3, GS 4
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="pt-6 border-t border-[#D5C3B0]/40 mt-6">
+                                <button
+                                  type="button"
+                                  className="w-full inline-flex items-center justify-center gap-2 btn-terracotta-pill text-xs py-2.5 px-4 font-serif font-bold transition-all shadow-xs hover:shadow-md cursor-pointer"
+                                >
+                                  <span>Open GS Papers &rarr;</span>
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Card 2 (Direct Paper): "Essay Paper" */}
+                          {mainsEssayPapers.length > 0 && mainsEssayPapers.map((paper, idx) => {
+                            const paperUrl = getPYQPaperUrl(paper);
+                            return (
+                              <div
+                                key={`essay-${idx}`}
+                                onClick={() => navigate(paperUrl)}
+                                className="card-parchment-3d rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0] hover:border-[#8C3A27] p-6 flex flex-col justify-between transition-all shadow-sm hover:shadow-md group text-left cursor-pointer h-full"
+                              >
+                                <div className="space-y-4">
+                                  <div className="flex items-center justify-between">
+                                    <div className="w-12 h-12 rounded-xl bg-[#8C3A27]/10 border border-[#8C3A27]/25 flex items-center justify-center text-[#8C3A27] shadow-2xs group-hover:bg-[#8C3A27] group-hover:text-white transition-colors">
+                                      <FileText className="w-6 h-6" />
+                                    </div>
+                                    <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[#8C3A27] bg-[#8C3A27]/10 px-2.5 py-1 rounded-md border border-[#8C3A27]/20">
+                                      Mains Paper &bull; 250 Marks
+                                    </span>
+                                  </div>
+
+                                  <div className="space-y-1.5">
+                                    <h3 className="font-serif-header text-xl font-bold text-[#221814] group-hover:text-[#8C3A27] transition-colors">
+                                      Essay Paper
+                                    </h3>
+                                    <p className="text-xs sm:text-sm text-[#5C4028] font-sans font-medium leading-relaxed">
+                                      Section A &amp; Section B Topics
+                                    </p>
+                                  </div>
+                                </div>
+
+                                <div className="pt-6 border-t border-[#D5C3B0]/40 mt-6">
+                                  <button
+                                    type="button"
+                                    className="w-full inline-flex items-center justify-center gap-2 btn-terracotta-pill text-xs py-2.5 px-4 font-serif font-bold transition-all shadow-xs hover:shadow-md cursor-pointer"
+                                  >
+                                    <span>View Question Paper &rarr;</span>
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+
+                          {/* Card 3 (Folder / Cards): "Optional Subjects" */}
+                          {Object.keys(mainsOptionalBySubject).length > 0 ? (
+                            Object.entries(mainsOptionalBySubject).map(([subj, papers], idx) => (
+                              <div
+                                key={`opt-${idx}`}
+                                onClick={() => handleStreamClick('OPTIONAL')}
+                                className="card-parchment-3d rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0] hover:border-[#8C3A27] p-6 flex flex-col justify-between transition-all shadow-sm hover:shadow-md group text-left cursor-pointer h-full"
+                              >
+                                <div className="space-y-4">
+                                  <div className="flex items-center justify-between">
+                                    <div className="w-12 h-12 rounded-xl bg-[#2E5A44]/10 border border-[#2E5A44]/25 flex items-center justify-center text-[#2E5A44] shadow-2xs group-hover:bg-[#2E5A44] group-hover:text-white transition-colors">
+                                      <Folder className="w-6 h-6" />
+                                    </div>
+                                    <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[#2E5A44] bg-[#2E5A44]/10 px-2.5 py-1 rounded-md border border-[#2E5A44]/20">
+                                      Paper 1 &amp; Paper 2
+                                    </span>
+                                  </div>
+
+                                  <div className="space-y-1.5">
+                                    <h3 className="font-serif-header text-xl font-bold text-[#221814] group-hover:text-[#2E5A44] transition-colors">
+                                      {subj.toLowerCase().includes('optional') ? subj : `${subj} Optional`}
+                                    </h3>
+                                    <p className="text-xs sm:text-sm text-[#5C4028] font-sans font-medium leading-relaxed">
+                                      Discipline-Specific Papers (Paper 1 &amp; Paper 2)
+                                    </p>
+                                  </div>
+                                </div>
+
+                                <div className="pt-6 border-t border-[#D5C3B0]/40 mt-6">
+                                  <button
+                                    type="button"
+                                    className="w-full inline-flex items-center justify-center gap-2 btn-terracotta-pill text-xs py-2.5 px-4 font-serif font-bold transition-all shadow-xs hover:shadow-md cursor-pointer"
+                                  >
+                                    <span>Open Optional &rarr;</span>
+                                  </button>
+                                </div>
+                              </div>
+                            ))
+                          ) : mainsOptionalPapers.length > 0 ? (
+                            <div
+                              onClick={() => handleStreamClick('OPTIONAL')}
+                              className="card-parchment-3d rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0] hover:border-[#8C3A27] p-6 flex flex-col justify-between transition-all shadow-sm hover:shadow-md group text-left cursor-pointer h-full"
+                            >
+                              <div className="space-y-4">
+                                <div className="flex items-center justify-between">
+                                  <div className="w-12 h-12 rounded-xl bg-[#2E5A44]/10 border border-[#2E5A44]/25 flex items-center justify-center text-[#2E5A44] shadow-2xs group-hover:bg-[#2E5A44] group-hover:text-white transition-colors">
+                                    <Folder className="w-6 h-6" />
+                                  </div>
+                                  <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[#2E5A44] bg-[#2E5A44]/10 px-2.5 py-1 rounded-md border border-[#2E5A44]/20">
+                                    Paper 1 &amp; Paper 2
+                                  </span>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                  <h3 className="font-serif-header text-xl font-bold text-[#221814] group-hover:text-[#2E5A44] transition-colors">
+                                    Optional Subjects
+                                  </h3>
+                                  <p className="text-xs sm:text-sm text-[#5C4028] font-sans font-medium leading-relaxed">
+                                    Discipline-Specific Papers (Paper 1 &amp; Paper 2)
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="pt-6 border-t border-[#D5C3B0]/40 mt-6">
+                                <button
+                                  type="button"
+                                  className="w-full inline-flex items-center justify-center gap-2 btn-terracotta-pill text-xs py-2.5 px-4 font-serif font-bold transition-all shadow-xs hover:shadow-md cursor-pointer"
+                                >
+                                  <span>Open Optional &rarr;</span>
+                                </button>
+                              </div>
+                            </div>
+                          ) : null}
+
+                          {/* Empty state if no papers exist */}
+                          {mainsPapers.length === 0 && (
+                            <div className="col-span-full card-parchment-3d p-8 text-center max-w-md mx-auto space-y-3 bg-[#FFFDF8] border border-[#D5C3B0] rounded-2xl">
+                              <FileText className="w-10 h-10 text-[#8C3A27] mx-auto opacity-70" />
+                              <h4 className="font-serif-header text-lg font-bold text-[#221814]">No Mains Papers Found</h4>
+                              <p className="text-xs sm:text-sm text-[#5C4028]">
+                                Mains question papers for {pyqYear} have not been uploaded to the archive yet.
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    ) : (
+                    /* Prelims View: Paper 1 & Paper 2 in natural ascending order */
+                    <div className="space-y-6">
+                      <div className="flex items-center justify-between border-b border-[#D5C3B0]/60 pb-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-[#8C3A27]/15 flex items-center justify-center text-[#8C3A27] border border-[#8C3A27]/25 shadow-xs">
+                            <Layers className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <h3 className="font-serif-header text-xl sm:text-2xl font-bold text-[#221814]">
+                              Prelims Examination Papers
+                            </h3>
+                            <p className="text-xs text-[#7A6B5D] font-mono">
+                              General Studies (Paper 1) &bull; CSAT (Paper 2)
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {prelimsPapers.length === 0 ? (
+                        <div className="card-parchment-3d p-8 text-center max-w-md mx-auto space-y-3 bg-[#FFFDF8] border border-[#D5C3B0] rounded-2xl">
+                          <FileText className="w-10 h-10 text-[#8C3A27] mx-auto opacity-70" />
+                          <h4 className="font-serif-header text-lg font-bold text-[#221814]">No Prelims Papers Uploaded</h4>
+                          <p className="text-xs sm:text-sm text-[#5C4028]">
+                            Prelims papers for {pyqYear} have not been uploaded to the archive yet.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          {prelimsPapers.map((paper, idx) => (
+                            <PYQPaperCard key={idx} item={paper} navigate={navigate} />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                ) : null}
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* 5. BOTTOM EXPLORATION BANNER */}
+        <section className="py-8 px-4 sm:px-6 lg:px-8 bg-[#FAF6EE] border-t border-[#D5C3B0]/30">
+          <div className="max-w-4xl mx-auto text-center space-y-4">
+            <p className="font-serif italic text-sm sm:text-base text-[#5C4028] font-semibold">
+              Looking for micro-syllabus breakdowns or comprehensive video lecture series?
+            </p>
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => navigate('/resources')}
+                className="btn-terracotta-pill text-xs py-2.5 px-6 font-serif font-bold cursor-pointer"
+              >
+                &larr; Return to All Study Resources
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('/resources/upsc-syllabus')}
+                className="btn-terracotta-outline-pill text-xs py-2.5 px-6 font-serif font-bold cursor-pointer"
+              >
+                UPSC Syllabus Hub &rarr;
+              </button>
+            </div>
+          </div>
+        </section>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-0 relative min-h-screen bg-[#FFFDF8]">
       
@@ -509,7 +1637,7 @@ export default function ResourcesPage({ navigate, folder }) {
           )}
 
           {/* CONTENT GRID */}
-          {!cmsLoading && (showSyllabusFolderInMain || filteredNonSyllabusResources.length > 0) ? (
+          {!cmsLoading && (showSyllabusFolderInMain || showPYQFolderInMain || filteredNonSyllabusResources.length > 0) ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {/* 1. DYNAMIC UPSC SYLLABUS FOLDER HUB CARD */}
               {showSyllabusFolderInMain && (
@@ -601,6 +1729,92 @@ export default function ResourcesPage({ navigate, folder }) {
                       >
                         <FolderOpen className="w-3.5 h-3.5" />
                         <span>EXPLORE SYLLABUS FOLDER &rarr;</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 2. DYNAMIC PREVIOUS YEAR QUESTIONS (PYQS) FOLDER HUB CARD */}
+              {showPYQFolderInMain && (
+                <div 
+                  className="card-parchment-3d rounded-2xl bg-gradient-to-br from-[#FFFDF8] via-[#FAF6EE] to-[#F5ECE0] border-2 border-[#8C3A27]/30 hover:border-[#8C3A27] overflow-hidden flex flex-col justify-between transition-all shadow-md hover:shadow-xl group text-left cursor-pointer relative ring-1 ring-[#8C3A27]/10"
+                  onClick={() => navigate('/resources/pyqs')}
+                >
+                  {/* Folder Tab / Visual Layer Header */}
+                  <div className="w-full bg-gradient-to-r from-[#6C1D18] via-[#8C3A27] to-[#732415] p-5 text-white flex flex-col justify-between relative overflow-hidden">
+                    {/* Decorative stacked cards background effect */}
+                    <div className="absolute right-0 bottom-0 opacity-10 translate-x-3 translate-y-3 pointer-events-none">
+                      <Layers className="w-36 h-36 text-white" />
+                    </div>
+
+                    <div className="flex items-center justify-between z-10">
+                      <div className="w-10 h-10 rounded-xl bg-white/15 backdrop-blur-xs flex items-center justify-center border border-white/20 shadow-xs">
+                        <FolderOpen className="w-5 h-5 text-[#F3EBD9]" />
+                      </div>
+                      <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#FAF6EE] bg-black/30 backdrop-blur-xs px-2.5 py-1 rounded-full border border-white/20 flex items-center gap-1">
+                        <Sparkles className="w-3 h-3 text-[#D4AF37]" />
+                        <span>EXAM ARCHIVE</span>
+                      </span>
+                    </div>
+
+                    <div className="mt-4 z-10">
+                      <h3 
+                        className="font-serif-header text-xl sm:text-2xl font-bold !text-white leading-snug drop-shadow-xs"
+                        style={{ color: '#FFFFFF' }}
+                      >
+                        Previous Year Questions
+                      </h3>
+                    </div>
+                  </div>
+
+                  {/* Folder Body */}
+                  <div className="p-6 space-y-4 flex-1 flex flex-col justify-between">
+                    <div className="space-y-3">
+                      {/* Total Count Badge */}
+                      <div className="flex items-center justify-between">
+                        <span className="inline-flex items-center gap-1.5 font-mono text-xs font-bold text-[#8C3A27] bg-[#8C3A27]/10 px-2.5 py-1 rounded-md border border-[#8C3A27]/20">
+                          <Layers className="w-3 h-3" />
+                          <span>{pyqResources.length} {pyqResources.length === 1 ? 'Paper' : 'Papers'} Available</span>
+                        </span>
+                        <span className="text-[11px] font-serif italic text-[#7A6B5D] font-semibold">
+                          Prelims &bull; Mains &bull; GS Papers
+                        </span>
+                      </div>
+
+                      {/* Folder Description */}
+                      <p className="text-xs sm:text-sm text-[#3D3028] font-sans font-medium leading-relaxed">
+                        Official UPSC Civil Services Prelims & Mains examination papers with structured question formatting, word limits, and marks.
+                      </p>
+
+                      {/* Dynamic Year Preview Pills */}
+                      <div className="pt-2 flex flex-wrap gap-1.5">
+                        {pyqGroupsByYear.sortedYears.map((year) => {
+                          const count = (pyqGroupsByYear.map[year] || []).length;
+                          return (
+                            <span 
+                              key={year} 
+                              className="text-[10px] font-mono font-bold bg-[#FAF6EE] text-[#5C4028] px-2 py-0.5 rounded-md border border-[#D5C3B0]"
+                            >
+                              {year} ({count})
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Folder Action CTA */}
+                    <div className="pt-4 border-t border-[#D5C3B0]/40">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate('/resources/pyqs');
+                        }}
+                        className="w-full inline-flex items-center justify-center gap-2 btn-terracotta-pill text-xs py-2.5 px-4 font-serif font-bold transition-all cursor-pointer shadow-xs hover:shadow-md"
+                      >
+                        <FolderOpen className="w-3.5 h-3.5" />
+                        <span>EXPLORE PYQS FOLDER &rarr;</span>
                       </button>
                     </div>
                   </div>

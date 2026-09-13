@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   ArrowLeft, 
   Calendar, 
@@ -8,12 +8,33 @@ import {
   ChevronRight, 
   ShieldAlert,
   Loader2,
-  BookOpen
+  BookOpen,
+  Download,
+  ExternalLink,
+  FileText,
+  CheckCircle,
+  FolderOpen,
+  Layers,
+  Sparkles,
+  Award,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { useCMSData } from '../hooks/useCMSData';
-import { isSyllabusResource } from '../services/cmsService';
+import { 
+  isSyllabusResource, 
+  isPYQResource, 
+  extractPYQYear, 
+  extractPYQPaperName,
+  extractPYQStage,
+  extractPYQCategory,
+  extractPYQPaperLabel,
+  getPYQPaperUrl,
+  sortPYQPapers
+} from '../services/cmsService';
 import { sortCurrentAffairsByDate, formatDisplayDate, parseDateToTimestamp } from '../utils/dateUtils';
 import { createSlug, getDirectImageUrl, getSecondaryImageUrl } from './CurrentAffairsReader';
+import ParticleConvergenceLoader from '../components/ParticleConvergenceLoader';
 
 /**
  * Clean and optimize raw HTML for high-fidelity native editorial typography
@@ -103,11 +124,352 @@ function formatToYMD(dateVal) {
   return new Date().toISOString().split('T')[0];
 }
 
+/**
+ * Converts Google Drive view/preview links into direct instant-download links:
+ * - https://drive.google.com/file/d/FILE_ID/view?usp=sharing -> https://drive.google.com/uc?export=download&id=FILE_ID
+ * - https://drive.google.com/open?id=FILE_ID -> https://drive.google.com/uc?export=download&id=FILE_ID
+ * - Google Docs -> https://docs.google.com/document/d/DOC_ID/export?format=pdf
+ */
+function getDirectDownloadUrl(url) {
+  if (!url || typeof url !== 'string') return '';
+  const cleanUrl = url.replace(/&amp;/g, '&').trim();
+
+  // 1. Google Drive File URLs
+  if (/drive\.google\.com/i.test(cleanUrl)) {
+    const fileIdMatch = cleanUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/i) ||
+                        cleanUrl.match(/[?&]id=([a-zA-Z0-9_-]+)/i) ||
+                        cleanUrl.match(/\/d\/([a-zA-Z0-9_-]+)/i);
+    if (fileIdMatch && fileIdMatch[1]) {
+      return `https://drive.google.com/uc?export=download&id=${fileIdMatch[1]}`;
+    }
+  }
+
+  // 2. Google Docs Document URLs
+  if (/docs\.google\.com\/document\/d\/([a-zA-Z0-9_-]+)/i.test(cleanUrl)) {
+    const docIdMatch = cleanUrl.match(/\/document\/d\/([a-zA-Z0-9_-]+)/i);
+    if (docIdMatch && docIdMatch[1]) {
+      return `https://docs.google.com/document/d/${docIdMatch[1]}/export?format=pdf`;
+    }
+  }
+
+  return cleanUrl;
+}
+
+/**
+ * Format model answer content with clean structure, subheadings (Approach, Introduction, Body, Conclusion),
+ * and clean typography
+ */
+function formatAnswerContent(rawAnswer) {
+  if (!rawAnswer || typeof rawAnswer !== 'string') return '';
+  let formatted = rawAnswer.trim();
+
+  // If plain text without HTML tags, convert newlines to paragraphs
+  if (!/<[a-z][\s\S]*>/i.test(formatted)) {
+    formatted = formatted
+      .split(/\n\s*\n/)
+      .map(p => `<p>${p.trim()}</p>`)
+      .join('');
+  }
+
+  // Clean google redirect links
+  formatted = formatted.replace(/href=["']https:\/\/www\.google\.com\/url\?q=([^&"']+)[^"']*["']/gi, (match, dest) => {
+    try {
+      return `href="${decodeURIComponent(dest)}" target="_blank" rel="noopener noreferrer"`;
+    } catch (e) {
+      return `href="${dest}" target="_blank" rel="noopener noreferrer"`;
+    }
+  });
+
+  // Strip leading 'Answer:' label if left over
+  formatted = formatted.replace(/^\s*(?:<p[^>]*>)?\s*(?:<strong>|<b>)?\s*(?:Answer|Model Answer|Solution|Explanation)\s*:\s*(?:<\/strong>|<\/b>)?(?:\s*<\/p>)?/i, '');
+
+  // Format section headings: Approach, Introduction, Body, Critical Dimension, Key Points, Conclusion, etc.
+  formatted = formatted.replace(
+    /<p[^>]*>\s*(?:<strong>|<b>|<span[^>]*font-weight[^>]*>)\s*(Approach|Introduction|Body|Critical\s+Dimension|Key\s+Points|Key\s+Arguments|Analysis|Challenges|Way\s+Forward|Conclusion|Dimensions|Critical\s+Analysis)\s*:?\s*(?:<\/strong>|<\/b>|<\/span>)\s*<\/p>/gi,
+    '<div class="pyq-answer-section-head font-serif font-bold text-[#6C1D18] text-base sm:text-lg border-b border-[#D5C3B0]/50 pb-1 mt-5 mb-2.5 flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-[#8C3A27]"></span><span>$1:</span></div>'
+  );
+
+  // Clean trailing divider dashes and empty spacing divs
+  formatted = formatted.replace(/<p[^>]*>\s*(?:---|–—|—)\s*<\/p>/gi, '');
+  formatted = formatted.replace(/<div[^>]*style=["'][^"']*height[^"']*["'][^>]*>\s*<\/div>/gi, '');
+
+  return formatted;
+}
+
+/**
+ * Robust parser for UPSC Previous Year Question Papers
+ * Extracts structured questions, mark limits, word limits, model answers, and original PDF download links.
+ * Accommodates GS Papers 1-4 & Essay Papers (Section dividers, 4-digit word counts, 3-digit marks, sub-questions, and Case Studies).
+ */
+function parsePYQQuestions(rawHtml) {
+  if (!rawHtml || typeof rawHtml !== 'string') return { questions: [], downloadLink: null };
+
+  // 1. Extract PDF download link if present
+  let downloadLink = null;
+  const linkMatch = rawHtml.match(/href=["']([^"']*(?:drive\.google|pdf|\/d\/)[^"']*)["']/i);
+  if (linkMatch) {
+    downloadLink = linkMatch[1];
+  }
+
+  // 2. Question identifier regex supporting sub-letters: e.g. Q1 (a), Q1. (a), Q8 (c), Q5 (e), Q7, 12.
+  const qHeaderRegex = /(?:<p[^>]*>|<div[^>]*>|<li[^>]*>|^)\s*(?:<strong>|<b>|<span[^>]*>)?\s*Q?(\d+)(?:(?:\s*\.|\.)?\s*\(([a-zA-Z])\)|[\.:\)])\s*[\.:\)]?/im;
+  const globalQHeaderRegex = /<(?:p|div|li)[^>]*>\s*(?:<strong>|<b>|<span[^>]*>)?\s*Q?(\d+)(?:(?:\s*\.|\.)?\s*\(([a-zA-Z])\)|[\.:\)])\s*[\.:\)]?/gi;
+
+  // Section divider regex: e.g. "SECTION - A", "SECTION - B", "SECTION A", "SECTION B"
+  const sectionHeaderRegex = /(?:<(?:p|div|h\d)[^>]*>|^)\s*(?:<strong>|<b>|<span[^>]*>)?\s*(SECTION\s*[-–—:]?\s*[A-Z](?:\s*[-–—:]\s*[^<\n]+)?)\s*(?:<\/strong>|<\/b>|<\/span>)?(?:\s*<\/(?:p|div|h\d)>|$)/im;
+
+  const extractSection = (textBlock) => {
+    if (!textBlock) return null;
+    const sMatch = textBlock.match(sectionHeaderRegex);
+    if (!sMatch) return null;
+    const header = sMatch[1].trim();
+    const withoutHeader = textBlock.replace(sMatch[0], '');
+    const cleanInstructions = withoutHeader
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .replace(/[\s\-_•|~]+$/, '')
+      .trim();
+    return {
+      sectionHeader: header,
+      sectionInstructions: cleanInstructions.length > 5 ? cleanInstructions : null
+    };
+  };
+
+  // Universal Question Delimiter: Horizontal Rule (---, ***, ___ or <hr>)
+  const hrDelimiterRegex = /(?:<p[^>]*>\s*(?:---|–—|—|\*\*\*|___)\s*<\/p>|<hr[^>]*>)/i;
+  const hrChunks = rawHtml.split(hrDelimiterRegex).map(c => c.trim()).filter(c => c.length > 10);
+
+  let rawQuestionChunks = [];
+  let pendingSection = null;
+
+  if (hrChunks.length >= 2) {
+    // Delimited by universal horizontal rule (---)
+    for (let i = 0; i < hrChunks.length; i++) {
+      const chunk = hrChunks[i];
+      const match = chunk.match(qHeaderRegex);
+
+      if (match) {
+        const qIndex = match.index || 0;
+        const preQuestionBlock = chunk.substring(0, qIndex);
+        const embeddedSection = extractSection(preQuestionBlock);
+        const sectionToUse = embeddedSection || pendingSection;
+        pendingSection = null;
+
+        rawQuestionChunks.push({
+          qNum: parseInt(match[1], 10),
+          subLetter: match[2] ? match[2].toLowerCase() : null,
+          sectionHeader: sectionToUse ? sectionToUse.sectionHeader : null,
+          sectionInstructions: sectionToUse ? sectionToUse.sectionInstructions : null,
+          rawChunk: chunk.substring(qIndex)
+        });
+      } else {
+        // Non-question chunk: could be standalone section divider or download footer
+        const sec = extractSection(chunk);
+        if (sec) {
+          pendingSection = sec;
+        } else if (!downloadLink) {
+          const dlMatch = chunk.match(/href=["']([^"']*(?:drive\.google|pdf|\/d\/)[^"']*)["']/i);
+          if (dlMatch) downloadLink = dlMatch[1];
+        }
+      }
+    }
+  }
+
+  // Fallback: If no horizontal rules found, split using global question boundary regex
+  if (rawQuestionChunks.length === 0) {
+    const pMatches = [...rawHtml.matchAll(globalQHeaderRegex)];
+    if (pMatches.length >= 2) {
+      for (let i = 0; i < pMatches.length; i++) {
+        const start = pMatches[i].index;
+        const end = (i + 1 < pMatches.length) ? pMatches[i + 1].index : rawHtml.length;
+        const rawChunkSlice = rawHtml.substring(start, end);
+        const qNum = parseInt(pMatches[i][1], 10) || (i + 1);
+        const subLetter = pMatches[i][2] ? pMatches[i][2].toLowerCase() : null;
+
+        const preamble = i === 0 ? rawHtml.substring(0, start) : '';
+        const sec = extractSection(preamble) || extractSection(rawChunkSlice);
+
+        rawQuestionChunks.push({
+          qNum,
+          subLetter,
+          sectionHeader: sec ? sec.sectionHeader : null,
+          sectionInstructions: sec ? sec.sectionInstructions : null,
+          rawChunk: rawChunkSlice
+        });
+      }
+    } else {
+      const liMatches = [...rawHtml.matchAll(/<li[^>]*>([\s\S]*?)<\/li>/gi)];
+      if (liMatches.length > 0) {
+        rawQuestionChunks = liMatches.map((m, idx) => ({
+          qNum: idx + 1,
+          subLetter: null,
+          sectionHeader: null,
+          sectionInstructions: null,
+          rawChunk: m[1]
+        }));
+      }
+    }
+  }
+
+  // Helper to parse individual question chunk
+  const parseChunk = ({ qNum, subLetter, sectionHeader, sectionInstructions, rawChunk }, index) => {
+    let questionPrompt = '';
+    let promptHtml = '';
+    let modelAnswer = null;
+
+    // 1. Dynamic Number token: e.g. "Q1 (a)", "Q1 (b)", "Q7", "Q12"
+    const displayNum = subLetter ? `Q${qNum} (${subLetter})` : `Q${qNum}`;
+    const idKey = subLetter ? `${qNum}${subLetter}` : `${qNum}`;
+
+    // 2. Dynamic Word limit: support up to 4 digits & ranges (e.g. 1000-1200 words, 150 words)
+    let words = null;
+    const wordsMatch = rawChunk.match(/\(?\s*(?:Answer in\s+)?(\d{2,4}(?:\s*[-–—to]\s*\d{2,4})?)\s*words?\)?/i);
+    if (wordsMatch) {
+      words = wordsMatch[1].replace(/\s+/g, '');
+    }
+
+    // 3. Dynamic Marks: support up to 3 digits (e.g. 125 Marks, 30 Marks, 20 Marks, 15 Marks, 10 Marks)
+    // Check for explicit overall question marks line first (e.g. "(Answer in 450 words) | 30 Marks" or "| 30 Marks")
+    const overallMarksMatch = rawChunk.match(/(?:\||\bAnswer\s+in[^\)]*\)\s*\|?)\s*(\d{1,3})\s*Marks\b/i);
+    let marks = null;
+    if (overallMarksMatch) {
+      marks = overallMarksMatch[1];
+    } else {
+      const marksMatch = rawChunk.match(/\b(\d{1,3})\s*Marks\b/i);
+      if (marksMatch) {
+        marks = marksMatch[1];
+      } else {
+        const numInParensMatch = rawChunk.match(/(?:[\(\[]\s*(\d{1,2})\s*[\)\]])\s*(?:<\/p>|<\/div>|<br\s*\/?>|$)/i);
+        if (numInParensMatch) {
+          marks = numInParensMatch[1];
+        } else {
+          marks = qNum <= 10 ? '10' : '15';
+        }
+      }
+    }
+
+    // Delimiter for Answer / Model Answer / Solution / Approach / blockquote
+    const answerDelimiterRegex = /(?:<(?:p|div)[^>]*>\s*(?:<strong>|<b>|<span[^>]*>)?\s*(?:Model\s+Answer|Answer|Solution|Explanation|Approach|Synopsis)\s*(?::|-|—)?\s*(?:<\/strong>|<\/b>|<\/span>)?\s*<\/(?:p|div)>|<blockquote[^>]*>)/i;
+    const ansMatch = rawChunk.match(answerDelimiterRegex);
+
+    let promptPartRaw = rawChunk;
+    let answerPartRaw = null;
+
+    if (ansMatch) {
+      promptPartRaw = rawChunk.substring(0, ansMatch.index);
+      answerPartRaw = rawChunk.substring(ansMatch.index + ansMatch[0].length);
+      if (/blockquote/i.test(ansMatch[0])) {
+        answerPartRaw = answerPartRaw.replace(/<\/blockquote>/i, '');
+      }
+    }
+
+    // Sanitize Prompt: Multi-paragraph scenario & case study support
+    const cleanPrompt = (rawPrompt) => {
+      let cleaned = rawPrompt;
+
+      // Cut off footer boilerplate / CTA / download notices
+      const footerCtaRegex = /(?:👉|📌|\b(?:Click\s+(?:the\s+)?(?:link\s+)?(?:below|here)|Download\s+(?:the\s+)?(?:complete\s+)?(?:Question\s+Paper|PDF)|General\s+Studies\s*[-–—]?\s*Paper|GS\s*[-–—]?\s*Paper)\b|<a\s+[^>]*href)/i;
+      const ctaMatch = cleaned.search(footerCtaRegex);
+      if (ctaMatch !== -1) {
+        cleaned = cleaned.substring(0, ctaMatch);
+      }
+
+      // Remove embedded section header line if present in promptPartRaw
+      cleaned = cleaned.replace(/(?:<(?:p|div|h\d)[^>]*>|^)\s*(?:<strong>|<b>|<span[^>]*>)?\s*SECTION\s*[-–—:]?\s*[A-Z][^<]*(?:<\/strong>|<\/b>|<\/span>)?(?:\s*<\/(?:p|div|h\d)>|$)\s*/gi, '');
+
+      // Remove leading question identifier prefix from start of prompt
+      cleaned = cleaned.replace(/<(?:p|div|li)[^>]*>\s*(?:<strong>|<b>|<span[^>]*>)?\s*Q?(\d+)(?:(?:\s*\.|\.)?\s*\(([a-zA-Z])\)|[\.:\)])\s*[\.:\)]?\s*(?:Case\s+Study\s*:?\s*)?/i, (match) => {
+        if (/case\s+study/i.test(match)) {
+          return '<p class="font-bold text-[#6C1D18] mb-1 flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-[#8C3A27]"></span><span>Case Study Scenario:</span></p><p>';
+        }
+        return '<p>';
+      });
+
+      // Strip word and marks instructions from prompt body (support 4-digit word limits and 3-digit marks)
+      cleaned = cleaned.replace(/\(?\s*(?:Answer in\s+)?\d{2,4}(?:\s*[-–—to]\s*\d{2,4})?\s*words?\)?\s*(?:\||,|-)?\s*(?:\d{1,3}\s*marks?)?/gi, '');
+      cleaned = cleaned.replace(/\(?\s*\d{1,3}\s*Marks\s*\)?/gi, '');
+      cleaned = cleaned.replace(/(?:[\(\[]\s*(?:10|15|20|25|30|125)\s*[\)\]])\s*(?=<\/p>|<\/div>|<br\s*\/?>|$)/gi, '');
+
+      // Clean empty spacing divs and empty paragraph tags
+      cleaned = cleaned.replace(/<div[^>]*style=["'][^"']*height[^"']*["'][^>]*>\s*<\/div>/gi, '');
+      cleaned = cleaned.replace(/<p[^>]*>\s*(?:&nbsp;|<br\s*\/?>|\s)*<\/p>/gi, '');
+
+      // Format sub-questions (a), (b), (c), (d), (e) cleanly with indentations if present
+      cleaned = cleaned.replace(/<p[^>]*>\s*(?:\((?:[a-eA-E])\)|\b[a-eA-E]\.)\s*([\s\S]*?)<\/p>/gi, (m) => {
+        return `<p class="pl-3 sm:pl-4 border-l-2 border-[#8C3A27]/30 py-0.5 my-1 text-[#221814] font-medium">${m.replace(/<\/?p[^>]*>/gi, '')}</p>`;
+      });
+
+      // Extract pure plain-text version for fallback and reading time
+      let plainText = cleaned
+        .replace(/<[^>]*>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .replace(/\s+([\.\?\,!])/g, '$1')
+        .replace(/[\s\-_•|~]+$/, '')
+        .trim();
+
+      if (plainText && !/[\.\?\!"”’]$/.test(plainText)) {
+        plainText += '.';
+      }
+
+      return {
+        promptHtml: cleaned.trim(),
+        text: plainText
+      };
+    };
+
+    const promptResult = cleanPrompt(promptPartRaw);
+    questionPrompt = promptResult.text;
+    promptHtml = promptResult.promptHtml;
+
+    // Process model answer if present (Empty Answer Rule: hidden unless substantive content exists)
+    if (answerPartRaw) {
+      const footerCtaRegex = /(?:👉|📌|\b(?:Click\s+(?:the\s+)?(?:link\s+)?(?:below|here)|Download\s+(?:the\s+)?(?:complete\s+)?(?:Question\s+Paper|PDF)|General\s+Studies\s*[-–—]?\s*Paper|GS\s*[-–—]?\s*Paper)\b|<a\s+[^>]*href)/i;
+      const ctaMatch = answerPartRaw.search(footerCtaRegex);
+      if (ctaMatch !== -1) {
+        answerPartRaw = answerPartRaw.substring(0, ctaMatch);
+      }
+
+      const cleanAnswerText = answerPartRaw
+        .replace(/<[^>]*>/g, '')
+        .replace(/[\s\n\r\-•_]/g, '')
+        .trim();
+
+      const isPlaceholder = /^(?:comingsoon|tbd|tobereleased|tobeupdated|na|n\/a|modelanswerawaited|modelanswerwillbeupdatedsoon)$/i.test(cleanAnswerText);
+
+      if (cleanAnswerText.length > 30 && !isPlaceholder) {
+        modelAnswer = formatAnswerContent(answerPartRaw);
+      }
+    }
+
+    return {
+      qNum,
+      subLetter,
+      displayNum,
+      idKey,
+      sectionHeader,
+      sectionInstructions,
+      index: index + 1,
+      text: questionPrompt,
+      promptHtml,
+      modelAnswer,
+      marks,
+      words
+    };
+  };
+
+  const parsed = rawQuestionChunks.map(parseChunk);
+  return { questions: parsed, downloadLink };
+}
+
 // Helper to normalize string keys by stripping non-alphanumeric characters
 const normalizeKey = (str) => String(str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
-export default function ResourceDetailPage({ slug, folder, navigate }) {
-  const { data, loading: cmsLoading } = useCMSData();
+export default function ResourceDetailPage({ slug, folder, year, stage, stream, navigate }) {
+  const { data, loading: cmsLoading, isFetched: cmsFetched } = useCMSData();
+
+  // 1. Explicit Loading & Fetched States (starts as true by default)
+  const [isLoading, setIsLoading] = useState(true);
+  const [isFetched, setIsFetched] = useState(false);
 
   // Helper to check active status
   const isItemActive = (obj) => {
@@ -145,6 +507,37 @@ export default function ResourceDetailPage({ slug, folder, navigate }) {
   }, [sortedResources, targetSlug, targetNorm]);
 
   const article = currentIndex !== -1 ? sortedResources[currentIndex] : null;
+  const resource = article;
+
+  // 1. State Initialization: Reset isLoading(true) and isFetched(false) when route parameters change
+  useEffect(() => {
+    setIsLoading(true);
+    setIsFetched(false);
+  }, [slug, folder, year, stage, stream]);
+
+  // 2. Explicit Route Resolution Guard & Catching Route Hydration Delays
+  useEffect(() => {
+    // If router is hydrating or slug is not ready yet, keep displaying the loader
+    if (!slug || typeof slug !== 'string' || !slug.trim()) {
+      setIsLoading(true);
+      setIsFetched(false);
+      return;
+    }
+
+    if (resource) {
+      // Resource matched successfully (from cache or fresh network response)
+      setIsLoading(false);
+      setIsFetched(true);
+    } else if (!cmsLoading && cmsFetched) {
+      // Network/cache query has completely settled and resource is verified absent
+      setIsLoading(false);
+      setIsFetched(true);
+    } else {
+      // Network fetch actively pending
+      setIsLoading(true);
+      setIsFetched(false);
+    }
+  }, [resource, cmsLoading, cmsFetched, slug]);
 
   // Determine if this resource is in the syllabus context
   const isSyllabus = useMemo(() => {
@@ -153,15 +546,67 @@ export default function ResourceDetailPage({ slug, folder, navigate }) {
     return false;
   }, [folder, article]);
 
+  // Determine if this resource is in the PYQ context
+  const isPYQ = useMemo(() => {
+    if (folder === 'pyqs') return true;
+    if (article && isPYQResource(article)) return true;
+    return false;
+  }, [folder, article]);
+
+  // Detected examination year for PYQ
+  const detectedYear = useMemo(() => {
+    if (year) return year;
+    if (article) return extractPYQYear(article);
+    return 'General';
+  }, [year, article]);
+
+  // Detected examination stage for PYQ (Prelims vs Mains)
+  const detectedStage = useMemo(() => {
+    if (stage) {
+      if (/prelims|preliminary/i.test(stage)) return 'Prelims';
+      if (/mains|main\b/i.test(stage)) return 'Mains';
+    }
+    if (article) return extractPYQStage(article);
+    return 'Mains';
+  }, [stage, article]);
+
+  // Detected category/stream for PYQ (General Studies, CSAT, Essay, Optional)
+  const detectedCategory = useMemo(() => {
+    if (stream) {
+      const s = stream.toLowerCase();
+      if (s === 'general-studies' || s === 'gs') return 'General Studies';
+      if (s === 'csat') return 'CSAT';
+      if (s === 'essay') return 'Essay';
+      if (s === 'optional') return 'Optional';
+    }
+    if (article) return extractPYQCategory(article);
+    return 'General Studies';
+  }, [stream, article]);
+
+  const paperName = useMemo(() => {
+    if (!article) return 'Question Paper';
+    return extractPYQPaperLabel(article) || extractPYQPaperName(article);
+  }, [article]);
+
   // Context-aware resource list for previous/next navigation
   const contextResources = useMemo(() => {
+    if (isPYQ) {
+      let pyqList = sortedResources.filter(isPYQResource);
+      if (detectedYear && detectedYear !== 'General') {
+        pyqList = pyqList.filter(p => String(extractPYQYear(p)) === String(detectedYear));
+      }
+      if (detectedStage) {
+        pyqList = pyqList.filter(p => extractPYQStage(p) === detectedStage);
+      }
+      return pyqList.length > 0 ? sortPYQPapers(pyqList) : sortedResources;
+    }
     if (isSyllabus) {
       const syllabusList = sortedResources.filter(isSyllabusResource);
       return syllabusList.length > 0 ? syllabusList : sortedResources;
     }
-    const nonSyllabusList = sortedResources.filter(a => !isSyllabusResource(a));
+    const nonSyllabusList = sortedResources.filter(a => !isSyllabusResource(a) && !isPYQResource(a));
     return nonSyllabusList.length > 0 ? nonSyllabusList : sortedResources;
-  }, [sortedResources, isSyllabus]);
+  }, [sortedResources, isPYQ, isSyllabus, detectedYear, detectedStage]);
 
   const contextIndex = useMemo(() => {
     if (!article || !contextResources || contextResources.length === 0) return -1;
@@ -211,11 +656,99 @@ export default function ResourceDetailPage({ slug, folder, navigate }) {
   const fullContentHtml = rawFullContent ? cleanDocHtml(rawFullContent) : '';
   const readingTime = estimateReadingTime(fullContentHtml || shortSummary);
 
+  // Parse structured questions for PYQ layout
+  const { questions: pyqQuestions, downloadLink: pyqDownloadLink } = useMemo(() => {
+    if (!isPYQ || !rawFullContent) return { questions: [], downloadLink: null };
+    return parsePYQQuestions(rawFullContent);
+  }, [isPYQ, rawFullContent]);
+
+  // Dynamic Question Count and Maximum Marks Calculation
+  const totalQuestions = pyqQuestions.length;
+
+  const maximumMarks = useMemo(() => {
+    if (!pyqQuestions || pyqQuestions.length === 0) return null;
+
+    const isOptional = 
+      /optional/i.test(title) || 
+      /optional/i.test(paperName) || 
+      /optional/i.test(category) ||
+      (
+        pyqQuestions.some(q => q.qNum === 8) && 
+        pyqQuestions.some(q => q.sectionHeader && /SECTION\s*[-–—]?\s*B/i.test(q.sectionHeader)) && 
+        !/essay/i.test(title) &&
+        pyqQuestions.length <= 25
+      );
+
+    const isEssay = 
+      /essay/i.test(title) || 
+      /essay/i.test(paperName) || 
+      /essay/i.test(category) || 
+      (pyqQuestions.length === 8 && pyqQuestions.every(q => {
+        const m = parseInt(String(q.marks).replace(/[^\d]/g, ''), 10);
+        return m === 125;
+      }));
+
+    if (isEssay) {
+      // UPSC Essay paper: candidates choose two 125-mark topics (1 from Section A, 1 from Section B)
+      // Cap/evaluate to intended 250 marks (125 * 2)
+      const firstQMarks = parseInt(String(pyqQuestions[0]?.marks).replace(/[^\d]/g, ''), 10) || 125;
+      return firstQMarks * 2;
+    }
+
+    if (isOptional) {
+      // UPSC Optional paper: candidates attempt 5 out of 8 questions (Total = 250 Marks)
+      return 250;
+    }
+
+    // For all other papers (GS 1, 2, 3, 4):
+    // Sum numeric marks parsed from each individual question
+    const sum = pyqQuestions.reduce((acc, q) => {
+      const m = parseInt(String(q.marks).replace(/[^\d]/g, ''), 10) || 0;
+      return acc + m;
+    }, 0);
+
+    return sum > 0 ? sum : 250;
+  }, [pyqQuestions, title, paperName, category]);
+
+  // Direct PDF Download Link: converts Google Drive previews into automatic direct downloads
+  const rawDownloadLink = pyqDownloadLink || article?.PDF_Link || article?.pdf_link || article?.Download_Link || article?.download_link || null;
+  const directDownloadUrl = useMemo(() => getDirectDownloadUrl(rawDownloadLink), [rawDownloadLink]);
+
+  // Interactive collapsible answer state for PYQ question cards
+  const [expandedAnswers, setExpandedAnswers] = useState(new Set());
+
+  const toggleAnswer = (key) => {
+    setExpandedAnswers(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
+
+  const jumpToQuestion = (id) => {
+    const el = document.getElementById(`q-${id}`);
+    if (el) {
+      const headerEl = document.getElementById('site-main-header');
+      const headerHeight = headerEl ? headerEl.offsetHeight : 146;
+      const jumpBarEl = document.getElementById('pyq-jump-bar');
+      const jumpBarHeight = jumpBarEl ? jumpBarEl.offsetHeight : 54;
+      const totalOffset = -(headerHeight + jumpBarHeight + 20);
+      const y = el.getBoundingClientRect().top + window.pageYOffset + totalOffset;
+      window.scrollTo({ top: y, behavior: 'smooth' });
+    }
+  };
+
   const navigateToResource = (art) => {
     if (!art) return;
     const artTitle = art.Title || art.title || '';
     const artSlug = art.slug || art.Slug || art.id || art.ID || createSlug(artTitle);
-    if (isSyllabus) {
+    if (isPYQ || isPYQResource(art)) {
+      navigate(getPYQPaperUrl(art));
+    } else if (isSyllabus) {
       navigate(`/resources/upsc-syllabus/${artSlug}`);
     } else {
       navigate(`/resources/${artSlug}`);
@@ -330,51 +863,25 @@ export default function ResourceDetailPage({ slug, folder, navigate }) {
     }
   };
 
-  // 1. SKELETON LOADER FOR DIRECT DEEP-LINK ENTRANCE (WHILE CMS DATA IS LOADING)
-  if (cmsLoading && !article) {
+  // 3. Catching Route Hydration Delays
+  const isRouterReady = Boolean(slug && typeof slug === 'string' && slug.trim().length > 0);
+
+  // 1. GLOBAL ROUTE GUARD: PARTICLE CONVERGENCE LOADER WHILE ROUTE/DATA IS HYDRATING
+  // If isLoading OR !isFetched, OR router is not ready: NEVER render Not Found screen!
+  if (!isRouterReady || isLoading || !isFetched) {
     return (
-      <div className="min-h-screen bg-[#FFFDF8] text-[#221814] py-12 px-4 sm:px-6 lg:px-8 select-text">
-        <div className="max-w-4xl mx-auto space-y-8 animate-fade-in text-left">
-          {/* Top Sticky Breadcrumb Placeholder */}
-          <div className="bg-[#FAF6EE] p-5 sm:p-6 rounded-3xl border border-[#D5C3B0] shadow-sm flex items-center justify-between">
-            <div className="h-4 bg-[#D5C3B0]/40 rounded-md w-36 animate-pulse"></div>
-            <div className="h-4 bg-[#D5C3B0]/30 rounded-md w-24 animate-pulse"></div>
-          </div>
-
-          {/* Title Placeholder */}
-          <div className="space-y-3 pb-6 border-b border-[#D5C3B0]/60 animate-pulse">
-            <div className="h-8 sm:h-12 bg-[#D5C3B0]/50 rounded-xl w-4/5"></div>
-            <div className="h-6 sm:h-8 bg-[#D5C3B0]/30 rounded-xl w-2/3"></div>
-          </div>
-
-          {/* Hero Banner Placeholder */}
-          <div className="w-full h-64 sm:h-96 rounded-3xl bg-[#D5C3B0]/20 border border-[#D5C3B0] animate-pulse flex items-center justify-center">
-            <div className="flex items-center gap-2.5 text-xs font-serif italic text-[#8C3A27] font-bold">
-              <Loader2 className="w-5 h-5 animate-spin" />
-              <span>Loading resource analysis...</span>
-            </div>
-          </div>
-
-          {/* Summary Box Placeholder */}
-          <div className="p-6 rounded-2xl bg-[#F4ECE1] border-l-4 border-[#8C3A27] space-y-2 animate-pulse">
-            <div className="h-4 bg-[#D5C3B0]/40 rounded-md w-full"></div>
-            <div className="h-4 bg-[#D5C3B0]/40 rounded-md w-5/6"></div>
-          </div>
-
-          {/* Multi-Paragraph Shimmer */}
-          <div className="space-y-4 pt-4 animate-pulse">
-            <div className="h-6 bg-[#D5C3B0]/40 rounded-md w-1/3 my-4"></div>
-            <div className="h-4 bg-[#D5C3B0]/30 rounded-md w-full"></div>
-            <div className="h-4 bg-[#D5C3B0]/30 rounded-md w-11/12"></div>
-            <div className="h-4 bg-[#D5C3B0]/30 rounded-md w-4/5"></div>
-          </div>
-        </div>
-      </div>
+      <ParticleConvergenceLoader
+        isReady={false}
+        label={isPYQ ? "Hydrating Question Paper..." : isSyllabus ? "Hydrating Syllabus..." : "Hydrating Study Resource..."}
+        sublabel="e-Gurukulam for IAS • Tradition of Wisdom & Modern Rigor"
+        fullScreen={true}
+      />
     );
   }
 
-  // 2. RESOURCE NOT FOUND STATE (CMS FETCH COMPLETED AND SLUG DOES NOT MATCH)
-  if (!cmsLoading && !article) {
+  // 2. RESOURCE NOT FOUND STATE (STRICT INVARIANT: ONLY AFTER CMS QUERY IS COMPLETE)
+  // If isFetched AND !isLoading AND !resource: Render "Resource Not Found"
+  if (isFetched && !isLoading && !resource) {
     return (
       <div className="min-h-screen bg-[#FFFDF8] text-[#221814] py-16 px-4 sm:px-6 lg:px-8">
         <div className="max-w-xl mx-auto space-y-6 text-center bg-[#FAF6EE] p-8 sm:p-12 rounded-3xl border border-[#D5C3B0] shadow-sm">
@@ -388,13 +895,385 @@ export default function ResourceDetailPage({ slug, folder, navigate }) {
           <div className="pt-2">
             <button
               type="button"
-              onClick={() => navigate(folder === 'upsc-syllabus' ? '/resources/upsc-syllabus' : '/resources')}
+              onClick={() => {
+                if (folder === 'upsc-syllabus') {
+                  navigate('/resources/upsc-syllabus');
+                } else if (folder === 'pyqs') {
+                  navigate(year ? `/resources/pyqs/${year}` : '/resources/pyqs');
+                } else {
+                  navigate('/resources');
+                }
+              }}
               className="btn-terracotta-pill text-xs py-3 px-6 font-serif font-bold cursor-pointer inline-flex items-center gap-2"
             >
               <ArrowLeft className="w-4 h-4" />
-              <span>{folder === 'upsc-syllabus' ? 'Back to UPSC Syllabus' : 'Back to Resources'}</span>
+              <span>
+                {folder === 'upsc-syllabus'
+                  ? 'Back to UPSC Syllabus'
+                  : folder === 'pyqs'
+                    ? year ? `Back to ${year} PYQs` : 'Back to All PYQs'
+                    : 'Back to Resources'}
+              </span>
             </button>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ==========================================================================
+  // LEVEL 3: DEDICATED UPSC QUESTION PAPER LAYOUT (isPYQ === true)
+  // ==========================================================================
+  if (isPYQ) {
+    const stageSlug = detectedStage.toLowerCase();
+    const backToStageUrl = detectedYear && detectedYear !== 'General' 
+      ? `/resources/pyqs/${detectedYear}/${stageSlug}` 
+      : `/resources/pyqs/${stageSlug}`;
+    const backToStageLabel = detectedYear && detectedYear !== 'General' 
+      ? `Back to ${detectedYear} ${detectedStage} Papers` 
+      : `Back to All ${detectedStage} Papers`;
+
+    return (
+      <div className="min-h-screen bg-[#FFFDF8] text-[#221814] py-12 px-4 sm:px-6 lg:px-8 select-text">
+        <div className="max-w-4xl mx-auto space-y-8 animate-fade-in text-left">
+          
+          {/* 1. TOP BREADCRUMB NAVIGATION */}
+          <div className="bg-[#FAF6EE] p-4 sm:p-5 rounded-3xl border border-[#D5C3B0] shadow-sm flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => navigate(backToStageUrl)}
+                className="inline-flex items-center gap-2 text-xs sm:text-sm font-serif font-bold text-[#8C3A27] hover:text-[#732D1B] transition-colors cursor-pointer group"
+              >
+                <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                <span>{backToStageLabel}</span>
+              </button>
+
+              <div className="hidden md:flex items-center gap-1.5 text-xs font-serif font-medium text-[#7A6B5D] pl-3 border-l border-[#D5C3B0]/60">
+                <span onClick={() => navigate('/resources')} className="hover:text-[#8C3A27] cursor-pointer">Resources</span>
+                <span>/</span>
+                <span onClick={() => navigate('/resources/pyqs')} className="hover:text-[#8C3A27] cursor-pointer">PYQs</span>
+                {detectedYear && detectedYear !== 'General' && (
+                  <>
+                    <span>/</span>
+                    <span onClick={() => navigate(`/resources/pyqs/${detectedYear}`)} className="hover:text-[#8C3A27] cursor-pointer font-bold text-[#8C3A27]">{detectedYear}</span>
+                  </>
+                )}
+                <span>/</span>
+                <span onClick={() => navigate(`/resources/pyqs/${detectedYear}/${stageSlug}`)} className="hover:text-[#8C3A27] cursor-pointer font-bold text-[#8C3A27]">{detectedStage}</span>
+                <span>/</span>
+                <span className="text-[#5C4028] font-bold">{detectedCategory}</span>
+              </div>
+            </div>
+
+            {/* Right Badges */}
+            <div className="flex items-center gap-2 text-xs">
+              <span className="inline-flex items-center gap-1.5 font-mono text-[#8C3A27] font-bold bg-[#8C3A27]/10 px-3 py-1 rounded-md border border-[#8C3A27]/20">
+                <Tag className="w-3.5 h-3.5" />
+                <span>{detectedCategory}</span>
+              </span>
+              <span className="inline-flex items-center gap-1.5 font-mono text-[#5C4028] font-bold bg-[#FAF6EE] px-2.5 py-1 rounded-md border border-[#D5C3B0]">
+                <FileText className="w-3.5 h-3.5 text-[#8C3A27]" />
+                <span>{totalQuestions} Questions</span>
+              </span>
+              {maximumMarks && (
+                <span className="inline-flex items-center gap-1.5 font-mono text-[#5C4028] font-bold bg-[#FAF6EE] px-2.5 py-1 rounded-md border border-[#D5C3B0]">
+                  <Award className="w-3.5 h-3.5 text-[#8C3A27]" />
+                  <span>{maximumMarks} Marks</span>
+                </span>
+              )}
+              {directDownloadUrl && (
+                <a
+                  href={directDownloadUrl}
+                  download={`${createSlug(title || 'official-question-paper')}.pdf`}
+                  className="inline-flex items-center gap-1 text-xs font-mono font-bold bg-[#8C3A27] text-white px-2.5 py-1 rounded-md hover:bg-[#732415] transition-colors shadow-2xs cursor-pointer"
+                  title="Download Official Question Paper (PDF)"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">PDF</span>
+                </a>
+              )}
+            </div>
+          </div>
+
+          {/* 2. STICKY QUESTION JUMP INDEX (Q1 TO Q20) */}
+          {pyqQuestions.length > 0 && (
+            <div 
+              id="pyq-jump-bar"
+              className="sticky z-30 bg-[#FAF6EE]/95 backdrop-blur-md p-3 rounded-2xl border border-[#D5C3B0] shadow-md flex items-center gap-2 overflow-x-auto scrollbar-thin transition-all"
+              style={{ top: 'var(--site-header-height, 146px)' }}
+            >
+              <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[#7A6B5D] shrink-0 pl-1 flex items-center gap-1">
+                <Layers className="w-3.5 h-3.5 text-[#8C3A27]" />
+                <span>Questions:</span>
+              </span>
+              <div className="flex items-center gap-1.5">
+                {pyqQuestions.map((q) => {
+                  const qKey = q.idKey || q.qNum;
+                  return (
+                    <button
+                      key={qKey}
+                      type="button"
+                      onClick={() => jumpToQuestion(qKey)}
+                      className="px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-[#FFFDF8] hover:bg-[#8C3A27] text-[#221814] hover:text-white border border-[#D5C3B0] hover:border-[#8C3A27] transition-all shrink-0 cursor-pointer shadow-2xs whitespace-nowrap"
+                    >
+                      {q.displayNum || `Q${q.qNum}`}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* 3. UNIFIED "QUESTION PAPER" BOOKLET CONTAINER */}
+          <div className="card-parchment-3d rounded-3xl bg-[#FFFDF8] border-2 border-[#8C3A27]/30 shadow-md relative overflow-hidden">
+            {/* Header Section */}
+            <div className="bg-gradient-to-b from-[#FFFDF8] via-[#FAF6EE] to-[#F5ECE0] p-6 sm:p-10 text-center space-y-6 border-b border-[#D5C3B0]">
+              {/* National Emblem & Crest Motif */}
+              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-[#FAF6EE] via-[#F4ECE1] to-[#EAE0D5] border-2 border-[#8C3A27]/40 mx-auto flex items-center justify-center shadow-inner relative">
+                <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full border border-dashed border-[#8C3A27]/60 flex items-center justify-center">
+                  <BookOpen className="w-6 h-6 sm:w-8 sm:h-8 text-[#8C3A27]" />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <p className="text-xs sm:text-sm font-serif font-bold text-[#7A6B5D] tracking-widest uppercase">
+                  संघ लोक सेवा आयोग
+                </p>
+                <h2 className="font-serif-header text-xl sm:text-2xl md:text-3xl font-extrabold text-[#221814] tracking-wider uppercase">
+                  UNION PUBLIC SERVICE COMMISSION
+                </h2>
+                <p className="text-xs sm:text-sm font-mono font-bold text-[#8C3A27] uppercase tracking-wider pt-1">
+                  CIVIL SERVICES ({detectedStage === 'Prelims' ? 'PRELIMINARY' : 'MAIN'}) EXAMINATION, {detectedYear}
+                </p>
+              </div>
+
+              <div className="py-2.5 border-t-2 border-b-2 border-[#8C3A27]/30 max-w-2xl mx-auto">
+                <h1 className="font-serif-header text-2xl sm:text-3xl md:text-4xl font-extrabold text-[#6C1D18] tracking-tight uppercase">
+                  {paperName}
+                </h1>
+              </div>
+
+              {/* Exam Metadata Stats */}
+              <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-6 text-xs sm:text-sm font-serif font-bold text-[#3D3028]">
+                <div className="flex items-center gap-1.5 bg-[#FAF6EE] px-3.5 py-1.5 rounded-xl border border-[#D5C3B0] shadow-2xs">
+                  <Clock className="w-4 h-4 text-[#8C3A27]" />
+                  <span>Duration: 3 Hours</span>
+                </div>
+                <div className="flex items-center gap-1.5 bg-[#FAF6EE] px-3.5 py-1.5 rounded-xl border border-[#D5C3B0] shadow-2xs">
+                  <Award className="w-4 h-4 text-[#8C3A27]" />
+                  <span>Maximum Marks: {maximumMarks !== null ? maximumMarks : (isPYQ ? 250 : '—')}</span>
+                </div>
+                <div className="flex items-center gap-1.5 bg-[#FAF6EE] px-3.5 py-1.5 rounded-xl border border-[#D5C3B0] shadow-2xs">
+                  <FileText className="w-4 h-4 text-[#8C3A27]" />
+                  <span>Total Questions: {totalQuestions}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Inline Question List with Subtle Dividers */}
+            <div className="divide-y divide-stone-200/80">
+              {pyqQuestions.length > 0 ? (
+                pyqQuestions.map((q, index) => {
+                  const qKey = q.idKey || q.qNum;
+                  const isAnswerExpanded = expandedAnswers.has(qKey);
+
+                  return (
+                    <React.Fragment key={qKey}>
+                      {/* Section Divider Banner (e.g. SECTION - A, SECTION - B) */}
+                      {q.sectionHeader && (
+                        <div className="py-7 sm:py-9 px-4 text-center bg-gradient-to-r from-[#FAF6EE]/20 via-[#8C3A27]/8 to-[#FAF6EE]/20 border-y-2 border-[#8C3A27]/25 my-2 space-y-2">
+                          <div className="inline-flex items-center gap-2 px-6 py-2 rounded-full bg-[#8C3A27]/10 border border-[#8C3A27]/30 text-[#6C1D18] font-serif-header font-extrabold text-sm sm:text-base tracking-widest uppercase shadow-2xs">
+                            <Sparkles className="w-3.5 h-3.5 text-[#D4AF37]" />
+                            <span>{q.sectionHeader}</span>
+                            <Sparkles className="w-3.5 h-3.5 text-[#D4AF37]" />
+                          </div>
+                          {q.sectionInstructions && (
+                            <p className="text-xs sm:text-sm font-serif italic text-[#5C4028] font-medium max-w-2xl mx-auto pt-1 leading-relaxed">
+                              {q.sectionInstructions}
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      <div
+                        id={`q-${qKey}`}
+                        className="p-6 sm:p-10 space-y-4 transition-colors relative hover:bg-[#FAF6EE]/25"
+                        style={{ scrollMarginTop: 'calc(var(--site-header-height, 146px) + 70px)' }}
+                      >
+                        {/* Question Top Bar */}
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2.5">
+                            <span className="min-w-8 h-8 px-2.5 sm:h-9 sm:min-w-9 sm:px-3 rounded-xl bg-[#6C1D18] text-white font-mono font-bold text-xs sm:text-sm flex items-center justify-center shadow-2xs shrink-0 whitespace-nowrap">
+                              {q.displayNum || `Q${q.qNum}`}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="px-2.5 py-1 rounded-lg bg-[#8C3A27]/10 text-[#8C3A27] font-mono font-bold text-xs border border-[#8C3A27]/20 shadow-2xs">
+                              {q.marks} Marks
+                            </span>
+                            {q.words && (
+                              <span className="px-2.5 py-1 rounded-lg bg-[#FAF6EE] text-[#5C4028] font-mono font-semibold text-xs border border-[#D5C3B0] shadow-2xs">
+                                {q.words} Words
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Question Prompt Body - Multi-paragraph & Case Study scenario support */}
+                        {q.promptHtml ? (
+                          <div 
+                            className="doc-article-content text-[#1C1613] font-serif text-base sm:text-lg leading-relaxed pt-1 select-text space-y-3 [&_p]:mb-3 [&_p]:leading-relaxed [&_strong]:font-bold [&_strong]:text-[#140C08]"
+                            dangerouslySetInnerHTML={{ __html: q.promptHtml }}
+                            onClick={handleContentClick}
+                          />
+                        ) : (
+                          <p className="text-[#1C1613] font-serif text-base sm:text-lg leading-relaxed pt-1 select-text">
+                            {q.text}
+                          </p>
+                        )}
+
+                        {/* COLLAPSIBLE MODEL ANSWER ACCORDION */}
+                        {q.modelAnswer && (
+                          <div className="pt-2">
+                            {/* Toggle Button */}
+                            <button
+                              type="button"
+                              onClick={() => toggleAnswer(qKey)}
+                              className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-serif font-bold transition-all cursor-pointer shadow-2xs ${
+                                isAnswerExpanded
+                                  ? 'bg-[#6C1D18] text-white border border-[#6C1D18] hover:bg-[#8C3A27]'
+                                  : 'bg-[#8C3A27]/8 text-[#8C3A27] border border-[#8C3A27]/25 hover:bg-[#8C3A27]/15 hover:border-[#8C3A27]/40'
+                              }`}
+                              aria-expanded={isAnswerExpanded}
+                              aria-controls={`answer-${qKey}`}
+                            >
+                              <span>{isAnswerExpanded ? 'Hide Model Answer' : 'View Model Answer'}</span>
+                              {isAnswerExpanded ? (
+                                <ChevronUp className="w-3.5 h-3.5" />
+                              ) : (
+                                <ChevronDown className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+
+                            {/* Smooth Expanding Container */}
+                            <div
+                              id={`answer-${qKey}`}
+                              className={`grid transition-all duration-300 ease-in-out ${
+                                isAnswerExpanded
+                                  ? 'grid-rows-[1fr] opacity-100 mt-3.5'
+                                  : 'grid-rows-[0fr] opacity-0 pointer-events-none'
+                              }`}
+                            >
+                              <div className="overflow-hidden">
+                                <div className="rounded-2xl bg-gradient-to-br from-[#FFFDF8] via-[#FAF6EE] to-[#F5ECE0] border-l-4 border-[#6C1D18] border-r border-t border-b border-[#D5C3B0]/60 p-5 sm:p-6 shadow-2xs space-y-3">
+                                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#D5C3B0]/40 pb-2.5">
+                                    <span className="inline-flex items-center gap-1.5 text-[11px] font-mono font-bold uppercase tracking-wider text-[#6C1D18] bg-[#6C1D18]/10 px-2.5 py-0.5 rounded-md border border-[#6C1D18]/20">
+                                      <Sparkles className="w-3 h-3 text-[#D4AF37]" />
+                                      <span>Model Answer &amp; Faculty Synopsis</span>
+                                    </span>
+                                    {q.words && (
+                                      <span className="text-[11px] font-mono text-[#7A6B5D] font-medium">
+                                        Target: ~{q.words} Words
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <div
+                                    className="doc-article-content text-stone-800 text-sm sm:text-base leading-relaxed font-sans [&_p]:mb-3 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:space-y-1.5 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:space-y-1.5 [&_li]:leading-relaxed [&_strong]:font-bold [&_strong]:text-[#140C08] [&_blockquote]:border-l-2 [&_blockquote]:border-[#8C3A27] [&_blockquote]:pl-3 [&_blockquote]:italic [&_blockquote]:text-[#5C4028]"
+                                    dangerouslySetInnerHTML={{ __html: q.modelAnswer }}
+                                    onClick={handleContentClick}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Question Footer Bar */}
+                        <div className="pt-2 flex items-center text-xs text-[#7A6B5D] font-mono border-t border-[#D5C3B0]/30">
+                          <span>UPSC CSE {detectedYear} &bull; {detectedStage} &bull; {paperName || 'Question Paper'}</span>
+                        </div>
+                      </div>
+                    </React.Fragment>
+                  );
+                })
+              ) : (
+                <div 
+                  className="p-6 sm:p-10 doc-article-content editorial-article-body prose prose-stone max-w-none text-stone-800 text-base md:text-lg leading-relaxed font-sans select-text my-4"
+                  dangerouslySetInnerHTML={{ __html: fullContentHtml }} 
+                  onClick={handleContentClick}
+                />
+              )}
+            </div>
+
+            {/* End of All Questions - Official PDF Download Section */}
+            {directDownloadUrl && (
+              <div className="p-6 sm:p-8 bg-[#FAF6EE] border-t border-[#D5C3B0] text-center">
+                <a
+                  href={directDownloadUrl}
+                  download={`${createSlug(title || 'official-question-paper')}.pdf`}
+                  className="inline-flex items-center justify-center gap-2 btn-terracotta-pill text-xs sm:text-sm py-3 px-6 font-serif font-bold shadow-md hover:shadow-lg transition-all cursor-pointer"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Download Official Question Paper (PDF)</span>
+                </a>
+              </div>
+            )}
+          </div>
+
+          {/* 5. BOTTOM NAVIGATION (RETURN TO PAPERS + NEXT QUESTION PAPER) */}
+          <div className="bg-[#FAF6EE] p-5 sm:p-6 rounded-3xl border border-[#D5C3B0] shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              <button
+                type="button"
+                onClick={() => navigate(backToStageUrl)}
+                className="btn-terracotta-outline-pill text-xs py-2.5 px-6 font-serif font-bold cursor-pointer shrink-0 w-full sm:w-auto"
+              >
+                <span>&larr; {backToStageLabel}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => navigate('/resources/pyqs')}
+                className="hidden md:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0]/60 hover:border-[#8C3A27] transition-all cursor-pointer text-xs font-serif font-bold text-[#7A6B5D] hover:text-[#8C3A27]"
+              >
+                <span>All PYQ Years</span>
+              </button>
+
+              {prevArticle && (
+                <button
+                  type="button"
+                  onClick={() => navigateToResource(prevArticle)}
+                  className="hidden md:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0]/60 hover:border-[#8C3A27] transition-all group cursor-pointer text-xs font-serif font-bold text-[#221814] hover:text-[#8C3A27]"
+                  title={prevArticle.Title || prevArticle.title}
+                >
+                  <ChevronLeft className="w-4 h-4 text-[#8C3A27] group-hover:-translate-x-0.5 transition-transform" />
+                  <span>Previous Paper</span>
+                </button>
+              )}
+            </div>
+
+            {nextArticle && (
+              <button
+                type="button"
+                onClick={() => navigateToResource(nextArticle)}
+                className="flex items-center justify-end text-right gap-3 p-3 sm:p-3.5 px-5 rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0]/60 hover:border-[#8C3A27] transition-all group cursor-pointer w-full sm:w-auto max-w-md shadow-2xs hover:shadow-xs sm:ml-auto"
+              >
+                <div className="space-y-0.5">
+                  <span className="text-[10px] font-mono uppercase font-bold text-[#8C3A27] tracking-wider block">
+                    NEXT QUESTION PAPER
+                  </span>
+                  <p className="text-xs sm:text-sm font-serif font-bold text-[#221814] line-clamp-1 group-hover:text-[#8C3A27] transition-colors">
+                    {nextArticle.Title || nextArticle.title}
+                  </p>
+                </div>
+                <ChevronRight className="w-5 h-5 text-[#8C3A27] shrink-0 group-hover:translate-x-1 transition-transform" />
+              </button>
+            )}
+          </div>
+
         </div>
       </div>
     );

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Menu, X, ArrowUpRight, Sparkles, Phone, Globe } from 'lucide-react';
 import { useCMSData } from '../hooks/useCMSData';
 import { sortCurrentAffairsByDate } from '../utils/dateUtils';
@@ -12,6 +12,7 @@ const stripLeadingEmoji = (str) => {
 export default function Header({ currentPath, navigate, onOpenPopup }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const headerRef = useRef(null);
   const { data } = useCMSData();
 
   useEffect(() => {
@@ -25,6 +26,21 @@ export default function Header({ currentPath, navigate, onOpenPopup }) {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  // Dynamically sync rendered header height to CSS custom property --site-header-height
+  useEffect(() => {
+    const updateHeaderHeight = () => {
+      if (headerRef.current) {
+        const height = headerRef.current.offsetHeight;
+        if (height > 0) {
+          document.documentElement.style.setProperty('--site-header-height', `${height}px`);
+        }
+      }
+    };
+    updateHeaderHeight();
+    window.addEventListener('resize', updateHeaderHeight);
+    return () => window.removeEventListener('resize', updateHeaderHeight);
+  }, [scrolled]);
 
   // Build Dynamic Horizontal Loop of New Additions & CMS Announcements
   const updateItems = useMemo(() => {
@@ -142,7 +158,7 @@ export default function Header({ currentPath, navigate, onOpenPopup }) {
   };
 
   return (
-    <div className="sticky top-0 z-50">
+    <div ref={headerRef} id="site-main-header" className="sticky top-0 z-50">
       {/* EXECUTIVE TOP UTILITY RIBBON */}
       <div className="w-full bg-[#140E0C] text-[#FAF5EE] border-b border-[#D4AF37]/25 py-2 px-4 md:px-6 select-none overflow-x-auto scrollbar-none">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-4 text-xs font-sans font-medium min-w-max md:min-w-0">

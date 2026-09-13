@@ -1,11 +1,12 @@
 // src/hooks/useCMSData.js
 // Custom Hook with Stale-While-Revalidate Strategy for 0ms Instant Page Renders
 import { useState, useEffect } from 'react';
-import { fetchCMSData, getCachedCMSData } from '../services/cmsService';
+import { fetchCMSData, getCachedCMSData, isCMSNetworkFetched } from '../services/cmsService';
 
 export function useCMSData() {
   // Step 1: Synchronous 0ms Cache Load from LocalStorage
   const initialCache = getCachedCMSData();
+  const alreadyFetched = isCMSNetworkFetched();
 
   const [data, setData] = useState(
     initialCache || {
@@ -19,7 +20,8 @@ export function useCMSData() {
   );
   
   // If cached data is present, loading is false immediately (0ms skeleton delay)
-  const [loading, setLoading] = useState(!initialCache);
+  const [loading, setLoading] = useState(!initialCache || !alreadyFetched);
+  const [isFetched, setIsFetched] = useState(alreadyFetched);
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -40,6 +42,7 @@ export function useCMSData() {
       } finally {
         if (isMounted) {
           setLoading(false);
+          setIsFetched(true);
         }
       }
     }
@@ -51,5 +54,5 @@ export function useCMSData() {
     };
   }, []);
 
-  return { data, loading, error };
+  return { data, loading, isFetched, error };
 }

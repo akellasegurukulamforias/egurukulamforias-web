@@ -156,6 +156,12 @@ const STATIC_ROUTES = [
     lastmod: getTodayYMD()
   },
   {
+    path: '/resources/pyqs',
+    priority: '0.8',
+    changefreq: 'daily',
+    lastmod: getTodayYMD()
+  },
+  {
     path: '/contact',
     priority: '0.7',
     changefreq: 'monthly',
@@ -261,13 +267,93 @@ async function generateSitemap() {
     if (!rawSlug) continue;
 
     const slug = encodeURIComponent(String(rawSlug).trim().toLowerCase());
+    const isPYQ = 
+      /previous\s*year\s*questions?|pyqs?|past\s*years?\s*papers?|question\s*paper/i.test(title) || 
+      /previous\s*year\s*questions?|pyqs?|past\s*years?\s*papers?|question\s*paper/i.test(res.Category || res.category || '') || 
+      /previous\s*year\s*questions?|pyqs?|past\s*years?\s*papers?|question\s*paper/i.test(res.Subcategory || res.subcategory || '');
+
     const isSyllabus = 
       /syllabus/i.test(title) || 
       /syllabus/i.test(res.Category || res.category || '') || 
       /syllabus/i.test(res.Subcategory || res.subcategory || '');
-    const fullUrl = isSyllabus 
-      ? `${BASE_URL}/resources/upsc-syllabus/${slug}`
-      : `${BASE_URL}/resources/${slug}`;
+
+    let fullUrl = '';
+    if (isPYQ) {
+      // Robust year detection matching cmsService.extractPYQYear
+      let year = '';
+      if (res.Year || res.year) {
+        const yr = String(res.Year || res.year).trim();
+        if (/^\d{4}$/.test(yr)) year = yr;
+      }
+      if (!year) {
+        const titleMatch = title.match(/\b(19\d{2}|20\d{2})\b/);
+        if (titleMatch) year = titleMatch[1];
+      }
+      if (!year) {
+        const catMatch = String(res.Category || res.category || '').match(/\b(19\d{2}|20\d{2})\b/);
+        if (catMatch) year = catMatch[1];
+      }
+      if (!year) {
+        const content = String(res.Full_Content || res.full_content || res.Content || res.content || '').slice(0, 400);
+        const contentMatch = content.match(/\b(19\d{2}|20\d{2})\b/);
+        if (contentMatch) year = contentMatch[1];
+      }
+      if (!year) {
+        const dateMatch = String(res.Date || res.date || '').match(/\b(19\d{2}|20\d{2})\b/);
+        if (dateMatch) year = dateMatch[1];
+      }
+
+      const combined = `${title} ${res.Category || ''} ${res.Subcategory || ''} ${res.Tags || ''}`;
+      let stage = 'mains';
+      if (/prelims|preliminary/i.test(combined) || /csat/i.test(combined)) {
+        stage = 'prelims';
+      }
+
+      if (year) {
+        const yearUrl = `${BASE_URL}/resources/pyqs/${year}`;
+        if (!seenUrls.has(yearUrl)) {
+          seenUrls.add(yearUrl);
+          urlEntries.push({
+            loc: yearUrl,
+            lastmod: getTodayYMD(),
+            changefreq: 'daily',
+            priority: '0.8'
+          });
+        }
+
+        const stageUrl = `${BASE_URL}/resources/pyqs/${year}/${stage}`;
+        if (!seenUrls.has(stageUrl)) {
+          seenUrls.add(stageUrl);
+          urlEntries.push({
+            loc: stageUrl,
+            lastmod: getTodayYMD(),
+            changefreq: 'daily',
+            priority: '0.8'
+          });
+        }
+
+        if (stage === 'mains') {
+          const gsUrl = `${BASE_URL}/resources/pyqs/${year}/mains/general-studies`;
+          if (!seenUrls.has(gsUrl)) {
+            seenUrls.add(gsUrl);
+            urlEntries.push({
+              loc: gsUrl,
+              lastmod: getTodayYMD(),
+              changefreq: 'daily',
+              priority: '0.8'
+            });
+          }
+        }
+
+        fullUrl = `${BASE_URL}/resources/pyqs/${year}/${stage}/${slug}`;
+      } else {
+        fullUrl = `${BASE_URL}/resources/pyqs/${stage}/${slug}`;
+      }
+    } else if (isSyllabus) {
+      fullUrl = `${BASE_URL}/resources/upsc-syllabus/${slug}`;
+    } else {
+      fullUrl = `${BASE_URL}/resources/${slug}`;
+    }
 
     if (!seenUrls.has(fullUrl)) {
       seenUrls.add(fullUrl);

@@ -16,13 +16,61 @@ import ResourcesPage from './pages/ResourcesPage';
 import ConnectPage from './pages/ConnectPage';
 import CurrentAffairsDetailPage from './pages/CurrentAffairsDetailPage';
 import ResourceDetailPage from './pages/ResourceDetailPage';
+import ParticleConvergenceLoader from './components/ParticleConvergenceLoader';
+
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error("ErrorBoundary caught an error:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-[60vh] flex items-center justify-center p-6 text-center">
+          <div className="max-w-md bg-[#FFFDF8] border-2 border-[#8C3A27]/30 rounded-3xl p-8 shadow-md space-y-4">
+            <h2 className="font-serif-header text-2xl font-bold text-[#6C1D18]">Something went wrong</h2>
+            <p className="text-sm text-[#5C4028] font-serif">
+              An unexpected error occurred while loading this view.
+            </p>
+            <div className="pt-2 flex items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => { this.setState({ hasError: false, error: null }); window.location.reload(); }}
+                className="btn-terracotta-pill text-xs py-2.5 px-5 font-serif font-bold cursor-pointer"
+              >
+                Reload Page
+              </button>
+              <button
+                type="button"
+                onClick={() => { this.setState({ hasError: false, error: null }); window.location.href = '/resources'; }}
+                className="btn-terracotta-outline-pill text-xs py-2.5 px-5 font-serif font-bold cursor-pointer"
+              >
+                Go to Resources
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 export default function App() {
   const [currentPath, setCurrentPath] = useState(window.location.pathname || '/');
   const [isPopupOpen, setIsPopupOpen] = useState(false);
   const [popupInitialIndex, setPopupInitialIndex] = useState(0);
   const [popupSelectedItem, setPopupSelectedItem] = useState(null);
-  const { data: cmsData } = useCMSData();
+  const { data: cmsData, loading: cmsLoading } = useCMSData();
 
   useEffect(() => {
     const handlePopState = () => {
@@ -79,7 +127,7 @@ export default function App() {
       } catch (e) {
         // keep raw slug
       }
-      return <CurrentAffairsDetailPage slug={slug} navigate={navigate} />;
+      return <CurrentAffairsDetailPage key={normalizedPath} slug={slug} navigate={navigate} />;
     }
 
     if (normalizedPath === '/resources/upsc-syllabus') {
@@ -93,7 +141,65 @@ export default function App() {
       } catch (e) {
         // keep raw slug
       }
-      return <ResourceDetailPage slug={slug} folder="upsc-syllabus" navigate={navigate} />;
+      return <ResourceDetailPage key={normalizedPath} slug={slug} folder="upsc-syllabus" navigate={navigate} />;
+    }
+
+    if (normalizedPath === '/resources/pyqs') {
+      return <ResourcesPage folder="pyqs" navigate={navigate} />;
+    }
+
+    if (normalizedPath.startsWith('/resources/pyqs/')) {
+      const rest = normalizedPath.replace('/resources/pyqs/', '');
+      const parts = rest.split('/').filter(Boolean);
+
+      if (parts.length === 1) {
+        const seg = parts[0];
+        if (/^(19\d{2}|20\d{2})$/.test(seg)) {
+          return <ResourcesPage folder="pyqs" pyqYear={seg} navigate={navigate} />;
+        } else if (seg === 'mains' || seg === 'prelims') {
+          return <ResourcesPage folder="pyqs" pyqStage={seg} navigate={navigate} />;
+        } else {
+          let slug = seg;
+          try { slug = decodeURIComponent(slug); } catch (e) {}
+          return <ResourceDetailPage key={normalizedPath} slug={slug} folder="pyqs" navigate={navigate} />;
+        }
+      } else if (parts.length === 2) {
+        const [p1, p2] = parts;
+        if (/^(19\d{2}|20\d{2})$/.test(p1) && (p2 === 'mains' || p2 === 'prelims')) {
+          return <ResourcesPage folder="pyqs" pyqYear={p1} pyqStage={p2} navigate={navigate} />;
+        } else if (/^(19\d{2}|20\d{2})$/.test(p1)) {
+          let slug = p2;
+          try { slug = decodeURIComponent(slug); } catch (e) {}
+          return <ResourceDetailPage key={normalizedPath} slug={slug} folder="pyqs" year={p1} navigate={navigate} />;
+        } else {
+          let slug = parts.join('/');
+          try { slug = decodeURIComponent(slug); } catch (e) {}
+          return <ResourceDetailPage key={normalizedPath} slug={slug} folder="pyqs" navigate={navigate} />;
+        }
+      } else if (parts.length === 3) {
+        const [year, stage, p3] = parts;
+        if (/^(19\d{2}|20\d{2})$/.test(year) && (stage === 'mains' || stage === 'prelims')) {
+          const streamTokens = ['general-studies', 'gs', 'csat', 'essay', 'optional', 'all'];
+          const isArticle = Array.isArray(cmsData?.resources) && cmsData.resources.some(r => {
+            const s = (r.slug || r.Slug || '').toLowerCase();
+            return s === p3;
+          });
+          if (streamTokens.includes(p3) && !isArticle) {
+            return <ResourcesPage folder="pyqs" pyqYear={year} pyqStage={stage} pyqStream={p3} navigate={navigate} />;
+          }
+          let slug = p3;
+          try { slug = decodeURIComponent(slug); } catch (e) {}
+          return <ResourceDetailPage key={normalizedPath} slug={slug} folder="pyqs" year={year} stage={stage} navigate={navigate} />;
+        }
+        let slug = parts.slice(1).join('/');
+        try { slug = decodeURIComponent(slug); } catch (e) {}
+        return <ResourceDetailPage key={normalizedPath} slug={slug} folder="pyqs" year={year} navigate={navigate} />;
+      } else if (parts.length >= 4) {
+        const [year, stage, stream] = parts;
+        let slug = parts.slice(3).join('/');
+        try { slug = decodeURIComponent(slug); } catch (e) {}
+        return <ResourceDetailPage key={normalizedPath} slug={slug} folder="pyqs" year={year} stage={stage} stream={stream} navigate={navigate} />;
+      }
     }
 
     if (normalizedPath.startsWith('/resources/')) {
@@ -103,7 +209,7 @@ export default function App() {
       } catch (e) {
         // keep raw slug
       }
-      return <ResourceDetailPage slug={slug} navigate={navigate} />;
+      return <ResourceDetailPage key={normalizedPath} slug={slug} navigate={navigate} />;
     }
 
     switch (normalizedPath) {
@@ -144,6 +250,13 @@ export default function App() {
       {/* Desktop Mode Recommendation Popup for Mobile Users */}
       <DesktopViewPrompt />
 
+      {/* Global Route Guard & Data Hydration Particle Convergence Loader */}
+      <ParticleConvergenceLoader 
+        isReady={!cmsLoading} 
+        label="Hydrating Knowledge Base..."
+        sublabel="e-Gurukulam for IAS • Tradition of Wisdom & Modern Rigor"
+      />
+
       {/* Dynamic Fanned Deck Google Sheet CMS Live Ticker / Announcement Popup Modal */}
       <AnnouncementPopup 
         activePopup={cmsData?.activePopup} 
@@ -166,7 +279,9 @@ export default function App() {
 
       {/* Main Container */}
       <main className="flex-1">
-        {renderPage()}
+        <ErrorBoundary key={currentPath}>
+          {renderPage()}
+        </ErrorBoundary>
       </main>
 
       {/* Global Footer */}

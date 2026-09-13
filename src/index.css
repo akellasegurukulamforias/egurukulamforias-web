@@ -39,6 +39,9 @@
 
   --font-heading: 'Playfair Display', 'Cinzel', serif;
   --font-body: 'Plus Jakarta Sans', sans-serif;
+
+  /* Global Layout Dimensions */
+  --site-header-height: 146px;
 }
 
 /* Reset & Smooth Scroll */

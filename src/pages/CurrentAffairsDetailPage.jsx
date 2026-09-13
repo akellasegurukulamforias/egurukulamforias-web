@@ -17,6 +17,7 @@ import {
   getDirectImageUrl, 
   getSecondaryImageUrl 
 } from './CurrentAffairsReader';
+import ParticleConvergenceLoader from '../components/ParticleConvergenceLoader';
 
 /**
  * Clean and optimize raw HTML for high-fidelity native editorial typography
@@ -88,7 +89,11 @@ function estimateReadingTime(content) {
 const normalizeKey = (str) => String(str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
 export default function CurrentAffairsDetailPage({ slug, navigate }) {
-  const { data, loading: cmsLoading } = useCMSData();
+  const { data, loading: cmsLoading, isFetched: cmsFetched } = useCMSData();
+
+  // 1. Explicit Loading & Fetched States (starts as true by default)
+  const [isLoading, setIsLoading] = useState(true);
+  const [isFetched, setIsFetched] = useState(false);
 
   // Sorted list of articles (latest first)
   const sortedArticles = useMemo(() => {
@@ -116,6 +121,33 @@ export default function CurrentAffairsDetailPage({ slug, navigate }) {
   }, [sortedArticles, targetSlug, targetNorm]);
 
   const article = currentIndex !== -1 ? sortedArticles[currentIndex] : null;
+  const resource = article;
+
+  // 1. State Initialization: Reset isLoading(true) and isFetched(false) when slug changes
+  useEffect(() => {
+    setIsLoading(true);
+    setIsFetched(false);
+  }, [slug]);
+
+  // 2. Explicit Route Resolution Guard & Catching Route Hydration Delays
+  useEffect(() => {
+    if (!slug || typeof slug !== 'string' || !slug.trim()) {
+      setIsLoading(true);
+      setIsFetched(false);
+      return;
+    }
+
+    if (resource) {
+      setIsLoading(false);
+      setIsFetched(true);
+    } else if (!cmsLoading && cmsFetched) {
+      setIsLoading(false);
+      setIsFetched(true);
+    } else {
+      setIsLoading(true);
+      setIsFetched(false);
+    }
+  }, [resource, cmsLoading, cmsFetched, slug]);
   const prevArticle = currentIndex > 0 ? sortedArticles[currentIndex - 1] : null;
   const nextArticle = currentIndex >= 0 && currentIndex < sortedArticles.length - 1 ? sortedArticles[currentIndex + 1] : null;
 
@@ -201,51 +233,25 @@ export default function CurrentAffairsDetailPage({ slug, navigate }) {
     }
   };
 
-  // 1. SKELETON LOADER FOR DIRECT DEEP-LINK ENTRANCE (WHILE CMS DATA IS LOADING)
-  if (cmsLoading && !article) {
+  // 3. Catching Route Hydration Delays
+  const isRouterReady = Boolean(slug && typeof slug === 'string' && slug.trim().length > 0);
+
+  // 1. GLOBAL ROUTE GUARD: PARTICLE CONVERGENCE LOADER WHILE CMS DATA IS HYDRATING
+  // If isLoading OR !isFetched, OR router is not ready: NEVER render Not Found screen!
+  if (!isRouterReady || isLoading || !isFetched) {
     return (
-      <div className="min-h-screen bg-[#FFFDF8] text-[#221814] py-12 px-4 sm:px-6 lg:px-8 select-text">
-        <div className="max-w-4xl mx-auto space-y-8 animate-fade-in text-left">
-          {/* Top Sticky Breadcrumb Placeholder */}
-          <div className="bg-[#FAF6EE] p-5 sm:p-6 rounded-3xl border border-[#D5C3B0] shadow-sm flex items-center justify-between">
-            <div className="h-4 bg-[#D5C3B0]/40 rounded-md w-36 animate-pulse"></div>
-            <div className="h-4 bg-[#D5C3B0]/30 rounded-md w-24 animate-pulse"></div>
-          </div>
-
-          {/* Title Placeholder */}
-          <div className="space-y-3 pb-6 border-b border-[#D5C3B0]/60 animate-pulse">
-            <div className="h-8 sm:h-12 bg-[#D5C3B0]/50 rounded-xl w-4/5"></div>
-            <div className="h-6 sm:h-8 bg-[#D5C3B0]/30 rounded-xl w-2/3"></div>
-          </div>
-
-          {/* Hero Banner Placeholder */}
-          <div className="w-full h-64 sm:h-96 rounded-3xl bg-[#D5C3B0]/20 border border-[#D5C3B0] animate-pulse flex items-center justify-center">
-            <div className="flex items-center gap-2.5 text-xs font-serif italic text-[#8C3A27] font-bold">
-              <Loader2 className="w-5 h-5 animate-spin" />
-              <span>Loading daily editorial analysis...</span>
-            </div>
-          </div>
-
-          {/* Summary Box Placeholder */}
-          <div className="p-6 rounded-2xl bg-[#F4ECE1] border-l-4 border-[#8C3A27] space-y-2 animate-pulse">
-            <div className="h-4 bg-[#D5C3B0]/40 rounded-md w-full"></div>
-            <div className="h-4 bg-[#D5C3B0]/40 rounded-md w-5/6"></div>
-          </div>
-
-          {/* Multi-Paragraph Shimmer */}
-          <div className="space-y-4 pt-4 animate-pulse">
-            <div className="h-6 bg-[#D5C3B0]/40 rounded-md w-1/3 my-4"></div>
-            <div className="h-4 bg-[#D5C3B0]/30 rounded-md w-full"></div>
-            <div className="h-4 bg-[#D5C3B0]/30 rounded-md w-11/12"></div>
-            <div className="h-4 bg-[#D5C3B0]/30 rounded-md w-4/5"></div>
-          </div>
-        </div>
-      </div>
+      <ParticleConvergenceLoader
+        isReady={false}
+        label="Hydrating Editorial Dispatch..."
+        sublabel="e-Gurukulam for IAS • Tradition of Wisdom & Modern Rigor"
+        fullScreen={true}
+      />
     );
   }
 
-  // 2. DISPATCH NOT FOUND STATE (ONCE CMS FETCH HAS COMPLETED AND SLUG DOES NOT MATCH)
-  if (!cmsLoading && !article) {
+  // 2. DISPATCH NOT FOUND STATE (STRICT INVARIANT: ONLY AFTER CMS QUERY IS COMPLETE)
+  // If isFetched AND !isLoading AND !resource: Render "Dispatch Not Found"
+  if (isFetched && !isLoading && !resource) {
     return (
       <div className="min-h-screen bg-[#FFFDF8] text-[#221814] py-16 px-4 sm:px-6 lg:px-8">
         <div className="max-w-xl mx-auto space-y-6 text-center bg-[#FAF6EE] p-8 sm:p-12 rounded-3xl border border-[#D5C3B0] shadow-sm">
