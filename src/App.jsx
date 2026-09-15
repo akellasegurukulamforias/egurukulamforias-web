@@ -77,6 +77,13 @@ export default function App() {
   const [popupSelectedItem, setPopupSelectedItem] = useState(null);
   const { data: cmsData, loading: cmsLoading } = useCMSData();
 
+  const hasCachedData = Boolean(
+    cmsData && (
+      (Array.isArray(cmsData.currentAffairs) && cmsData.currentAffairs.length > 0) ||
+      (Array.isArray(cmsData.resources) && cmsData.resources.length > 0)
+    )
+  );
+
   useEffect(() => {
     const handlePopState = () => {
       setCurrentPath(window.location.pathname || '/');
@@ -258,9 +265,10 @@ export default function App() {
       {/* Desktop Mode Recommendation Popup for Mobile Users */}
       <DesktopViewPrompt />
 
-      {/* Global Route Guard & Data Hydration Particle Convergence Loader */}
+      {/* Global Route Guard & Data Hydration Instant Transition */}
       <ParticleConvergenceLoader 
         isReady={!cmsLoading} 
+        minimal={hasCachedData}
         label="Hydrating Knowledge Base..."
         sublabel="e-Gurukulam for IAS • Tradition of Wisdom & Modern Rigor"
       />
