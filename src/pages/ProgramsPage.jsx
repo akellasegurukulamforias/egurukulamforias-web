@@ -3,36 +3,13 @@ import { SectionDivider } from '../components/Artworks';
 import IASWithLifeSection from '../components/IASWithLifeSection';
 import { 
   ArrowRight, 
-  Sparkles, 
-  Briefcase,
   Home,
-  ArrowDown,
-  X,
-  Bell,
-  Clock
+  ArrowDown
 } from 'lucide-react';
 
 export default function ProgramsPage({ navigate }) {
   const [activeTier, setActiveTier] = useState(0); // 0 = 99%, 1 = 75%, 2 = 50%
   const [activeFieldStage, setActiveFieldStage] = useState(0); // 0 = Enter, 1 = Observe, 2 = Understand, 3 = Contribute
-  
-  // Session-Persistent "Coming Soon" Modal Popup State (Triggers only once per browser session)
-  const [showComingSoonModal, setShowComingSoonModal] = useState(false);
-
-  useEffect(() => {
-    const hasSeenModal = sessionStorage.getItem('hasSeenProgramsComingSoonModal');
-    if (!hasSeenModal) {
-      const timer = setTimeout(() => {
-        setShowComingSoonModal(true);
-      }, 1200);
-      return () => clearTimeout(timer);
-    }
-  }, []);
-
-  const handleCloseComingSoonModal = () => {
-    sessionStorage.setItem('hasSeenProgramsComingSoonModal', 'true');
-    setShowComingSoonModal(false);
-  };
 
   const spectrumContainerRef = useRef(null);
   const sankalpaContainerRef = useRef(null);
@@ -528,131 +505,6 @@ export default function ProgramsPage({ navigate }) {
         </div>
 
       </section>
-
-      {/* ==================================================================== */}
-      {/* SESSION-ONLY "COMING SOON" PROGRAM PREVIEW MODAL POPUP */}
-      {/* APPEARS ONLY ONCE PER BROWSER SESSION & ONLY ON PROGRAMS PAGE */}
-      {/* ==================================================================== */}
-      {showComingSoonModal && (
-        <div 
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/75 backdrop-blur-xs transition-opacity animate-fade-in text-[#221814]"
-          onClick={handleCloseComingSoonModal}
-        >
-          <div 
-            className="relative w-full max-w-xl bg-[#FAF6EE] text-[#221814] rounded-3xl shadow-2xl border-2 border-[#8C3A27]/40 p-6 sm:p-8 overflow-hidden text-left"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Close Button */}
-            <button 
-              type="button"
-              onClick={handleCloseComingSoonModal}
-              className="absolute top-5 right-5 p-2 rounded-full bg-[#8C3A27]/10 hover:bg-[#8C3A27]/20 text-[#8C3A27] transition-colors cursor-pointer"
-              aria-label="Close modal"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <div className="space-y-6">
-              
-              {/* Header Badge & Title */}
-              <div className="space-y-3 pr-8">
-                {/* Premium Editorial "Upcoming Initiatives" Campaign Seal Badge */}
-                <div className="inline-block relative z-20 select-none">
-                  <div className="relative bg-[#8C3A27] text-[#F3EBDD] px-4 py-1.5 rounded-md border border-[#C5A059] shadow-md flex items-center justify-center gap-2 overflow-hidden">
-                    {/* Inner Inset Hairline Frame */}
-                    <div className="absolute inset-0.5 border border-[#C5A059]/60 rounded-xs pointer-events-none" />
-                    
-                    {/* Corner Notch Stamp Accents */}
-                    <div className="w-1.5 h-1.5 bg-[#FFD700] rounded-full shrink-0" />
-                    <span className="font-mono text-xs font-black uppercase tracking-[0.25em] text-[#F3EBDD] relative z-10 pt-0.5">
-                      Upcoming Initiatives
-                    </span>
-                    <div className="w-1.5 h-1.5 bg-[#FFD700] rounded-full shrink-0" />
-                  </div>
-                </div>
-
-                <h3 className="font-serif-header text-xl sm:text-2xl lg:text-3xl font-extrabold text-[#221814] leading-none whitespace-nowrap">
-                  A NEW WAY TO PREPARE FOR IAS
-                </h3>
-
-                <p className="text-xs sm:text-sm font-serif italic text-[#5C4028] font-bold">
-                  Be the first to explore our upcoming specialized initiatives on the Programs Page.
-                </p>
-              </div>
-
-              {/* 2 Upcoming Initiatives Preview Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-                
-                {/* Initiative 1: IAS | WITH LIFE */}
-                <div className="p-4 rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0] space-y-2 relative overflow-hidden group hover:border-[#8C3A27] transition-all">
-                  <div className="flex items-center justify-between">
-                    {/* Premium Editorial "COMING SOON" Campaign Seal Badge */}
-                    <div className="inline-block relative z-10 select-none transform -rotate-1 group-hover:rotate-0 transition-transform duration-300">
-                      <div className="relative bg-[#8C3A27] text-[#F3EBDD] px-3 py-1 rounded-md border border-[#C5A059] shadow-xs flex items-center justify-center gap-1.5 overflow-hidden">
-                        <div className="absolute inset-0.5 border border-[#C5A059]/60 rounded-xs pointer-events-none" />
-                        <div className="w-1.5 h-1.5 bg-[#FFD700] rounded-full shrink-0" />
-                        <span className="font-mono text-[10px] font-black uppercase tracking-[0.2em] text-[#F3EBDD] relative z-10 pt-0.5">
-                          COMING SOON
-                        </span>
-                        <div className="w-1.5 h-1.5 bg-[#FFD700] rounded-full shrink-0" />
-                      </div>
-                    </div>
-                    <Clock className="w-3.5 h-3.5 text-[#8C3A27]" />
-                  </div>
-
-                  <h4 className="font-serif-header text-base font-extrabold text-[#221814] pt-1">
-                    IAS | WITH LIFE
-                  </h4>
-
-                  <p className="text-xs font-serif italic text-[#5C4028] font-semibold leading-relaxed">
-                    Designed for Homemakers &amp; Working Professionals who can't put life on hold.
-                  </p>
-                </div>
-
-                {/* Initiative 2: NextGen Governance */}
-                <div className="p-4 rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0] space-y-2 relative overflow-hidden group hover:border-[#8C3A27] transition-all">
-                  <div className="flex items-center justify-between">
-                    {/* Premium Editorial "COMING SOON" Campaign Seal Badge */}
-                    <div className="inline-block relative z-10 select-none transform -rotate-1 group-hover:rotate-0 transition-transform duration-300">
-                      <div className="relative bg-[#8C3A27] text-[#F3EBDD] px-3 py-1 rounded-md border border-[#C5A059] shadow-xs flex items-center justify-center gap-1.5 overflow-hidden">
-                        <div className="absolute inset-0.5 border border-[#C5A059]/60 rounded-xs pointer-events-none" />
-                        <div className="w-1.5 h-1.5 bg-[#FFD700] rounded-full shrink-0" />
-                        <span className="font-mono text-[10px] font-black uppercase tracking-[0.2em] text-[#F3EBDD] relative z-10 pt-0.5">
-                          COMING SOON
-                        </span>
-                        <div className="w-1.5 h-1.5 bg-[#FFD700] rounded-full shrink-0" />
-                      </div>
-                    </div>
-                    <Clock className="w-3.5 h-3.5 text-[#8C3A27]" />
-                  </div>
-
-                  <h4 className="font-serif-header text-base font-extrabold text-[#221814] pt-1">
-                    NextGen Governance
-                  </h4>
-
-                  <p className="text-xs font-serif italic text-[#5C4028] font-semibold leading-relaxed">
-                    Master diagnostic workflows to break down, design, and scale public systems.
-                  </p>
-                </div>
-
-              </div>
-
-              {/* Action Buttons */}
-              <div className="pt-2 flex flex-col sm:flex-row items-center gap-3 justify-end">
-                <button
-                  type="button"
-                  onClick={handleCloseComingSoonModal}
-                  className="btn-terracotta-pill text-xs py-3 px-8 font-serif font-bold shadow-md hover:shadow-xl transition-all w-full sm:w-auto flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  <span>EXPLORE UPCOMING PROGRAMS →</span>
-                </button>
-              </div>
-
-            </div>
-
-          </div>
-        </div>
-      )}
 
     </div>
   );
