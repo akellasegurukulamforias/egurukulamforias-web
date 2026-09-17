@@ -20,8 +20,8 @@ export function useCMSData() {
   );
   
   // If cached data is present, loading is false immediately (0ms skeleton delay)
-  const [loading, setLoading] = useState(!initialCache || !alreadyFetched);
-  const [isFetched, setIsFetched] = useState(alreadyFetched);
+  const [loading, setLoading] = useState(!initialCache);
+  const [isFetched, setIsFetched] = useState(Boolean(initialCache || alreadyFetched));
   const [error, setError] = useState(null);
 
   useEffect(() => {

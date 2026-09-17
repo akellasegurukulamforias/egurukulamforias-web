@@ -70,8 +70,44 @@ class ErrorBoundary extends React.Component {
   }
 }
 
+function NotFoundPage({ navigate }) {
+  return (
+    <div className="min-h-[65vh] flex items-center justify-center px-4 py-16 text-center">
+      <div className="max-w-md w-full bg-[#FFFDF8] border-2 border-[#D5C3B0] rounded-3xl p-8 shadow-sm space-y-5">
+        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[#6C1D18]/10 text-[#6C1D18] mb-1">
+          <span className="font-serif-header text-3xl font-bold">404</span>
+        </div>
+        <h1 className="font-serif-header text-2xl sm:text-3xl font-bold text-[#6C1D18]">
+          Manuscript Not Found
+        </h1>
+        <p className="text-sm sm:text-base text-[#5C4028] font-serif leading-relaxed">
+          The manuscript or resource you are looking for does not exist, has been moved, or archived.
+        </p>
+        <div className="pt-3 flex flex-col sm:flex-row items-center justify-center gap-3">
+          <button
+            type="button"
+            onClick={() => navigate('/')}
+            className="w-full sm:w-auto px-6 py-2.5 rounded-full bg-[#6C1D18] text-white text-xs font-serif font-bold uppercase tracking-wider hover:bg-[#8C3A27] transition-colors shadow-xs cursor-pointer"
+          >
+            Return Home
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate('/current-affairs')}
+            className="w-full sm:w-auto px-6 py-2.5 rounded-full bg-white border border-[#D5C3B0] text-[#6C1D18] text-xs font-serif font-bold uppercase tracking-wider hover:bg-[#FAF6EE] transition-colors cursor-pointer"
+          >
+            Current Affairs
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
-  const [currentPath, setCurrentPath] = useState(window.location.pathname || '/');
+  const [currentPath, setCurrentPath] = useState(
+    typeof window !== 'undefined' ? (window.location.pathname + window.location.search) : '/'
+  );
   const [isPopupOpen, setIsPopupOpen] = useState(false);
   const [popupInitialIndex, setPopupInitialIndex] = useState(0);
   const [popupSelectedItem, setPopupSelectedItem] = useState(null);
@@ -86,11 +122,64 @@ export default function App() {
 
   useEffect(() => {
     const handlePopState = () => {
-      setCurrentPath(window.location.pathname || '/');
+      setCurrentPath((window.location.pathname + window.location.search) || '/');
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
+
+  // Default metadata reset for top-level pages
+  useEffect(() => {
+    const rawPath = (currentPath || '/').split('?')[0].split('#')[0];
+    const normalizedPath = rawPath.toLowerCase().replace(/\/$/, '') || '/';
+    const isDetailPage = normalizedPath.startsWith('/current-affairs/') || 
+                         (normalizedPath.startsWith('/resources/') && normalizedPath !== '/resources' && normalizedPath !== '/resources/upsc-syllabus' && normalizedPath !== '/resources/pyqs');
+
+    if (!isDetailPage) {
+      const titles = {
+        '/': 'e-Gurukulam for IAS | Tradition of Wisdom & Modern Rigor',
+        '/about': 'About Us | e-Gurukulam for IAS',
+        '/philosophy': 'About Us | e-Gurukulam for IAS',
+        '/programs': 'UPSC Mentorship Programs | e-Gurukulam for IAS',
+        '/courses': 'UPSC Mentorship Programs | e-Gurukulam for IAS',
+        '/mentorship': 'UPSC Mentorship Programs | e-Gurukulam for IAS',
+        '/ias-with-life': 'UPSC Mentorship Programs | e-Gurukulam for IAS',
+        '/test-series': 'Test Series & Sadhana | e-Gurukulam for IAS',
+        '/sadhana': 'Test Series & Sadhana | e-Gurukulam for IAS',
+        '/current-affairs': 'Daily UPSC Current Affairs & Editorial Analysis | e-Gurukulam for IAS',
+        '/blog': 'Daily UPSC Current Affairs & Editorial Analysis | e-Gurukulam for IAS',
+        '/insights': 'Daily UPSC Current Affairs & Editorial Analysis | e-Gurukulam for IAS',
+        '/journal': 'Daily UPSC Current Affairs & Editorial Analysis | e-Gurukulam for IAS',
+        '/resources': 'UPSC Resources, Syllabus & PYQs | e-Gurukulam for IAS',
+        '/repository': 'UPSC Resources, Syllabus & PYQs | e-Gurukulam for IAS',
+        '/resources/upsc-syllabus': 'UPSC CSE Syllabus Breakdown | e-Gurukulam for IAS',
+        '/resources/pyqs': 'UPSC Previous Year Questions (PYQs) | e-Gurukulam for IAS',
+        '/contact': 'Connect & Admissions | e-Gurukulam for IAS',
+        '/connect': 'Connect & Admissions | e-Gurukulam for IAS',
+        '/apply': 'Connect & Admissions | e-Gurukulam for IAS',
+        '/admission': 'Connect & Admissions | e-Gurukulam for IAS',
+      };
+      
+      const newTitle = titles[normalizedPath] || 'Page Not Found | e-Gurukulam for IAS';
+      document.title = newTitle;
+
+      let canonical = document.querySelector('link[rel="canonical"]');
+      if (!canonical) {
+        canonical = document.createElement('link');
+        canonical.setAttribute('rel', 'canonical');
+        document.head.appendChild(canonical);
+      }
+      const canonicalHref = normalizedPath === '/' 
+        ? 'https://egurukulamforias.com/' 
+        : `https://egurukulamforias.com${normalizedPath}`;
+      canonical.setAttribute('href', canonicalHref);
+
+      let metaDesc = document.querySelector('meta[name="description"]');
+      if (metaDesc) {
+        metaDesc.setAttribute('content', 'e-Gurukulam for IAS - Premium UPSC Civil Services Examination mentoring, daily editorial current affairs analysis, comprehensive syllabus breakdown, and categorized PYQs.');
+      }
+    }
+  }, [currentPath]);
 
   // SPA Route Tracking for Google Analytics 4 (GA4 Measurement ID: G-T5W96019N1)
   useEffect(() => {
@@ -103,9 +192,10 @@ export default function App() {
     }
   }, [currentPath]);
 
-  const navigate = (path) => {
-    if (window.location.pathname !== path) {
-      window.history.pushState({}, '', path);
+  const navigate = (path, options = {}) => {
+    const currentFull = typeof window !== 'undefined' ? (window.location.pathname + window.location.search) : '';
+    if (currentFull !== path || options?.state) {
+      window.history.pushState(options?.state || {}, '', path);
     }
     setCurrentPath(path);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -130,7 +220,8 @@ export default function App() {
 
   // Route Resolver for client-side navigation
   const renderPage = () => {
-    const normalizedPath = currentPath.toLowerCase().replace(/\/$/, '') || '/';
+    const rawPath = (currentPath || '/').split('?')[0].split('#')[0];
+    const normalizedPath = rawPath.toLowerCase().replace(/\/$/, '') || '/';
 
     if (normalizedPath.startsWith('/current-affairs/')) {
       let slug = normalizedPath.replace('/current-affairs/', '');
@@ -256,7 +347,7 @@ export default function App() {
       case '/admission':
         return <ConnectPage navigate={navigate} />;
       default:
-        return <HomePage navigate={navigate} />;
+        return <NotFoundPage navigate={navigate} />;
     }
   };
 

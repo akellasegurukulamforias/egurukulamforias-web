@@ -1,7 +1,17 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Menu, X, ArrowUpRight, Sparkles, Phone, Globe } from 'lucide-react';
+import { Menu, X, ArrowUpRight, Sparkles, Phone, Globe, Search, BookOpen, FileText } from 'lucide-react';
 import { useCMSData } from '../hooks/useCMSData';
-import { sortCurrentAffairsByDate } from '../utils/dateUtils';
+import { sortCurrentAffairsByDate, formatDisplayDate } from '../utils/dateUtils';
+import { 
+  getCachedCMSData, 
+  isPYQResource, 
+  isSyllabusResource, 
+  extractPYQYear, 
+  extractPYQStage, 
+  extractPYQPaperLabel, 
+  getPYQPaperUrl 
+} from '../services/cmsService';
+import { createSlug } from '../pages/CurrentAffairsReader';
 
 // Helper to strip leading emojis from CMS strings so icons never duplicate
 const stripLeadingEmoji = (str) => {
@@ -11,9 +21,46 @@ const stripLeadingEmoji = (str) => {
 
 export default function Header({ currentPath, navigate, onOpenPopup }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [mobileSearchFocused, setMobileSearchFocused] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const headerRef = useRef(null);
+  const searchContainerRef = useRef(null);
+  const searchInputRef = useRef(null);
   const { data } = useCMSData();
+
+  // Close search suggestions on outside click or ESC key
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target)) {
+        setSearchOpen(false);
+      }
+    };
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setSearchOpen(false);
+        if (searchInputRef.current) searchInputRef.current.blur();
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
+  // Lock body scroll when mobile menu is open
+  useEffect(() => {
+    if (mobileMenuOpen) {
+      const prev = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = prev;
+      };
+    }
+  }, [mobileMenuOpen]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -27,20 +74,42 @@ export default function Header({ currentPath, navigate, onOpenPopup }) {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Dynamically sync rendered header height to CSS custom property --site-header-height
+  // Dynamically measure and sync rendered header height to CSS variable --site-header-height
   useEffect(() => {
     const updateHeaderHeight = () => {
       if (headerRef.current) {
-        const height = headerRef.current.offsetHeight;
+        const rect = headerRef.current.getBoundingClientRect();
+        const height = Math.round(rect.height) || headerRef.current.offsetHeight;
         if (height > 0) {
           document.documentElement.style.setProperty('--site-header-height', `${height}px`);
         }
       }
     };
+
     updateHeaderHeight();
+
+    // Use requestAnimationFrame to ensure accurate measurement after layout paint
+    const rafId = requestAnimationFrame(updateHeaderHeight);
+
+    // Live ResizeObserver continuously measures the rendered header across viewports, transitions & image loads
+    let resizeObserver = null;
+    if (typeof ResizeObserver !== 'undefined' && headerRef.current) {
+      resizeObserver = new ResizeObserver(() => {
+        updateHeaderHeight();
+      });
+      resizeObserver.observe(headerRef.current);
+    }
+
     window.addEventListener('resize', updateHeaderHeight);
-    return () => window.removeEventListener('resize', updateHeaderHeight);
-  }, [scrolled]);
+    window.addEventListener('scroll', updateHeaderHeight, { passive: true });
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      if (resizeObserver) resizeObserver.disconnect();
+      window.removeEventListener('resize', updateHeaderHeight);
+      window.removeEventListener('scroll', updateHeaderHeight);
+    };
+  }, []);
 
   // Build Dynamic Horizontal Loop of New Additions & CMS Announcements
   const updateItems = useMemo(() => {
@@ -74,7 +143,7 @@ export default function Header({ currentPath, navigate, onOpenPopup }) {
             type: 'CURRENT_AFFAIRS',
             icon: '📰',
             text: `New Current Affairs: ${cleanTitle}`,
-            onClick: () => navigate('/blog')
+            onClick: () => navigate('/current-affairs')
           });
         }
       });
@@ -128,7 +197,7 @@ export default function Header({ currentPath, navigate, onOpenPopup }) {
         type: 'CURRENT_AFFAIRS',
         icon: '📰',
         text: 'New Current Affairs Dispatches Updated Daily',
-        onClick: () => navigate('/blog')
+        onClick: () => navigate('/current-affairs')
       });
       items.push({
         id: 'fallback-3',
@@ -147,7 +216,7 @@ export default function Header({ currentPath, navigate, onOpenPopup }) {
     { path: '/about', label: 'About e-Gurukulam' },
     { path: '/programs', label: 'Programs' },
     { path: '/test-series', label: 'Test Series' },
-    { path: '/blog', label: 'Current Affairs' },
+    { path: '/current-affairs', label: 'Current Affairs' },
     { path: '/resources', label: 'Resources' },
     { path: '/contact', label: 'Begin Your Journey With Us', isBadge: true },
   ];
@@ -156,6 +225,196 @@ export default function Header({ currentPath, navigate, onOpenPopup }) {
     navigate(path);
     setMobileMenuOpen(false);
   };
+
+  // Default Built-in Suggestions shown ON FOCUS when input is empty (Zero Typing)
+  const defaultSuggestions = useMemo(() => {
+    const memData = getCachedCMSData();
+    const caList = (memData?.currentAffairs && Array.isArray(memData.currentAffairs) && memData.currentAffairs.length > 0)
+      ? memData.currentAffairs
+      : (data?.currentAffairs || data?.articles || []);
+
+    // 1. Trending Current Affairs: 3–4 latest/trending dispatches directly from cache
+    let trendingCA = [];
+    if (caList.length > 0) {
+      const sortedCA = sortCurrentAffairsByDate(caList.filter(item => item && typeof item === 'object'));
+      trendingCA = sortedCA.slice(0, 4).map(art => {
+        const title = String(art.Title || art.title || '');
+        const cat = String(art.Category || art.category || '');
+        const tags = String(art.Tags || art.tags || '');
+        const content = String(art.Full_Content || art.full_content || art.Article_HTML || art.content || '');
+        const gsMatch = (content + ' ' + tags + ' ' + cat).match(/GS\s*(?:Paper\s*)?(?:I|II|III|IV|[1-4])\b/i);
+        const artSlug = art.slug || art.Slug || createSlug(title);
+        return {
+          title,
+          date: formatDisplayDate(art.Date || art.date) || '',
+          slug: artSlug,
+          gsTag: gsMatch ? gsMatch[0].toUpperCase() : null
+        };
+      });
+    }
+
+    // High-yield fallback topics if cache is initially empty
+    if (trendingCA.length === 0) {
+      trendingCA = [
+        {
+          title: 'BRICS Expansion & Emerging Geopolitical Order',
+          date: 'Latest Analysis',
+          slug: 'brics-expansion-emerging-geopolitical-order',
+          gsTag: 'GS PAPER II'
+        },
+        {
+          title: 'Important Emergency Helpline Numbers in India',
+          date: 'Latest Analysis',
+          slug: 'important-emergency-helpline-numbers-in-india',
+          gsTag: 'GS PAPER II'
+        },
+        {
+          title: 'Voice of Global South & India’s Diplomatic Leadership',
+          date: 'Latest Analysis',
+          slug: 'voice-of-global-south-indias-diplomatic-leadership',
+          gsTag: 'GS PAPER II'
+        }
+      ];
+    }
+
+    // 2. Syllabus Areas: Quick-filter pills for GS Paper I, GS Paper II, GS Paper III, GS Paper IV
+    const syllabusAreas = [
+      { id: 'gs1', label: 'GS Paper I', query: 'GS Paper I', sub: 'History & Society' },
+      { id: 'gs2', label: 'GS Paper II', query: 'GS Paper II', sub: 'Polity & Governance' },
+      { id: 'gs3', label: 'GS Paper III', query: 'GS Paper III', sub: 'Economy & Security' },
+      { id: 'gs4', label: 'GS Paper IV', query: 'GS Paper IV', sub: 'Ethics & Integrity' }
+    ];
+
+    // 3. High-Frequency PYQ Topics: Direct shortcuts
+    const pyqShortcuts = [
+      { id: 'ethics', label: 'Ethics Case Studies', query: 'Ethics', stage: 'Mains GS 4' },
+      { id: 'internal-sec', label: 'Internal Security Mains', query: 'Security', stage: 'Mains GS 3' },
+      { id: 'modern-hist', label: 'Modern History Prelims', query: 'History', stage: 'Prelims GS 1' }
+    ];
+
+    return {
+      trendingCA,
+      syllabusAreas,
+      pyqShortcuts
+    };
+  }, [data]);
+
+  // Real-Time Query Fan-Out Suggestions from in-memory cache
+  const searchSuggestions = useMemo(() => {
+    const rawQ = searchQuery.trim();
+    if (!rawQ) return { currentAffairs: [], pyqs: [], syllabus: [] };
+    const q = rawQ.toLowerCase();
+
+    const memData = getCachedCMSData();
+    const caList = (memData?.currentAffairs && Array.isArray(memData.currentAffairs) && memData.currentAffairs.length > 0)
+      ? memData.currentAffairs
+      : (data?.currentAffairs || data?.articles || []);
+    const resList = (memData?.resources && Array.isArray(memData.resources) && memData.resources.length > 0)
+      ? memData.resources
+      : (data?.resources || []);
+
+    // Flexible regex for GS Paper matching (e.g. "GS Paper I", "GS 1", "GS Paper 1")
+    const isGS1 = /\b(gs\s*1|gs\s*i|gs\s*paper\s*1|gs\s*paper\s*i)\b/i.test(q);
+    const isGS2 = /\b(gs\s*2|gs\s*ii|gs\s*paper\s*2|gs\s*paper\s*ii)\b/i.test(q);
+    const isGS3 = /\b(gs\s*3|gs\s*iii|gs\s*paper\s*3|gs\s*paper\s*iii)\b/i.test(q);
+    const isGS4 = /\b(gs\s*4|gs\s*iv|gs\s*paper\s*4|gs\s*paper\s*iv)\b/i.test(q);
+
+    const matchesGSTerm = (text) => {
+      if (!text) return false;
+      const lower = text.toLowerCase();
+      if (isGS1 && (lower.includes('gs 1') || lower.includes('gs i') || lower.includes('gs-1') || lower.includes('general studies 1') || lower.includes('general studies - 1') || lower.includes('general studies i') || lower.includes('paper 1') || lower.includes('paper i'))) return true;
+      if (isGS2 && (lower.includes('gs 2') || lower.includes('gs ii') || lower.includes('gs-2') || lower.includes('general studies 2') || lower.includes('general studies - 2') || lower.includes('general studies ii') || lower.includes('paper 2') || lower.includes('paper ii'))) return true;
+      if (isGS3 && (lower.includes('gs 3') || lower.includes('gs iii') || lower.includes('gs-3') || lower.includes('general studies 3') || lower.includes('general studies - 3') || lower.includes('general studies iii') || lower.includes('paper 3') || lower.includes('paper iii'))) return true;
+      if (isGS4 && (lower.includes('gs 4') || lower.includes('gs iv') || lower.includes('gs-4') || lower.includes('general studies 4') || lower.includes('general studies - 4') || lower.includes('general studies iv') || lower.includes('paper 4') || lower.includes('paper iv') || lower.includes('ethics'))) return true;
+      return false;
+    };
+
+    // 1. Current Affairs matching
+    const matchingCA = [];
+    for (const art of caList) {
+      if (!art || typeof art !== 'object') continue;
+      const title = String(art.Title || art.title || '');
+      const cat = String(art.Category || art.category || '');
+      const tags = String(art.Tags || art.tags || '');
+      const content = String(art.Full_Content || art.full_content || art.Article_HTML || art.content || '');
+
+      if (
+        title.toLowerCase().includes(q) ||
+        cat.toLowerCase().includes(q) ||
+        tags.toLowerCase().includes(q) ||
+        (q.length >= 3 && content.toLowerCase().includes(q)) ||
+        matchesGSTerm(title + ' ' + cat + ' ' + tags + ' ' + content)
+      ) {
+        const gsMatch = (content + ' ' + tags + ' ' + cat).match(/GS\s*(?:Paper\s*)?(?:I|II|III|IV|[1-4])\b/i);
+        const artSlug = art.slug || art.Slug || createSlug(title);
+        matchingCA.push({
+          title,
+          date: formatDisplayDate(art.Date || art.date) || '',
+          slug: artSlug,
+          gsTag: gsMatch ? gsMatch[0].toUpperCase() : null
+        });
+        if (matchingCA.length >= 4) break;
+      }
+    }
+
+    // 2. PYQ matching
+    const pyqList = resList.filter(isPYQResource);
+    const matchingPYQ = [];
+    for (const pyq of pyqList) {
+      if (!pyq || typeof pyq !== 'object') continue;
+      const title = String(pyq.Title || pyq.title || '');
+      const year = extractPYQYear(pyq);
+      const stage = extractPYQStage(pyq);
+      const paperLabel = extractPYQPaperLabel(pyq);
+      const content = String(pyq.Full_Content || pyq.full_content || pyq.Content || '');
+
+      if (
+        title.toLowerCase().includes(q) ||
+        paperLabel.toLowerCase().includes(q) ||
+        year.toLowerCase().includes(q) ||
+        stage.toLowerCase().includes(q) ||
+        (q.length >= 3 && content.toLowerCase().includes(q)) ||
+        matchesGSTerm(title + ' ' + paperLabel + ' ' + content)
+      ) {
+        matchingPYQ.push({
+          title,
+          year,
+          stage,
+          paperLabel,
+          url: getPYQPaperUrl(pyq)
+        });
+        if (matchingPYQ.length >= 4) break;
+      }
+    }
+
+    // 3. Syllabus matching
+    const sylList = resList.filter(isSyllabusResource);
+    const matchingSyl = [];
+    for (const syl of sylList) {
+      if (!syl || typeof syl !== 'object') continue;
+      const title = String(syl.Title || syl.title || '');
+      const cat = String(syl.Category || syl.category || '');
+      if (
+        title.toLowerCase().includes(q) || 
+        cat.toLowerCase().includes(q) ||
+        matchesGSTerm(title + ' ' + cat)
+      ) {
+        const sylSlug = syl.slug || syl.Slug || syl.id || syl.ID || createSlug(title);
+        matchingSyl.push({
+          title,
+          slug: sylSlug
+        });
+        if (matchingSyl.length >= 2) break;
+      }
+    }
+
+    return { currentAffairs: matchingCA, pyqs: matchingPYQ, syllabus: matchingSyl };
+  }, [searchQuery, data]);
+
+  const hasAnySuggestions = 
+    searchSuggestions.currentAffairs.length > 0 || 
+    searchSuggestions.pyqs.length > 0 || 
+    searchSuggestions.syllabus.length > 0;
 
   return (
     <div ref={headerRef} id="site-main-header" className="sticky top-0 z-50">
@@ -286,6 +545,15 @@ export default function Header({ currentPath, navigate, onOpenPopup }) {
             src="/images/Logo.png" 
             alt="e-Gurukulam Logo"
             className="navbar-logo-img"
+            onLoad={() => {
+              if (headerRef.current) {
+                const rect = headerRef.current.getBoundingClientRect();
+                const height = Math.round(rect.height) || headerRef.current.offsetHeight;
+                if (height > 0) {
+                  document.documentElement.style.setProperty('--site-header-height', `${height}px`);
+                }
+              }
+            }}
             onError={(e) => {
               e.target.onerror = null;
               e.target.style.display = 'none';
@@ -296,19 +564,8 @@ export default function Header({ currentPath, navigate, onOpenPopup }) {
         {/* Desktop Navigation Links */}
         <nav className="hidden lg:flex nav-links-wrapper items-center">
           {navItems.map((item) => {
+            if (item.isBadge) return null;
             const isActive = currentPath === item.path || (item.path !== '/' && currentPath.startsWith(item.path));
-            if (item.isBadge) {
-              return (
-                <button
-                  key={item.path}
-                  onClick={() => handleNavClick(item.path)}
-                  className="btn-terracotta-pill text-xs py-2 px-4 shrink-0 whitespace-nowrap ml-2 shadow-xs"
-                >
-                  <span className="btn-label" style={{ whiteSpace: 'nowrap' }}>{item.label}</span>
-                  <ArrowUpRight className="w-3.5 h-3.5" />
-                </button>
-              );
-            }
             return (
               <button
                 key={item.path}
@@ -323,6 +580,302 @@ export default function Header({ currentPath, navigate, onOpenPopup }) {
               </button>
             );
           })}
+
+          {/* MINIMALIST NAV BAR SEARCH WITH REAL-TIME QUERY FAN-OUT SUGGESTIONS */}
+          <div className="relative shrink-0 ml-1" ref={searchContainerRef}>
+            <div className="flex items-center bg-[#FAF6EE] border border-[#D5C3B0] rounded-full px-2.5 py-1 text-xs text-[#1A0F0B] focus-within:border-[#8C3A27] focus-within:ring-1 focus-within:ring-[#8C3A27]/20 transition-all shadow-2xs w-36 xl:w-44">
+              <Search className="w-3.5 h-3.5 text-[#8C3A27] shrink-0 mr-1.5" />
+              <input
+                ref={searchInputRef}
+                type="text"
+                role="combobox"
+                aria-label="Search UPSC Current Affairs and PYQs"
+                aria-expanded={searchOpen}
+                aria-haspopup="listbox"
+                aria-controls="header-search-results"
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setSearchOpen(true);
+                }}
+                onFocus={() => setSearchOpen(true)}
+                placeholder="Search GS, PYQs..."
+                className="w-full bg-transparent border-0 p-0 text-xs focus:outline-none placeholder:text-[#7A6B5D]/70 font-sans"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery('');
+                    if (searchInputRef.current) searchInputRef.current.focus();
+                  }}
+                  className="text-[#7A6B5D] hover:text-[#8C3A27] ml-1 shrink-0 cursor-pointer"
+                  aria-label="Clear search"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+
+            {/* REAL-TIME AUTOCOMPLETE RECOMMENDATIONS DROPDOWN */}
+            {searchOpen && (
+              <div 
+                id="header-search-results"
+                role="listbox"
+                className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-[#FFFDF8] border border-[#D5C3B0] rounded-2xl shadow-2xl p-3.5 z-50 animate-fade-in text-left"
+                style={{ filter: 'drop-shadow(0 12px 28px rgba(20, 14, 12, 0.18))' }}
+              >
+                {!searchQuery.trim() ? (
+                  /* 1. ON-FOCUS DEFAULT SUGGESTIONS (Zero Typing) */
+                  <div className="space-y-3.5 divide-y divide-[#D5C3B0]/30">
+                    {/* SYLLABUS AREAS QUICK-FILTER PILLS */}
+                    <div className="space-y-2">
+                      <div className="px-1 flex items-center justify-between text-[10px] font-mono font-bold tracking-wider uppercase text-[#8C3A27]">
+                        <span className="flex items-center gap-1.5">
+                          <Sparkles className="w-3 h-3 text-[#D4AF37]" />
+                          <span>Syllabus Areas</span>
+                        </span>
+                        <span className="text-[#7A6B5D] font-normal text-[9px]">Quick Filters</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {defaultSuggestions.syllabusAreas.map((area) => (
+                          <button
+                            key={area.id}
+                            type="button"
+                            onClick={() => {
+                              setSearchQuery(area.query);
+                              if (searchInputRef.current) searchInputRef.current.focus();
+                            }}
+                            className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-[#FAF6EE] hover:bg-[#8C3A27] text-[#221814] hover:text-white border border-[#D5C3B0]/60 hover:border-[#8C3A27] transition-all group text-left cursor-pointer shadow-2xs"
+                          >
+                            <div>
+                              <span className="text-xs font-serif font-bold block group-hover:text-white transition-colors">
+                                {area.label}
+                              </span>
+                              <span className="text-[10px] font-sans text-[#7A6B5D] group-hover:text-white/80 transition-colors block">
+                                {area.sub}
+                              </span>
+                            </div>
+                            <ArrowUpRight className="w-3 h-3 text-[#8C3A27] group-hover:text-white opacity-60 group-hover:opacity-100 transition-all shrink-0" />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* TRENDING CURRENT AFFAIRS */}
+                    {defaultSuggestions.trendingCA.length > 0 && (
+                      <div className="pt-3 space-y-1">
+                        <div className="px-1 pb-1 flex items-center justify-between text-[10px] font-mono font-bold tracking-wider uppercase text-[#8C3A27]">
+                          <span className="flex items-center gap-1.5">
+                            <BookOpen className="w-3 h-3 text-[#8C3A27]" />
+                            <span>Trending Current Affairs</span>
+                          </span>
+                          <span className="text-[#7A6B5D] font-normal text-[9px]">Latest Dispatches</span>
+                        </div>
+                        {defaultSuggestions.trendingCA.map((ca, idx) => (
+                          <a
+                            key={ca.slug || idx}
+                            href={`/current-affairs/${encodeURIComponent(ca.slug)}`}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setSearchOpen(false);
+                              setSearchQuery('');
+                              navigate(`/current-affairs/${encodeURIComponent(ca.slug)}`);
+                            }}
+                            className="block px-2.5 py-1.5 rounded-lg hover:bg-[#FAF6EE] transition-colors group cursor-pointer"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <span className="text-xs font-serif font-bold text-[#221814] group-hover:text-[#8C3A27] transition-colors leading-snug line-clamp-2">
+                                {ca.title}
+                              </span>
+                              {ca.gsTag && (
+                                <span className="inline-block px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-[#8C3A27]/10 text-[#8C3A27] border border-[#8C3A27]/20 shrink-0">
+                                  {ca.gsTag}
+                                </span>
+                              )}
+                            </div>
+                            {ca.date && (
+                              <span className="text-[10px] text-[#7A6B5D] font-serif italic block mt-0.5">
+                                {ca.date}
+                              </span>
+                            )}
+                          </a>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* HIGH-FREQUENCY PYQ TOPICS */}
+                    <div className="pt-3 space-y-1.5">
+                      <div className="px-1 pb-0.5 flex items-center justify-between text-[10px] font-mono font-bold tracking-wider uppercase text-[#8C3A27]">
+                        <span className="flex items-center gap-1.5">
+                          <FileText className="w-3 h-3 text-[#8C3A27]" />
+                          <span>High-Frequency PYQ Topics</span>
+                        </span>
+                        <span className="text-[#7A6B5D] font-normal text-[9px]">Direct Shortcuts</span>
+                      </div>
+                      <div className="space-y-1">
+                        {defaultSuggestions.pyqShortcuts.map((topic) => (
+                          <button
+                            key={topic.id}
+                            type="button"
+                            onClick={() => {
+                              setSearchQuery(topic.query);
+                              if (searchInputRef.current) searchInputRef.current.focus();
+                            }}
+                            className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-[#FAF6EE] text-left transition-colors group cursor-pointer"
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="w-1.5 h-1.5 rounded-full bg-[#8C3A27] shrink-0"></span>
+                              <span className="text-xs font-serif font-bold text-[#221814] group-hover:text-[#8C3A27] transition-colors">
+                                {topic.label}
+                              </span>
+                            </div>
+                            <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-[#D4AF37]/20 text-[#8C3A27] border border-[#D4AF37]/30 shrink-0">
+                              {topic.stage}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  /* 2. ACTIVE TYPING FILTER (Query Fan-Out) */
+                  <div>
+                    {hasAnySuggestions ? (
+                      <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-1 scrollbar-thin divide-y divide-[#D5C3B0]/30">
+                        {/* CURRENT AFFAIRS */}
+                        {searchSuggestions.currentAffairs.length > 0 && (
+                          <div className="space-y-1 pb-2">
+                            <div className="px-2 py-1 flex items-center justify-between text-[10px] font-mono font-bold tracking-wider uppercase text-[#8C3A27]">
+                              <span className="flex items-center gap-1.5">
+                                <BookOpen className="w-3 h-3 text-[#8C3A27]" />
+                                <span>Current Affairs</span>
+                              </span>
+                              <span className="text-[#7A6B5D] font-normal">{searchSuggestions.currentAffairs.length} found</span>
+                            </div>
+                            {searchSuggestions.currentAffairs.map((ca, idx) => (
+                              <a
+                                key={ca.slug || idx}
+                                href={`/current-affairs/${encodeURIComponent(ca.slug)}`}
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  setSearchOpen(false);
+                                  setSearchQuery('');
+                                  navigate(`/current-affairs/${encodeURIComponent(ca.slug)}`);
+                                }}
+                                className="block px-2.5 py-1.5 rounded-lg hover:bg-[#FAF6EE] transition-colors group cursor-pointer"
+                              >
+                                <div className="flex items-start justify-between gap-2">
+                                  <span className="text-xs font-serif font-bold text-[#221814] group-hover:text-[#8C3A27] transition-colors leading-snug line-clamp-2">
+                                    {ca.title}
+                                  </span>
+                                  {ca.gsTag && (
+                                    <span className="inline-block px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-[#8C3A27]/10 text-[#8C3A27] border border-[#8C3A27]/20 shrink-0">
+                                      {ca.gsTag}
+                                    </span>
+                                  )}
+                                </div>
+                                {ca.date && (
+                                  <span className="text-[10px] text-[#7A6B5D] font-serif italic block mt-0.5">
+                                    {ca.date}
+                                  </span>
+                                )}
+                              </a>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* PREVIOUS YEAR QUESTIONS (PYQs) */}
+                        {searchSuggestions.pyqs.length > 0 && (
+                          <div className="space-y-1 pt-2 pb-2">
+                            <div className="px-2 py-1 flex items-center justify-between text-[10px] font-mono font-bold tracking-wider uppercase text-[#8C3A27]">
+                              <span className="flex items-center gap-1.5">
+                                <FileText className="w-3 h-3 text-[#8C3A27]" />
+                                <span>Previous Year Questions (PYQs)</span>
+                              </span>
+                              <span className="text-[#7A6B5D] font-normal">{searchSuggestions.pyqs.length} found</span>
+                            </div>
+                            {searchSuggestions.pyqs.map((pyq, idx) => (
+                              <a
+                                key={pyq.url || `${pyq.year}-${pyq.paperLabel}-${idx}`}
+                                href={pyq.url}
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  setSearchOpen(false);
+                                  setSearchQuery('');
+                                  navigate(pyq.url);
+                                }}
+                                className="block px-2.5 py-1.5 rounded-lg hover:bg-[#FAF6EE] transition-colors group cursor-pointer"
+                              >
+                                <div className="flex items-start justify-between gap-2">
+                                  <span className="text-xs font-serif font-bold text-[#221814] group-hover:text-[#8C3A27] transition-colors leading-snug line-clamp-2">
+                                    {pyq.paperLabel}
+                                  </span>
+                                  <span className="inline-block px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-[#D4AF37]/20 text-[#8C3A27] border border-[#D4AF37]/30 shrink-0">
+                                    {pyq.year} {pyq.stage}
+                                  </span>
+                                </div>
+                                <span className="text-[10px] text-[#7A6B5D] font-sans truncate block mt-0.5">
+                                  {pyq.title}
+                                </span>
+                              </a>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* SYLLABUS */}
+                        {searchSuggestions.syllabus.length > 0 && (
+                          <div className="space-y-1 pt-2">
+                            <div className="px-2 py-1 flex items-center justify-between text-[10px] font-mono font-bold tracking-wider uppercase text-[#8C3A27]">
+                              <span className="flex items-center gap-1.5">
+                                <BookOpen className="w-3 h-3 text-[#8C3A27]" />
+                                <span>UPSC Syllabus</span>
+                              </span>
+                            </div>
+                            {searchSuggestions.syllabus.map((syl, idx) => (
+                              <a
+                                key={syl.slug || idx}
+                                href={`/resources/upsc-syllabus/${syl.slug}`}
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  setSearchOpen(false);
+                                  setSearchQuery('');
+                                  navigate(`/resources/upsc-syllabus/${syl.slug}`);
+                                }}
+                                className="block px-2.5 py-1.5 rounded-lg hover:bg-[#FAF6EE] transition-colors group cursor-pointer"
+                              >
+                                <span className="text-xs font-serif font-bold text-[#221814] group-hover:text-[#8C3A27] transition-colors leading-snug">
+                                  {syl.title}
+                                </span>
+                              </a>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="p-4 text-center space-y-1">
+                        <p className="text-xs font-serif italic text-[#7A6B5D] font-semibold">
+                          No matching topics found for &ldquo;{searchQuery}&rdquo;.
+                        </p>
+                        <p className="text-[11px] text-[#5C4028]">
+                          Try searching &ldquo;GS 1&rdquo;, &ldquo;Ethics&rdquo;, &ldquo;2024 Prelims&rdquo;, or &ldquo;Economy&rdquo;.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* "Begin Your Journey With Us" CTA Button */}
+          <button
+            onClick={() => handleNavClick('/contact')}
+            className="btn-terracotta-pill text-xs py-2 px-4 shrink-0 whitespace-nowrap ml-2 shadow-xs"
+          >
+            <span className="btn-label" style={{ whiteSpace: 'nowrap' }}>Begin Your Journey With Us</span>
+            <ArrowUpRight className="w-3.5 h-3.5" />
+          </button>
         </nav>
 
         {/* Mobile Menu Toggle Button */}
@@ -339,6 +892,150 @@ export default function Header({ currentPath, navigate, onOpenPopup }) {
       {/* Mobile Dropdown Menu */}
       {mobileMenuOpen && (
         <div className="lg:hidden bg-[#F9F5EB] border-b border-[#D5C3B0] px-4 pt-3 pb-6 space-y-3 animate-fade-in">
+          {/* Mobile Search Bar */}
+          <div className="relative pb-2 border-b border-[#D5C3B0]/40">
+            <div className="flex items-center bg-[#FFFDF8] border border-[#D5C3B0] rounded-full px-3 py-2 text-xs text-[#1A0F0B] focus-within:border-[#8C3A27]">
+              <Search className="w-4 h-4 text-[#8C3A27] shrink-0 mr-2" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onFocus={() => setMobileSearchFocused(true)}
+                placeholder="Search GS, PYQs & Syllabus..."
+                className="w-full bg-transparent border-0 p-0 text-xs focus:outline-none placeholder:text-[#7A6B5D]"
+              />
+              {searchQuery && (
+                <button 
+                  type="button" 
+                  onClick={() => {
+                    setSearchQuery('');
+                    setMobileSearchFocused(true);
+                  }} 
+                  className="text-[#7A6B5D] hover:text-[#8C3A27]"
+                  aria-label="Clear mobile search"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Mobile Suggestions (Active or On-Focus Default) */}
+            {(searchQuery.trim() || mobileSearchFocused) && (
+              <div className="mt-2 bg-[#FFFDF8] border border-[#D5C3B0] rounded-xl p-3 space-y-3 max-h-72 overflow-y-auto divide-y divide-[#D5C3B0]/30 text-left">
+                {!searchQuery.trim() ? (
+                  /* Mobile On-Focus Default Suggestions */
+                  <div className="space-y-3">
+                    <div>
+                      <div className="px-1 pb-1.5 text-[10px] font-mono font-bold uppercase text-[#8C3A27] flex items-center gap-1.5">
+                        <Sparkles className="w-3 h-3 text-[#D4AF37]" />
+                        <span>Syllabus Quick Filters</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {defaultSuggestions.syllabusAreas.map((area) => (
+                          <button
+                            key={area.id}
+                            type="button"
+                            onClick={() => setSearchQuery(area.query)}
+                            className="px-2.5 py-1.5 text-xs font-serif font-bold text-[#221814] bg-[#FAF6EE] hover:bg-[#8C3A27] hover:text-white rounded-md border border-[#D5C3B0]/50 text-left transition-colors flex items-center justify-between"
+                          >
+                            <span>{area.label}</span>
+                            <ArrowUpRight className="w-3 h-3 opacity-60" />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {defaultSuggestions.trendingCA.length > 0 && (
+                      <div className="pt-2">
+                        <div className="px-1 pb-1 text-[10px] font-mono font-bold uppercase text-[#8C3A27] flex items-center gap-1.5">
+                          <BookOpen className="w-3 h-3 text-[#8C3A27]" />
+                          <span>Trending Dispatches</span>
+                        </div>
+                        <div className="space-y-1">
+                          {defaultSuggestions.trendingCA.slice(0, 3).map((ca, idx) => (
+                            <a
+                              key={ca.slug || idx}
+                              href={`/current-affairs/${encodeURIComponent(ca.slug)}`}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setSearchQuery('');
+                                handleNavClick(`/current-affairs/${encodeURIComponent(ca.slug)}`);
+                              }}
+                              className="block p-1.5 rounded-md hover:bg-[#FAF6EE]"
+                            >
+                              <span className="text-xs font-serif font-bold text-[#221814] block line-clamp-1">{ca.title}</span>
+                              <span className="text-[10px] text-[#8C3A27] font-mono">Current Affairs {ca.gsTag ? `• ${ca.gsTag}` : ''}</span>
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="pt-2">
+                      <div className="px-1 pb-1 text-[10px] font-mono font-bold uppercase text-[#8C3A27] flex items-center gap-1.5">
+                        <FileText className="w-3 h-3 text-[#8C3A27]" />
+                        <span>High-Frequency PYQ Topics</span>
+                      </div>
+                      <div className="space-y-1">
+                        {defaultSuggestions.pyqShortcuts.map((topic) => (
+                          <button
+                            key={topic.id}
+                            type="button"
+                            onClick={() => setSearchQuery(topic.query)}
+                            className="w-full flex items-center justify-between p-1.5 rounded-md hover:bg-[#FAF6EE] text-left"
+                          >
+                            <span className="text-xs font-serif font-bold text-[#221814]">{topic.label}</span>
+                            <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-[#D4AF37]/20 text-[#8C3A27]">{topic.stage}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  /* Mobile Active Typing Filter */
+                  <div className="space-y-2">
+                    {hasAnySuggestions ? (
+                      <>
+                        {searchSuggestions.currentAffairs.map((ca, idx) => (
+                          <a
+                            key={ca.slug || idx}
+                            href={`/current-affairs/${encodeURIComponent(ca.slug)}`}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setSearchQuery('');
+                              handleNavClick(`/current-affairs/${encodeURIComponent(ca.slug)}`);
+                            }}
+                            className="block p-2 rounded-lg hover:bg-[#FAF6EE] text-left"
+                          >
+                            <span className="text-xs font-serif font-bold text-[#221814] block line-clamp-1">{ca.title}</span>
+                            <span className="text-[10px] text-[#8C3A27] font-mono">Current Affairs {ca.gsTag ? `• ${ca.gsTag}` : ''}</span>
+                          </a>
+                        ))}
+                        {searchSuggestions.pyqs.map((pyq, idx) => (
+                          <a
+                            key={pyq.url || `${pyq.year}-${pyq.paperLabel}-${idx}`}
+                            href={pyq.url}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setSearchQuery('');
+                              handleNavClick(pyq.url);
+                            }}
+                            className="block p-2 rounded-lg hover:bg-[#FAF6EE] text-left"
+                          >
+                            <span className="text-xs font-serif font-bold text-[#221814] block line-clamp-1">{pyq.paperLabel}</span>
+                            <span className="text-[10px] text-[#8C3A27] font-mono">PYQ • {pyq.year} {pyq.stage}</span>
+                          </a>
+                        ))}
+                      </>
+                    ) : (
+                      <p className="text-xs text-[#7A6B5D] p-2 text-center">No matches found for &ldquo;{searchQuery}&rdquo;</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           {navItems.map((item) => {
             const isActive = currentPath === item.path;
             if (item.isBadge) {

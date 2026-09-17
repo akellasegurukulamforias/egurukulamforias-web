@@ -94,7 +94,11 @@ export default function FloatingSocialDock() {
       timer = setTimeout(() => setIsScrolling(false), 600);
     };
     window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      clearTimeout(timer);
+      if (closeTimer.current) clearTimeout(closeTimer.current);
+    };
   }, []);
 
   // 2. Click-Outside Auto-Dismiss Listener
@@ -203,7 +207,7 @@ export default function FloatingSocialDock() {
               {/* SLEEK APPLE-STYLE FLOATING CARD MENU FLYOUT (No Subtitles) */}
               {hasBranches && isExpanded && (
                 <div 
-                  className="absolute right-12 top-1/2 -translate-y-1/2 flex flex-col gap-1.5 p-2 bg-[#FAF5EE]/98 backdrop-blur-xl border border-[#D4AF37]/50 rounded-2xl shadow-2xl min-w-[240px] max-w-[340px] z-50 animate-in fade-in slide-in-from-right-3 duration-200"
+                  className="absolute right-12 top-1/2 -translate-y-1/2 flex flex-col gap-1.5 p-2 bg-[#FAF5EE]/98 backdrop-blur-xl border border-[#D4AF37]/50 rounded-2xl shadow-2xl min-w-[200px] max-w-[calc(100vw-4.5rem)] sm:max-w-[340px] z-50 animate-in fade-in slide-in-from-right-3 duration-200"
                   onMouseEnter={() => handleMouseEnter(itemId)}
                   onMouseLeave={handleMouseLeave}
                 >
@@ -224,7 +228,7 @@ export default function FloatingSocialDock() {
                       className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-white/90 hover:bg-[#6C1D18] text-stone-800 hover:text-white text-xs font-semibold shadow-xs transition-all duration-200 group/item cursor-pointer text-left"
                     >
                       {getSocialIcon(platformName, "w-4 h-4 shrink-0 transition-colors group-hover/item:text-white")}
-                      <span className="truncate max-w-[260px] transition-colors group-hover/item:text-white">{channel.name}</span>
+                      <span className="truncate max-w-[170px] sm:max-w-[260px] transition-colors group-hover/item:text-white">{channel.name}</span>
                       <ArrowUpRight className="w-3.5 h-3.5 ml-auto text-amber-600 group-hover/item:text-white opacity-70 group-hover/item:opacity-100 transition-all shrink-0" />
                     </a>
                   ))}

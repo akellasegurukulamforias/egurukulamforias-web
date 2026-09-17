@@ -29,6 +29,7 @@ import {
 import coursesData from '../data/courses.json';
 import { useCMSData } from '../hooks/useCMSData';
 import { 
+  getCachedCMSData,
   getCMSImageLink, 
   formatCMSImageUrl, 
   getSecondaryCMSImageUrl, 
@@ -45,7 +46,7 @@ import {
   extractPaperNumber,
   extractOptionalSubject
 } from '../services/cmsService';
-import { createSlug, getDirectImageUrl, getSecondaryImageUrl } from './CurrentAffairsReader';
+import { createSlug, getDirectImageUrl, getSecondaryImageUrl } from '../utils/urlUtils';
 import { sortCurrentAffairsByDate, formatDisplayDate } from '../utils/dateUtils';
 import PdfViewerModal from '../components/PdfViewerModal';
 
@@ -208,19 +209,91 @@ export default function ResourcesPage({ navigate, folder, pyqYear, pyqStage, pyq
     }
   }, [pyqStream]);
 
-  // Set document title dynamically based on folder context
+  // Automated SEO & Schema: Document Title, Meta Description, Canonical Link, and JSON-LD
   useEffect(() => {
+    let pageTitle = 'Digital Learning & Study Resources | e-Gurukulam for IAS';
+    let pageDesc = 'Comprehensive digital library, syllabus micro-notes, previous year question papers, and study resources for UPSC Civil Services Examination.';
+    let canonicalUrl = 'https://egurukulamforias.com/resources';
+    let schemaType = 'CollectionPage';
+    let schemaName = 'Digital Learning & Study Resources';
+
     if (folder === 'upsc-syllabus') {
-      document.title = 'UPSC Civil Services Syllabus Directory & Micro-Notes | e-Gurukulam for IAS';
+      pageTitle = 'UPSC Civil Services Syllabus Directory & Micro-Notes | e-Gurukulam for IAS';
+      pageDesc = 'Comprehensive UPSC Civil Services Examination Syllabus directory covering Prelims and Mains (GS I, II, III, IV, Essay, and Optionals) with micro-notes.';
+      canonicalUrl = 'https://egurukulamforias.com/resources/upsc-syllabus';
+      schemaType = 'Course';
+      schemaName = 'UPSC Civil Services Examination Syllabus Directory';
     } else if (folder === 'pyqs') {
       if (pyqYear) {
-        document.title = `UPSC Civil Services ${pyqYear} ${activeStage} Question Papers (PYQs) | e-Gurukulam for IAS`;
+        pageTitle = `UPSC Civil Services ${pyqYear} ${activeStage} Question Papers (PYQs) | e-Gurukulam for IAS`;
+        pageDesc = `Download and analyze UPSC Civil Services ${pyqYear} ${activeStage} Previous Year Question Papers with detailed syllabus mapping.`;
+        canonicalUrl = `https://egurukulamforias.com/resources/pyqs/${pyqYear}/${activeStage.toLowerCase()}`;
+        schemaType = 'Quiz';
+        schemaName = `UPSC Civil Services ${pyqYear} ${activeStage} Question Papers (PYQs)`;
       } else {
-        document.title = 'UPSC Civil Services Previous Year Questions (PYQs) Archive | e-Gurukulam for IAS';
+        pageTitle = 'UPSC Civil Services Previous Year Questions (PYQs) Archive | e-Gurukulam for IAS';
+        pageDesc = 'Authentic repository of UPSC Civil Services Preliminary and Mains Examination previous year question papers (PYQs) with answer synopses.';
+        canonicalUrl = 'https://egurukulamforias.com/resources/pyqs';
+        schemaType = 'CollectionPage';
+        schemaName = 'UPSC Civil Services Previous Year Questions (PYQs) Archive';
       }
-    } else {
-      document.title = 'Digital Learning & Study Resources | e-Gurukulam for IAS';
     }
+
+    document.title = pageTitle;
+
+    // Meta Description
+    let metaDesc = document.querySelector('meta[name="description"]');
+    if (!metaDesc) {
+      metaDesc = document.createElement('meta');
+      metaDesc.name = 'description';
+      document.head.appendChild(metaDesc);
+    }
+    metaDesc.content = pageDesc;
+
+    // Canonical Link
+    let canonicalLink = document.querySelector('link[rel="canonical"]');
+    if (!canonicalLink) {
+      canonicalLink = document.createElement('link');
+      canonicalLink.rel = 'canonical';
+      document.head.appendChild(canonicalLink);
+    }
+    canonicalLink.href = canonicalUrl;
+
+    // Automated JSON-LD Schema
+    const scriptId = 'resources-page-jsonld';
+    let scriptEl = document.getElementById(scriptId);
+    if (!scriptEl) {
+      scriptEl = document.createElement('script');
+      scriptEl.id = scriptId;
+      scriptEl.type = 'application/ld+json';
+      document.head.appendChild(scriptEl);
+    }
+
+    const schemaData = {
+      '@context': 'https://schema.org',
+      '@type': schemaType,
+      'name': schemaName,
+      'description': pageDesc,
+      'url': canonicalUrl,
+      'provider': {
+        '@type': 'EducationalOrganization',
+        'name': 'e-Gurukulam for IAS',
+        'url': 'https://egurukulamforias.com'
+      },
+      'educationalAlignment': {
+        '@type': 'AlignmentObject',
+        'alignmentType': 'educationalSubject',
+        'educationalFramework': 'UPSC Civil Services Examination',
+        'targetName': schemaName
+      }
+    };
+
+    scriptEl.textContent = JSON.stringify(schemaData);
+
+    return () => {
+      const el = document.getElementById(scriptId);
+      if (el) el.remove();
+    };
   }, [folder, pyqYear, activeStage]);
 
   // Available Category Filter Pills
@@ -266,9 +339,13 @@ export default function ResourcesPage({ navigate, folder, pyqYear, pyqStage, pyq
     });
   }, [selectedCategory, searchQuery]);
 
-  // Active Resources from Google Sheet CMS sorted latest first
+  // Active Resources from Google Sheet CMS sorted latest first (synchronous 0ms cache fallback)
   const activeResources = useMemo(() => {
-    const list = Array.isArray(cmsData?.resources) ? cmsData.resources.filter(isItemActive) : [];
+    const memData = getCachedCMSData();
+    const rawList = (Array.isArray(cmsData?.resources) && cmsData.resources.length > 0)
+      ? cmsData.resources
+      : (Array.isArray(memData?.resources) ? memData.resources : []);
+    const list = rawList.filter(isItemActive);
     return sortCurrentAffairsByDate(list);
   }, [cmsData?.resources]);
 
@@ -524,7 +601,7 @@ export default function ResourcesPage({ navigate, folder, pyqYear, pyqStage, pyq
     return (
       <div className="space-y-0 relative min-h-screen bg-[#FFFDF8]">
         {/* 1. TOP STICKY BREADCRUMB & BACK NAVIGATION */}
-        <section className="sticky top-16 z-20 bg-[#FAF6EE]/95 backdrop-blur-md p-4 sm:p-5 border-b border-[#D5C3B0] shadow-xs">
+        <section className="sticky z-20 bg-[#FAF6EE] p-4 sm:p-5 border-b border-[#D5C3B0] shadow-xs m-0 mt-0" style={{ top: 'var(--site-header-height)' }}>
           <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
             <button
               type="button"
@@ -564,7 +641,7 @@ export default function ResourcesPage({ navigate, folder, pyqYear, pyqStage, pyq
         </section>
 
         {/* 3. IN-FOLDER SEARCH & FILTER BAR */}
-        <section className="py-3 px-4 sm:px-6 lg:px-8 bg-[#FBF7F0]/95 backdrop-blur-md border-b border-[#D5C3B0]/30 sticky top-[138px] z-10 shadow-2xs">
+        <section className="py-3 px-4 sm:px-6 lg:px-8 bg-[#FAF6EE] border-b border-[#D5C3B0] shadow-2xs">
           <div className="max-w-5xl mx-auto flex items-center gap-3">
             <div className="relative flex-1">
               <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[#7A6B5D]" />
@@ -593,7 +670,7 @@ export default function ResourcesPage({ navigate, folder, pyqYear, pyqStage, pyq
         {/* 4. SYLLABUS CARDS SUB-GRID */}
         <section className="py-12 px-4 sm:px-6 lg:px-8 bg-[#FAF6EE] min-h-[50vh]">
           <div className="max-w-7xl mx-auto">
-            {cmsLoading && (
+            {cmsLoading && syllabusResources.length === 0 && (
               <div className="py-12 text-center space-y-3">
                 <Loader2 className="w-8 h-8 text-[#8C3A27] animate-spin mx-auto" />
                 <p className="text-xs font-serif italic text-[#7A6B5D] font-bold">
@@ -602,22 +679,7 @@ export default function ResourcesPage({ navigate, folder, pyqYear, pyqStage, pyq
               </div>
             )}
 
-            {!cmsLoading && filteredSyllabusResources.length === 0 ? (
-              <div className="card-parchment-3d p-8 text-center max-w-md mx-auto space-y-4 bg-[#FFFDF8] border border-[#D5C3B0] rounded-2xl shadow-sm">
-                <FileText className="w-10 h-10 text-[#8C3A27] mx-auto opacity-70" />
-                <h4 className="font-serif-header text-lg font-bold text-[#221814]">No Syllabus Found</h4>
-                <p className="text-xs sm:text-sm text-[#5C4028]">
-                  No syllabus subjects matched &ldquo;{syllabusSearchQuery}&rdquo;. Try clearing your search term or exploring all subjects.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setSyllabusSearchQuery('')}
-                  className="btn-terracotta-pill text-xs py-2 px-5 font-serif font-bold"
-                >
-                  Reset Search
-                </button>
-              </div>
-            ) : !cmsLoading && (
+            {filteredSyllabusResources.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredSyllabusResources.map((item, idx) => {
                   const title = item.Title || item.title || 'Untitled Syllabus';
@@ -713,7 +775,22 @@ export default function ResourcesPage({ navigate, folder, pyqYear, pyqStage, pyq
                   );
                 })}
               </div>
-            )}
+            ) : !cmsLoading ? (
+              <div className="card-parchment-3d p-8 text-center max-w-md mx-auto space-y-4 bg-[#FFFDF8] border border-[#D5C3B0] rounded-2xl shadow-sm">
+                <FileText className="w-10 h-10 text-[#8C3A27] mx-auto opacity-70" />
+                <h4 className="font-serif-header text-lg font-bold text-[#221814]">No Syllabus Found</h4>
+                <p className="text-xs sm:text-sm text-[#5C4028]">
+                  No syllabus subjects matched &ldquo;{syllabusSearchQuery}&rdquo;. Try clearing your search term or exploring all subjects.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setSyllabusSearchQuery('')}
+                  className="btn-terracotta-pill text-xs py-2 px-5 font-serif font-bold"
+                >
+                  Reset Search
+                </button>
+              </div>
+            ) : null}
           </div>
         </section>
 
@@ -752,7 +829,7 @@ export default function ResourcesPage({ navigate, folder, pyqYear, pyqStage, pyq
     return (
       <div className="space-y-0 relative min-h-screen bg-[#FFFDF8]">
         {/* 1. TOP STICKY BREADCRUMB & BACK NAVIGATION */}
-        <section className="sticky top-16 z-20 bg-[#FAF6EE]/95 backdrop-blur-md p-4 sm:p-5 border-b border-[#D5C3B0] shadow-xs">
+        <section className="sticky z-20 bg-[#FAF6EE] p-4 sm:p-5 border-b border-[#D5C3B0] shadow-xs m-0 mt-0" style={{ top: 'var(--site-header-height)' }}>
           <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-2 sm:gap-3">
               <button
@@ -839,7 +916,7 @@ export default function ResourcesPage({ navigate, folder, pyqYear, pyqStage, pyq
         </section>
 
         {/* 3. IN-FOLDER SEARCH & FILTER BAR */}
-        <section className="py-3 px-4 sm:px-6 lg:px-8 bg-[#FBF7F0]/95 backdrop-blur-md border-b border-[#D5C3B0]/30 sticky top-[138px] z-10 shadow-2xs">
+        <section className="py-3 px-4 sm:px-6 lg:px-8 bg-[#FAF6EE] border-b border-[#D5C3B0] shadow-2xs">
           <div className="max-w-5xl mx-auto flex items-center gap-3">
             <div className="relative flex-1">
               <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[#7A6B5D]" />
@@ -868,7 +945,7 @@ export default function ResourcesPage({ navigate, folder, pyqYear, pyqStage, pyq
         {/* 4. CONTENT SECTIONS */}
         <section className="py-12 px-4 sm:px-6 lg:px-8 bg-[#FAF6EE] min-h-[50vh]">
           <div className="max-w-7xl mx-auto space-y-12">
-            {cmsLoading && (
+            {cmsLoading && pyqResources.length === 0 && (
               <div className="py-12 text-center space-y-3">
                 <Loader2 className="w-8 h-8 text-[#8C3A27] animate-spin mx-auto" />
                 <p className="text-xs font-serif italic text-[#7A6B5D] font-bold">
@@ -878,7 +955,7 @@ export default function ResourcesPage({ navigate, folder, pyqYear, pyqStage, pyq
             )}
 
             {/* LEVEL 2: IF ON ROOT /resources/pyqs AND NO SEARCH QUERY, DISPLAY YEAR CARDS */}
-            {!cmsLoading && !pyqYear && !pyqSearchQuery && pyqGroupsByYear.sortedYears.length > 0 && (
+            {(!cmsLoading || pyqResources.length > 0) && !pyqYear && !pyqSearchQuery && pyqGroupsByYear.sortedYears.length > 0 && (
               <div className="space-y-6">
                 <div className="flex items-center justify-between border-b border-[#D5C3B0]/60 pb-3">
                   <div className="flex items-center gap-2">
@@ -1107,7 +1184,7 @@ export default function ResourcesPage({ navigate, folder, pyqYear, pyqStage, pyq
             )}
 
             {/* LEVEL 4 & 5: PAPERS SUB-GRID & FOLDERS */}
-            {!cmsLoading && (
+            {(pyqResources.length > 0 || !cmsLoading) && (
               <div className="space-y-8">
                 {/* A. If Search Query is Active: Show Search Results */}
                 {pyqSearchQuery.trim() ? (
@@ -1535,7 +1612,10 @@ export default function ResourcesPage({ navigate, folder, pyqYear, pyqStage, pyq
       </section>
 
       {/* 3. SEARCH & CATEGORY FILTER BAR FOR COURSES & RECORDED MODULES */}
-      <section className="section-clean-parchment py-3 px-4 sm:px-6 lg:px-8 border-t border-b border-[#D5C3B0]/30 sticky top-[73px] z-30 bg-[#FBF7F0]/95 backdrop-blur-md shadow-xs">
+      <section 
+        className="section-clean-parchment py-3 px-4 sm:px-6 lg:px-8 border-b border-[#D5C3B0] sticky z-20 bg-[#FAF6EE] shadow-xs m-0 mt-0"
+        style={{ top: 'var(--site-header-height)' }}
+      >
         <div className="max-w-7xl mx-auto flex items-center gap-2 sm:gap-3 w-full overflow-hidden">
           
           {/* Search Input */}
@@ -1627,7 +1707,7 @@ export default function ResourcesPage({ navigate, folder, pyqYear, pyqStage, pyq
 
 
           {/* LOADING STATE */}
-          {cmsLoading && (
+          {cmsLoading && nonSyllabusResources.length === 0 && (
             <div className="py-12 text-center space-y-3">
               <Loader2 className="w-8 h-8 text-[#8C3A27] animate-spin mx-auto" />
               <p className="text-xs font-serif italic text-[#7A6B5D] font-bold">
@@ -1637,7 +1717,7 @@ export default function ResourcesPage({ navigate, folder, pyqYear, pyqStage, pyq
           )}
 
           {/* CONTENT GRID */}
-          {!cmsLoading && (showSyllabusFolderInMain || showPYQFolderInMain || filteredNonSyllabusResources.length > 0) ? (
+          {(showSyllabusFolderInMain || showPYQFolderInMain || filteredNonSyllabusResources.length > 0) ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {/* 1. DYNAMIC UPSC SYLLABUS FOLDER HUB CARD */}
               {showSyllabusFolderInMain && (

@@ -30,10 +30,11 @@ import {
   extractPYQCategory,
   extractPYQPaperLabel,
   getPYQPaperUrl,
-  sortPYQPapers
+  sortPYQPapers,
+  getCachedCMSData
 } from '../services/cmsService';
 import { sortCurrentAffairsByDate, formatDisplayDate, parseDateToTimestamp } from '../utils/dateUtils';
-import { createSlug, getDirectImageUrl, getSecondaryImageUrl } from './CurrentAffairsReader';
+import { createSlug, getDirectImageUrl, getSecondaryImageUrl } from '../utils/urlUtils';
 import ParticleConvergenceLoader from '../components/ParticleConvergenceLoader';
 
 /**
@@ -472,10 +473,6 @@ const normalizeKey = (str) => String(str || '').toLowerCase().replace(/[^a-z0-9]
 export default function ResourceDetailPage({ slug, folder, year, stage, stream, navigate }) {
   const { data, loading: cmsLoading, isFetched: cmsFetched } = useCMSData();
 
-  // 1. Explicit Loading & Fetched States (starts as true by default)
-  const [isLoading, setIsLoading] = useState(true);
-  const [isFetched, setIsFetched] = useState(false);
-
   // Helper to check active status
   const isItemActive = (obj) => {
     if (!obj || typeof obj !== 'object') return false;
@@ -485,14 +482,63 @@ export default function ResourceDetailPage({ slug, folder, year, stage, stream, 
     return true;
   };
 
-  // Sorted list of active resources (latest first)
-  const sortedResources = useMemo(() => {
-    const list = Array.isArray(data?.resources) ? data.resources.filter(isItemActive) : [];
-    return sortCurrentAffairsByDate(list);
-  }, [data?.resources]);
-
   const targetSlug = slug || '';
   const targetNorm = normalizeKey(targetSlug);
+
+  // Synchronous resolution of initial resource from router state or cache for 0ms render
+  const initialResource = useMemo(() => {
+    // 1. Navigation / router history state
+    if (typeof window !== 'undefined') {
+      const historyArt = 
+        window.history?.state?.usr?.article || 
+        window.history?.state?.article || 
+        window.history?.state?.usr?.item || 
+        window.history?.state?.item;
+      if (historyArt && typeof historyArt === 'object') {
+        const artSlug = historyArt.slug || historyArt.Slug || createSlug(historyArt.Title || historyArt.title || '');
+        const docId = historyArt.docId || historyArt.Doc_ID || historyArt.id || '';
+        if (
+          artSlug === targetSlug ||
+          normalizeKey(artSlug) === targetNorm ||
+          normalizeKey(historyArt.Title || historyArt.title || '') === targetNorm ||
+          (docId && normalizeKey(docId) === targetNorm)
+        ) {
+          return historyArt;
+        }
+      }
+    }
+
+    // 2. Synchronous cached CMS data from localStorage
+    const cached = getCachedCMSData();
+    const cachedResources = Array.isArray(cached?.resources) ? cached.resources.filter(isItemActive) : [];
+    if (cachedResources.length > 0 && targetSlug) {
+      const found = cachedResources.find(art => {
+        const artTitle = art.Title || art.title || '';
+        const artSlug = art.slug || art.Slug || createSlug(artTitle);
+        const docId = art.docId || art.Doc_ID || art.id || '';
+        return (
+          artSlug === targetSlug ||
+          normalizeKey(artSlug) === targetNorm ||
+          normalizeKey(artTitle) === targetNorm ||
+          (docId && normalizeKey(docId) === targetNorm)
+        );
+      });
+      if (found) return found;
+    }
+    return null;
+  }, [targetSlug, targetNorm]);
+
+  // 1. Explicit Loading & Fetched States (0ms if initialResource found)
+  const [isLoading, setIsLoading] = useState(!initialResource);
+  const [isFetched, setIsFetched] = useState(Boolean(initialResource || (cmsFetched && !cmsLoading)));
+
+  // Sorted list of active resources (latest first)
+  const sortedResources = useMemo(() => {
+    const list = Array.isArray(data?.resources) && data.resources.length > 0
+      ? data.resources.filter(isItemActive)
+      : (Array.isArray(getCachedCMSData()?.resources) ? getCachedCMSData().resources.filter(isItemActive) : []);
+    return sortCurrentAffairsByDate(list);
+  }, [data?.resources]);
 
   // Resilient article matching: direct slug, normalized slug, normalized title, or docId
   const currentIndex = useMemo(() => {
@@ -511,14 +557,19 @@ export default function ResourceDetailPage({ slug, folder, year, stage, stream, 
     });
   }, [sortedResources, targetSlug, targetNorm]);
 
-  const article = currentIndex !== -1 ? sortedResources[currentIndex] : null;
+  const article = currentIndex !== -1 ? sortedResources[currentIndex] : initialResource;
   const resource = article;
 
-  // 1. State Initialization: Reset isLoading(true) and isFetched(false) when route parameters change
+  // 1. State Initialization: Reset isLoading and isFetched when route parameters change
   useEffect(() => {
-    setIsLoading(true);
-    setIsFetched(false);
-  }, [slug, folder, year, stage, stream]);
+    if (initialResource) {
+      setIsLoading(false);
+      setIsFetched(true);
+    } else {
+      setIsLoading(true);
+      setIsFetched(false);
+    }
+  }, [slug, folder, year, stage, stream, initialResource]);
 
   // 2. Explicit Route Resolution Guard & Catching Route Hydration Delays
   useEffect(() => {
@@ -761,11 +812,20 @@ export default function ResourceDetailPage({ slug, folder, year, stage, stream, 
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // SEO & Dynamic Metadata: Document Title, Meta Description, JSON-LD Schema
+  // SEO & Dynamic Metadata: Document Title, Meta Description, Canonical Link, and JSON-LD Schema
   useEffect(() => {
     if (article && title) {
+      const articleSlug = article.slug || article.Slug || createSlug(title);
+      const isoDate = formatToYMD(article.Date || article.date);
+
       // 1. Set document title
-      document.title = `${title} | e-Gurukulam for IAS`;
+      let pageTitle = `${title} | e-Gurukulam for IAS`;
+      if (isPYQ) {
+        pageTitle = `${paperName} (${detectedYear}) - UPSC ${detectedStage} PYQs | e-Gurukulam for IAS`;
+      } else if (isSyllabus) {
+        pageTitle = `${title} - UPSC Civil Services Syllabus | e-Gurukulam for IAS`;
+      }
+      document.title = pageTitle;
 
       // 2. Set / update meta description
       let metaDesc = document.querySelector('meta[name="description"]');
@@ -777,7 +837,58 @@ export default function ResourceDetailPage({ slug, folder, year, stage, stream, 
       const descContent = shortSummary || `${title} - In-depth study resource and analytical notes by e-Gurukulam for IAS.`;
       metaDesc.setAttribute('content', descContent);
 
-      // 3. Inject standard Article Schema.org JSON-LD in head
+      // 3. Set / update canonical link (Specific syllabus and PYQ canonical paths take strict priority)
+      let canonicalUrl = '';
+      if (isPYQ) {
+        const stageStr = detectedStage ? detectedStage.toLowerCase() : 'mains';
+        if (detectedYear && detectedYear !== 'General') {
+          canonicalUrl = `https://egurukulamforias.com/resources/pyqs/${detectedYear}/${stageStr}/${articleSlug}`;
+        } else {
+          canonicalUrl = `https://egurukulamforias.com/resources/pyqs/${stageStr}/${articleSlug}`;
+        }
+      } else if (isSyllabus || folder === 'upsc-syllabus') {
+        canonicalUrl = `https://egurukulamforias.com/resources/upsc-syllabus/${articleSlug}`;
+      } else if (folder === 'pyqs') {
+        const stageStr = stage ? stage.toLowerCase() : (detectedStage ? detectedStage.toLowerCase() : 'mains');
+        if (year) {
+          canonicalUrl = `https://egurukulamforias.com/resources/pyqs/${year}/${stageStr}/${articleSlug}`;
+        } else {
+          canonicalUrl = `https://egurukulamforias.com/resources/pyqs/${stageStr}/${articleSlug}`;
+        }
+      } else {
+        canonicalUrl = `https://egurukulamforias.com/resources/${articleSlug}`;
+      }
+
+      let canonicalLink = document.querySelector('link[rel="canonical"]');
+      if (!canonicalLink) {
+        canonicalLink = document.createElement('link');
+        canonicalLink.setAttribute('rel', 'canonical');
+        document.head.appendChild(canonicalLink);
+      }
+      canonicalLink.setAttribute('href', canonicalUrl);
+
+      // 4. Set / update meta keywords for Google AI indexing
+      let metaKeywords = document.querySelector('meta[name="keywords"]');
+      if (!metaKeywords) {
+        metaKeywords = document.createElement('meta');
+        metaKeywords.setAttribute('name', 'keywords');
+        document.head.appendChild(metaKeywords);
+      }
+      const keywordsList = [
+        'UPSC', 'IAS', 'Civil Services Examination',
+        title,
+        paperName,
+        category,
+        detectedYear !== 'General' ? `UPSC ${detectedYear}` : null,
+        detectedStage ? `UPSC ${detectedStage}` : null,
+        isPYQ ? 'Previous Year Questions' : null,
+        isPYQ ? 'PYQ' : null,
+        isSyllabus ? 'UPSC Syllabus' : null,
+        'Akella Raghavendra', 'e-Gurukulam for IAS'
+      ].filter(Boolean).join(', ');
+      metaKeywords.setAttribute('content', keywordsList);
+
+      // 5. Inject semantic Schema.org JSON-LD in head
       const schemaId = 'resource-schema-jsonld';
       let schemaScript = document.getElementById(schemaId);
       if (!schemaScript) {
@@ -787,45 +898,132 @@ export default function ResourceDetailPage({ slug, folder, year, stage, stream, 
         document.head.appendChild(schemaScript);
       }
 
-      const articleSlug = article.slug || article.Slug || createSlug(title);
-      const isoDate = formatToYMD(article.Date || article.date);
+      const authorObj = [{
+        '@type': 'Person',
+        'name': 'Akella Raghavendra',
+        'url': 'https://egurukulamforias.com/about'
+      }];
 
-      const schemaData = {
-        '@context': 'https://schema.org',
-        '@type': 'Article',
-        'headline': title,
-        'description': descContent,
-        'image': bannerImage ? [bannerImage] : [],
-        'datePublished': isoDate,
-        'dateModified': isoDate,
-        'author': [{
-          '@type': 'Person',
-          'name': 'Akella Raghavendra',
-          'url': 'https://egurukulamforias.com/about'
-        }],
-        'publisher': {
-          '@type': 'Organization',
-          'name': 'e-Gurukulam for IAS',
-          'logo': {
-            '@type': 'ImageObject',
-            'url': 'https://egurukulamforias.com/favicon-192x192.png'
-          }
-        },
-        'mainEntityOfPage': {
-          '@type': 'WebPage',
-          '@id': `https://egurukulamforias.com/resources/${articleSlug}`
+      const publisherObj = {
+        '@type': 'Organization',
+        'name': 'e-Gurukulam for IAS',
+        'logo': {
+          '@type': 'ImageObject',
+          'url': 'https://egurukulamforias.com/favicon-192x192.png'
         }
       };
-      schemaScript.textContent = JSON.stringify(schemaData);
 
-      // 4. GA4 Page View tracking
-      if (typeof window !== 'undefined' && typeof window.gtag === 'function') {
-        window.gtag('config', 'G-T5W96019N1', {
-          page_path: window.location.pathname,
-          page_location: window.location.href,
-          page_title: document.title,
+      let schemaData = null;
+
+      if (isPYQ) {
+        const questionItems = (pyqQuestions || []).slice(0, 30).map((q, idx) => {
+          const qText = q.text || `Question ${q.displayNum || (idx + 1)}`;
+          const qItem = {
+            '@type': 'Question',
+            'name': `Question ${q.displayNum || q.qNum || (idx + 1)}`,
+            'text': qText
+          };
+          if (q.modelAnswer) {
+            const cleanAns = cleanDocHtml(q.modelAnswer).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 1000);
+            if (cleanAns) {
+              qItem.acceptedAnswer = {
+                '@type': 'Answer',
+                'text': cleanAns
+              };
+            }
+          }
+          return qItem;
         });
+
+        schemaData = {
+          '@context': 'https://schema.org',
+          '@type': 'Quiz',
+          'name': `${title} | UPSC Civil Services Examination`,
+          'headline': title,
+          'description': descContent,
+          'educationalAlignment': {
+            '@type': 'AlignmentObject',
+            'alignmentType': 'educationalSubject',
+            'educationalFramework': 'UPSC Civil Services Examination',
+            'targetName': `${detectedStage} Examination - ${paperName || 'General Studies'}`
+          },
+          'about': [
+            { '@type': 'Thing', 'name': 'UPSC Civil Services Examination' },
+            { '@type': 'Thing', 'name': `UPSC ${detectedStage}` },
+            { '@type': 'Thing', 'name': paperName || 'General Studies' },
+            ...(detectedYear && detectedYear !== 'General' ? [{ '@type': 'Thing', 'name': `UPSC ${detectedYear}` }] : [])
+          ],
+          ...(questionItems.length > 0 ? { 'hasPart': questionItems } : {}),
+          'datePublished': isoDate,
+          'dateModified': isoDate,
+          'author': authorObj,
+          'publisher': publisherObj,
+          'mainEntityOfPage': {
+            '@type': 'WebPage',
+            '@id': canonicalUrl
+          }
+        };
+      } else if (isSyllabus) {
+        schemaData = {
+          '@context': 'https://schema.org',
+          '@type': 'Course',
+          'name': `${title} - UPSC Civil Services Syllabus`,
+          'description': descContent,
+          'provider': {
+            '@type': 'Organization',
+            'name': 'e-Gurukulam for IAS',
+            'url': 'https://egurukulamforias.com'
+          },
+          'educationalAlignment': {
+            '@type': 'AlignmentObject',
+            'alignmentType': 'educationalSubject',
+            'educationalFramework': 'UPSC Civil Services Examination',
+            'targetName': title
+          },
+          'about': [
+            { '@type': 'Thing', 'name': 'UPSC Civil Services Examination' },
+            { '@type': 'Thing', 'name': 'UPSC Syllabus' },
+            { '@type': 'Thing', 'name': title }
+          ],
+          'hasCourseInstance': {
+            '@type': 'CourseInstance',
+            'courseMode': 'blended',
+            'courseWorkload': 'Self-paced comprehensive syllabus analysis'
+          },
+          'datePublished': isoDate,
+          'dateModified': isoDate,
+          'author': authorObj,
+          'publisher': publisherObj,
+          'mainEntityOfPage': {
+            '@type': 'WebPage',
+            '@id': canonicalUrl
+          }
+        };
+      } else {
+        schemaData = {
+          '@context': 'https://schema.org',
+          '@type': 'Article',
+          'headline': title,
+          'description': descContent,
+          'image': bannerImage ? [bannerImage] : [],
+          'educationalAlignment': {
+            '@type': 'AlignmentObject',
+            'alignmentType': 'educationalSubject',
+            'educationalFramework': 'UPSC Civil Services Examination',
+            'targetName': category || 'General Studies'
+          },
+          'datePublished': isoDate,
+          'dateModified': isoDate,
+          'author': authorObj,
+          'publisher': publisherObj,
+          'mainEntityOfPage': {
+            '@type': 'WebPage',
+            '@id': canonicalUrl
+          }
+        };
       }
+
+      schemaScript.textContent = JSON.stringify(schemaData);
     }
 
     return () => {
@@ -835,7 +1033,7 @@ export default function ResourceDetailPage({ slug, folder, year, stage, stream, 
         schemaScript.remove();
       }
     };
-  }, [article, title, shortSummary, bannerImage]);
+  }, [article, title, shortSummary, bannerImage, isPYQ, isSyllabus, detectedYear, detectedStage, paperName, pyqQuestions, category]);
 
   // Intercept clicks on internal links within article HTML to prevent full page reloads
   const handleContentClick = (e) => {
@@ -1005,8 +1203,8 @@ export default function ResourceDetailPage({ slug, folder, year, stage, stream, 
           {pyqQuestions.length > 0 && (
             <div 
               id="pyq-jump-bar"
-              className="sticky z-30 bg-[#FAF6EE]/95 backdrop-blur-md p-3 rounded-2xl border border-[#D5C3B0] shadow-md flex items-center gap-2 overflow-x-auto scrollbar-thin transition-all"
-              style={{ top: 'var(--site-header-height, 146px)' }}
+              className="sticky z-20 bg-[#FAF6EE] p-3 rounded-2xl border border-[#D5C3B0] shadow-md flex items-center gap-2 overflow-x-auto scrollbar-thin transition-all"
+              style={{ top: 'var(--site-header-height, 134px)' }}
             >
               <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[#7A6B5D] shrink-0 pl-1 flex items-center gap-1">
                 <Layers className="w-3.5 h-3.5 text-[#8C3A27]" />
@@ -1290,7 +1488,7 @@ export default function ResourceDetailPage({ slug, folder, year, stage, stream, 
       <div className="max-w-4xl mx-auto space-y-8 animate-fade-in text-left">
         
         {/* 1. STICKY BACK NAVIGATION BAR */}
-        <div className="sticky top-16 z-20 bg-[#FAF6EE]/95 backdrop-blur-md p-4 sm:p-5 rounded-3xl border border-[#D5C3B0] shadow-sm flex flex-wrap items-center justify-between gap-4">
+        <div className="sticky z-20 bg-[#FAF6EE] p-4 sm:p-5 rounded-3xl border border-[#D5C3B0] shadow-sm flex flex-wrap items-center justify-between gap-4" style={{ top: 'var(--site-header-height, 134px)' }}>
           <div className="flex items-center gap-3">
             <button
               type="button"

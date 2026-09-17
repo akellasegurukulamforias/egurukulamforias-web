@@ -27,6 +27,7 @@ export default function AspirantJourney({ navigate }) {
 
   // 1. Preload all 31 frames (.png) into memory
   useEffect(() => {
+    let isMounted = true;
     let loadedCount = 0;
     const loadedImgs = [];
 
@@ -34,18 +35,24 @@ export default function AspirantJourney({ navigate }) {
       const img = new Image();
       img.src = getFramePath(i);
       img.onload = () => {
+        if (!isMounted) return;
         loadedCount++;
         if (loadedCount === TOTAL_FRAMES) {
           setImagesLoaded(true);
         }
       };
       img.onerror = () => {
+        if (!isMounted) return;
         const jpgPath = `/aspirant-journey/ezgif-frame-${String(i).padStart(3, '0')}.jpg`;
         img.src = jpgPath;
       };
       loadedImgs.push(img);
     }
-    setImages(loadedImgs);
+    if (isMounted) setImages(loadedImgs);
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   // 2. Render Canvas Frame
@@ -104,9 +111,13 @@ export default function AspirantJourney({ navigate }) {
 
   // 4. Draw canvas whenever images load or frame updates
   useEffect(() => {
+    let rafId = null;
     if (imagesLoaded || images.length > 0) {
-      requestAnimationFrame(() => renderCanvasFrame(currentFrameNumber));
+      rafId = requestAnimationFrame(() => renderCanvasFrame(currentFrameNumber));
     }
+    return () => {
+      if (rafId) cancelAnimationFrame(rafId);
+    };
   }, [imagesLoaded, currentFrameNumber, images]);
 
   // Handle Resize

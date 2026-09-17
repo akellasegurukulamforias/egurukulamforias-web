@@ -112,7 +112,10 @@ export default function AnnouncementPopup({
     if (sortedCards.length === 0) return;
 
     const checkAndShow = () => {
-      const lastClosed = sessionStorage.getItem("egk_popup_closed_time");
+      let lastClosed = null;
+      try {
+        lastClosed = sessionStorage.getItem("egk_popup_closed_time");
+      } catch (e) {}
       const fiveMinutes = 5 * 60 * 1000;
 
       // If never closed, or 5 minutes have passed since last close
@@ -129,6 +132,17 @@ export default function AnnouncementPopup({
       clearInterval(interval);
     };
   }, [sortedCards.length]);
+
+  // Lock body scroll when popup is open
+  useEffect(() => {
+    if (isOpen) {
+      const prevOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = prevOverflow || "";
+      };
+    }
+  }, [isOpen]);
 
   // Keyboard navigation (Escape to close, ArrowLeft/Right to fan cards)
   useEffect(() => {
@@ -150,7 +164,9 @@ export default function AnnouncementPopup({
 
   const handleClose = () => {
     setIsOpen(false);
-    sessionStorage.setItem("egk_popup_closed_time", String(Date.now()));
+    try {
+      sessionStorage.setItem("egk_popup_closed_time", String(Date.now()));
+    } catch (e) {}
     if (onClose) onClose();
   };
 

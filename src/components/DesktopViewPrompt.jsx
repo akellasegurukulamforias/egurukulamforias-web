@@ -7,7 +7,11 @@ export default function DesktopViewPrompt() {
 
   useEffect(() => {
     // 1. If user already dismissed it during this session, NEVER show it again!
-    if (sessionStorage.getItem('desktopPromptDismissed') === 'true') {
+    try {
+      if (sessionStorage.getItem('desktopPromptDismissed') === 'true') {
+        return;
+      }
+    } catch (e) {
       return;
     }
 
@@ -21,13 +25,37 @@ export default function DesktopViewPrompt() {
     // ONLY trigger ONCE on genuine mobile devices with screen width < 1024px
     if (isMobileUA && !isDesktopOS && window.innerWidth < 1024) {
       const timer = setTimeout(() => {
-        if (sessionStorage.getItem('desktopPromptDismissed') !== 'true') {
+        try {
+          if (sessionStorage.getItem('desktopPromptDismissed') !== 'true') {
+            setShowPrompt(true);
+          }
+        } catch (e) {
           setShowPrompt(true);
         }
       }, 1000);
       return () => clearTimeout(timer);
     }
   }, []);
+
+  // Lock body scroll and listen for Escape key when prompt is displayed
+  useEffect(() => {
+    if (!showPrompt) return;
+
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        handleDismiss();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = prevOverflow || '';
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showPrompt]);
 
   const handleDismiss = () => {
     // Save dismissal in sessionStorage so it NEVER pops up again while scrolling or navigating

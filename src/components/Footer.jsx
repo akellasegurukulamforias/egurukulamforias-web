@@ -17,7 +17,7 @@ export default function Footer({ navigate }) {
     { path: '/about', label: 'About e-Gurukulam' },
     { path: '/programs', label: 'Programs' },
     { path: '/test-series', label: 'Test Series' },
-    { path: '/blog', label: 'Current Affairs' },
+    { path: '/current-affairs', label: 'Current Affairs' },
     { path: '/resources', label: 'Resources' },
     { path: '/contact', label: 'Begin Your Journey With Us' }
   ];

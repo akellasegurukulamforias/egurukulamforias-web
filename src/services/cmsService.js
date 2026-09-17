@@ -414,13 +414,18 @@ export async function fetchCMSData(forceRevalidate = false) {
   }
 
   fetchPromise = (async () => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+
     try {
       const response = await fetch(CMS_API_ENDPOINT, {
         method: 'GET',
         headers: {
           'Accept': 'application/json'
-        }
+        },
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         throw new Error(`CMS HTTP Error: ${response.status}`);
@@ -485,16 +490,32 @@ export async function fetchCMSData(forceRevalidate = false) {
 
       cachedCMSData = freshData;
 
-      // Save to localStorage for 0ms instant renders on future visits
+      // Save to localStorage for 0ms instant renders on future visits with quota pruning
       try {
         localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(freshData));
       } catch (err) {
-        console.warn('Failed to save CMS data to localStorage:', err);
+        console.warn('Initial save to localStorage failed, attempting quota-safe pruning:', err);
+        try {
+          // Prune older article full-text content, keeping full content for top 30 dispatches
+          const prunedCA = (freshData.currentAffairs || []).map((item, idx) => {
+            if (idx < 30) return item;
+            const { Full_Content, full_content, Article_HTML, article_html, Content, content, ...rest } = item;
+            return rest;
+          });
+          const prunedData = {
+            ...freshData,
+            currentAffairs: prunedCA
+          };
+          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(prunedData));
+        } catch (retryErr) {
+          console.warn('Quota-safe pruned save to localStorage also failed:', retryErr);
+        }
       }
 
       cmsNetworkFetched = true;
       return freshData;
     } catch (error) {
+      clearTimeout(timeoutId);
       console.warn('Google Sheet CMS revalidation error, returning cached/fallback structure:', error);
       cmsNetworkFetched = true;
       const staleData = getCachedCMSData();
@@ -524,3 +545,180 @@ export function clearCMSCache() {
     // ignore
   }
 }
+
+// Base website URL for canonical sitemap generation
+const SITEMAP_BASE_URL = 'https://egurukulamforias.com';
+
+// Format arbitrary dates (timestamp, Date, string) into YYYY-MM-DD
+export function formatDateToYMD(dateVal) {
+  if (!dateVal) {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  }
+
+  if (typeof dateVal === 'number' && !isNaN(dateVal)) {
+    const parsed = new Date(dateVal);
+    if (!isNaN(parsed.getTime())) {
+      return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`;
+    }
+  }
+
+  if (typeof dateVal === 'string') {
+    const trimmed = dateVal.trim();
+
+    // 1. DD/MM/YYYY, DD-MM-YYYY, or DD.MM.YYYY
+    const dmyMatch = trimmed.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})/);
+    if (dmyMatch) {
+      return `${dmyMatch[3]}-${String(dmyMatch[2]).padStart(2, '0')}-${String(dmyMatch[1]).padStart(2, '0')}`;
+    }
+
+    // 2. YYYY-MM-DD or YYYY/MM/DD
+    const ymdMatch = trimmed.match(/^(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})/);
+    if (ymdMatch) {
+      return `${ymdMatch[1]}-${String(ymdMatch[2]).padStart(2, '0')}-${String(ymdMatch[3]).padStart(2, '0')}`;
+    }
+
+    // 3. Textual dates
+    const parsed = new Date(trimmed);
+    if (!isNaN(parsed.getTime())) {
+      return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`;
+    }
+  }
+
+  if (dateVal instanceof Date && !isNaN(dateVal.getTime())) {
+    return `${dateVal.getFullYear()}-${String(dateVal.getMonth() + 1).padStart(2, '0')}-${String(dateVal.getDate()).padStart(2, '0')}`;
+  }
+
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}
+
+// Generate structured array of all canonical sitemap entries (Static + Dynamic CMS Dispatches + Resources)
+export function generateSitemapEntries(data) {
+  const cmsData = data || getCachedCMSData() || {};
+  const todayYMD = formatDateToYMD(new Date());
+  const seenUrls = new Set();
+  const entries = [];
+
+  // 1. Core Static Routes with explicit SEO priority weights matching header navigation
+  const staticRoutes = [
+    { path: '/', priority: '1.0', changefreq: 'daily', lastmod: todayYMD },
+    { path: '/current-affairs', priority: '0.9', changefreq: 'daily', lastmod: todayYMD },
+    { path: '/programs', priority: '0.8', changefreq: 'weekly', lastmod: todayYMD },
+    { path: '/test-series', priority: '0.8', changefreq: 'weekly', lastmod: todayYMD },
+    { path: '/about', priority: '0.8', changefreq: 'weekly', lastmod: todayYMD },
+    { path: '/connect', priority: '0.8', changefreq: 'weekly', lastmod: todayYMD },
+    { path: '/contact', priority: '0.8', changefreq: 'weekly', lastmod: todayYMD },
+    { path: '/resources', priority: '0.8', changefreq: 'weekly', lastmod: todayYMD },
+    { path: '/resources/upsc-syllabus', priority: '0.8', changefreq: 'daily', lastmod: todayYMD },
+    { path: '/resources/pyqs', priority: '0.8', changefreq: 'daily', lastmod: todayYMD }
+  ];
+
+  for (const route of staticRoutes) {
+    const loc = `${SITEMAP_BASE_URL}${route.path}`;
+    if (!seenUrls.has(loc)) {
+      seenUrls.add(loc);
+      entries.push({
+        loc,
+        lastmod: route.lastmod,
+        changefreq: route.changefreq,
+        priority: route.priority,
+        type: 'static'
+      });
+    }
+  }
+
+  // 2. Dynamic Current Affairs Dispatches (Priority 0.9)
+  const affairs = Array.isArray(cmsData.currentAffairs) 
+    ? cmsData.currentAffairs.filter(isItemActive) 
+    : [];
+
+  for (const art of affairs) {
+    const title = art.Title || art.title || '';
+    const rawSlug = art.slug || art.Slug || (title ? title.toLowerCase().replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '-') : '');
+    if (!rawSlug) continue;
+
+    const slug = encodeURIComponent(String(rawSlug).trim().toLowerCase());
+    const loc = `${SITEMAP_BASE_URL}/current-affairs/${slug}`;
+
+    if (!seenUrls.has(loc)) {
+      seenUrls.add(loc);
+      const rawDate = art.Date || art.date || art.Published_Date || art.published_date;
+      entries.push({
+        loc,
+        lastmod: formatDateToYMD(rawDate),
+        changefreq: 'daily',
+        priority: '0.9',
+        type: 'current-affairs'
+      });
+    }
+  }
+
+  // 3. Dynamic Resources, Syllabus & PYQ Items (Priority 0.8)
+  const resources = Array.isArray(cmsData.resources) 
+    ? cmsData.resources.filter(isItemActive) 
+    : [];
+
+  for (const res of resources) {
+    const title = res.Title || res.title || '';
+    const rawSlug = res.slug || res.Slug || (title ? title.toLowerCase().replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '-') : '');
+    if (!rawSlug) continue;
+
+    const slug = encodeURIComponent(String(rawSlug).trim().toLowerCase());
+    const isSyllabus = isSyllabusResource(res);
+    const isPYQ = isPYQResource(res);
+
+    let loc = `${SITEMAP_BASE_URL}/resources/${slug}`;
+    if (isPYQ) {
+      loc = `${SITEMAP_BASE_URL}${getPYQPaperUrl(res)}`;
+    } else if (isSyllabus) {
+      loc = `${SITEMAP_BASE_URL}/resources/upsc-syllabus/${slug}`;
+    }
+
+    if (!seenUrls.has(loc)) {
+      seenUrls.add(loc);
+      const rawDate = res.Date || res.date || res.Published_Date || res.published_date;
+      entries.push({
+        loc,
+        lastmod: formatDateToYMD(rawDate),
+        changefreq: 'daily',
+        priority: '0.8',
+        type: isSyllabus ? 'syllabus' : isPYQ ? 'pyq' : 'resource'
+      });
+    }
+  }
+
+  return entries;
+}
+
+// Generate client-side XML sitemap string
+export function generateClientSitemapXML(data) {
+  const entries = generateSitemapEntries(data);
+  const escapeXml = (unsafe) => String(unsafe || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+    ...entries.map(entry => [
+      '  <url>',
+      `    <loc>${escapeXml(entry.loc)}</loc>`,
+      `    <lastmod>${escapeXml(entry.lastmod)}</lastmod>`,
+      `    <changefreq>${escapeXml(entry.changefreq)}</changefreq>`,
+      `    <priority>${escapeXml(entry.priority)}</priority>`,
+      '  </url>'
+    ].join('\n')),
+    '</urlset>',
+    ''
+  ].join('\n');
+}
+
+// Retrieve real-time sitemap metadata from cached CMS state
+export function getSitemapData() {
+  return generateSitemapEntries(getCachedCMSData());
+}
+

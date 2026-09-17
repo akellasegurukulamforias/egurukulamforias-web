@@ -25,9 +25,19 @@ function getTodayYMD() {
   return `${y}-${m}-${d}`;
 }
 
-// Convert various date formats (DD/MM/YYYY, DD-MM-YYYY, YYYY-MM-DD, textual) into YYYY-MM-DD
+// Convert various date formats (DD/MM/YYYY, DD-MM-YYYY, YYYY-MM-DD, textual, numeric) into YYYY-MM-DD
 function formatToYMD(dateVal) {
   if (!dateVal) return getTodayYMD();
+
+  if (typeof dateVal === 'number' && !isNaN(dateVal)) {
+    const parsed = new Date(dateVal);
+    if (!isNaN(parsed.getTime())) {
+      const y = parsed.getFullYear();
+      const m = String(parsed.getMonth() + 1).padStart(2, '0');
+      const d = String(parsed.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+  }
 
   if (typeof dateVal === 'string') {
     const trimmed = dateVal.trim();
@@ -114,25 +124,7 @@ const STATIC_ROUTES = [
     lastmod: getTodayYMD()
   },
   {
-    path: '/ias-with-life',
-    priority: '0.8',
-    changefreq: 'weekly',
-    lastmod: getTodayYMD()
-  },
-  {
-    path: '/courses',
-    priority: '0.8',
-    changefreq: 'weekly',
-    lastmod: getTodayYMD()
-  },
-  {
-    path: '/mentorship',
-    priority: '0.8',
-    changefreq: 'weekly',
-    lastmod: getTodayYMD()
-  },
-  {
-    path: '/about',
+    path: '/programs',
     priority: '0.8',
     changefreq: 'weekly',
     lastmod: getTodayYMD()
@@ -144,8 +136,26 @@ const STATIC_ROUTES = [
     lastmod: getTodayYMD()
   },
   {
+    path: '/about',
+    priority: '0.8',
+    changefreq: 'weekly',
+    lastmod: getTodayYMD()
+  },
+  {
+    path: '/connect',
+    priority: '0.8',
+    changefreq: 'weekly',
+    lastmod: getTodayYMD()
+  },
+  {
+    path: '/contact',
+    priority: '0.8',
+    changefreq: 'weekly',
+    lastmod: getTodayYMD()
+  },
+  {
     path: '/resources',
-    priority: '0.7',
+    priority: '0.8',
     changefreq: 'weekly',
     lastmod: getTodayYMD()
   },
@@ -159,12 +169,6 @@ const STATIC_ROUTES = [
     path: '/resources/pyqs',
     priority: '0.8',
     changefreq: 'daily',
-    lastmod: getTodayYMD()
-  },
-  {
-    path: '/contact',
-    priority: '0.7',
-    changefreq: 'monthly',
     lastmod: getTodayYMD()
   }
 ];
@@ -254,7 +258,7 @@ async function generateSitemap() {
         loc: fullUrl,
         lastmod: lastmod,
         changefreq: 'daily',
-        priority: '0.8'
+        priority: '0.9'
       });
       articleCount++;
     }

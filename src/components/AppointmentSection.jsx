@@ -65,13 +65,14 @@ export function AppointmentSection() {
     }
     setEnquiryValidationError('');
 
-    // 2. Anti-Spam Honeypot Verification (Silently simulate success for bots without writing to backend)
+    // 2. Anti-Spam Honeypot Verification (Silently simulate success for the bot without writing to backend)
     if (
       (enquiryForm.user_organization_code && enquiryForm.user_organization_code.trim() !== '') ||
-      (enquiryHoneypot && enquiryHoneypot.trim() !== '') ||
-      isSpamBot(enquiryForm.hp_trap)
+      (enquiryHoneypot && enquiryHoneypot.trim() !== '')
     ) {
-      setEnquiryStatus('success');
+      if (isMountedRef.current) {
+        setEnquiryStatus('success');
+      }
       return;
     }
 
@@ -83,15 +84,10 @@ export function AppointmentSection() {
       return;
     }
 
-    // 4. Rate Limiting (3-Second Cooldown)
-    if (isRateLimited('EnquiryForm', 3000)) {
-      return;
-    }
-
     setEnquiryStatus('loading');
 
     const sanitizedPayload = sanitizePayload({
-      formType: "admissions",
+      formType: "ADMISSIONS_ENQUIRY",
       fullName: enquiryForm.fullName,
       email: enquiryForm.email,
       contactNumber: contactNumber,
@@ -111,22 +107,26 @@ export function AppointmentSection() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(sanitizedPayload),
       });
-      setEnquiryStatus('success');
-      setEnquiryHoneypot('');
-      setEnquiryForm({
-        fullName: '',
-        email: '',
-        phone: '',
-        address: '',
-        program: 'Mentorship programs',
-        prepStage: 'Not Started',
-        message: '',
-        hp_trap: '',
-        user_organization_code: ''
-      });
+      if (isMountedRef.current) {
+        setEnquiryStatus('success');
+        setEnquiryHoneypot('');
+        setEnquiryForm({
+          fullName: '',
+          email: '',
+          phone: '',
+          address: '',
+          program: 'Mentorship programs',
+          prepStage: 'Not Started',
+          message: '',
+          hp_trap: '',
+          user_organization_code: ''
+        });
+      }
     } catch (err) {
       console.error("Admissions Form Submission Error:", err);
-      setEnquiryStatus('error');
+      if (isMountedRef.current) {
+        setEnquiryStatus('error');
+      }
     }
   };
 
@@ -196,25 +196,29 @@ export function AppointmentSection() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(sanitizedPayload),
       });
-      setAppointmentStatus('success');
-      setAppointmentHoneypot('');
-      setAppointmentForm({
-        name: '',
-        mobile: '',
-        email: '',
-        currentAddress: '',
-        prepStage: 'Not Started',
-        education: 'Graduation Complete (B.Tech / B.A / B.Sc / B.Com)',
-        message: '',
-        appointmentDate: '',
-        appointmentTime: '10:00 AM - 11:00 AM',
-        appointmentMode: 'Online Video Session (Whatsapp/Google Meet)',
-        hp_trap: '',
-        user_organization_code: ''
-      });
+      if (isMountedRef.current) {
+        setAppointmentStatus('success');
+        setAppointmentHoneypot('');
+        setAppointmentForm({
+          name: '',
+          mobile: '',
+          email: '',
+          currentAddress: '',
+          prepStage: 'Not Started',
+          education: 'Graduation Complete (B.Tech / B.A / B.Sc / B.Com)',
+          message: '',
+          appointmentDate: '',
+          appointmentTime: '10:00 AM - 11:00 AM',
+          appointmentMode: 'Online Video Session (Whatsapp/Google Meet)',
+          hp_trap: '',
+          user_organization_code: ''
+        });
+      }
     } catch (err) {
       console.error("Appointment Form Submission Error:", err);
-      setAppointmentStatus('error');
+      if (isMountedRef.current) {
+        setAppointmentStatus('error');
+      }
     }
   };
 
@@ -276,6 +280,8 @@ export function AppointmentSection() {
                   <input 
                     type="text" 
                     id="enquiryFullName" 
+                    name="fullName"
+                    autoComplete="name"
                     value={enquiryForm.fullName}
                     onChange={(e) => setEnquiryForm({ ...enquiryForm, fullName: e.target.value })}
                     placeholder="Enter your name" 
@@ -293,6 +299,8 @@ export function AppointmentSection() {
                     <input 
                       type="email" 
                       id="enquiryEmail" 
+                      name="email"
+                      autoComplete="email"
                       value={enquiryForm.email}
                       onChange={(e) => setEnquiryForm({ ...enquiryForm, email: e.target.value })}
                       placeholder="Enter your email address" 
@@ -308,6 +316,8 @@ export function AppointmentSection() {
                     <input 
                       type="tel" 
                       id="enquiryPhone" 
+                      name="phone"
+                      autoComplete="tel"
                       value={enquiryForm.phone}
                       onChange={(e) => setEnquiryForm({ ...enquiryForm, phone: e.target.value })}
                       placeholder="Enter your phone number" 
@@ -326,6 +336,8 @@ export function AppointmentSection() {
                   <input 
                     type="text" 
                     id="enquiryAddress" 
+                    name="address"
+                    autoComplete="street-address"
                     value={enquiryForm.address}
                     onChange={(e) => setEnquiryForm({ ...enquiryForm, address: e.target.value })}
                     placeholder="Enter your current city / residential address" 
@@ -495,6 +507,8 @@ export function AppointmentSection() {
                   <input 
                     type="text" 
                     id="apptName" 
+                    name="name"
+                    autoComplete="name"
                     value={appointmentForm.name}
                     onChange={(e) => setAppointmentForm({ ...appointmentForm, name: e.target.value })}
                     placeholder="Enter your name" 
@@ -512,6 +526,8 @@ export function AppointmentSection() {
                     <input 
                       type="tel" 
                       id="apptMobile" 
+                      name="mobile"
+                      autoComplete="tel"
                       value={appointmentForm.mobile}
                       onChange={(e) => setAppointmentForm({ ...appointmentForm, mobile: e.target.value })}
                       placeholder="Enter your phone number" 
@@ -528,6 +544,8 @@ export function AppointmentSection() {
                     <input 
                       type="email" 
                       id="apptEmail" 
+                      name="email"
+                      autoComplete="email"
                       value={appointmentForm.email}
                       onChange={(e) => setAppointmentForm({ ...appointmentForm, email: e.target.value })}
                       placeholder="Enter your email address" 
@@ -545,6 +563,8 @@ export function AppointmentSection() {
                   <input 
                     type="text" 
                     id="apptCurrentAddress" 
+                    name="currentAddress"
+                    autoComplete="street-address"
                     value={appointmentForm.currentAddress}
                     onChange={(e) => setAppointmentForm({ ...appointmentForm, currentAddress: e.target.value })}
                     placeholder="Enter your current city / residential address" 

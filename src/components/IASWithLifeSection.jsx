@@ -34,6 +34,35 @@ export default function IASWithLifeSection({ navigate }) {
 
   const sectionRef = useRef(null);
 
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  // Lock body scroll and listen for Escape when interest modal is open
+  useEffect(() => {
+    if (!isModalOpen) return;
+
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        handleResetModal();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = prevOverflow || '';
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isModalOpen]);
+
   // ====================================================================
   // NATIVE BROWSER VERTICAL SCROLL AS SINGLE SOURCE OF TRUTH
   // ZERO WHEEL OVERRIDES / ZERO GLOBAL EVENT LISTENERS / ZERO BODY MUTATIONS
@@ -119,13 +148,19 @@ export default function IASWithLifeSection({ navigate }) {
           body: JSON.stringify(payload)
         }
       );
-      setIsSubmitted(true);
+      if (isMountedRef.current) {
+        setIsSubmitted(true);
+      }
     } catch (err) {
       console.error("IAS WITH LIFE Interest List submission error:", err);
       // Fallback: show success confirmation screen so user experience remains seamless
-      setIsSubmitted(true);
+      if (isMountedRef.current) {
+        setIsSubmitted(true);
+      }
     } finally {
-      setIsSubmitting(false);
+      if (isMountedRef.current) {
+        setIsSubmitting(false);
+      }
     }
   };
 
