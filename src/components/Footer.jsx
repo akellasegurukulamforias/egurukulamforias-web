@@ -4,7 +4,6 @@ import { ArrowUpRight, Mail, Phone, MapPin, Feather, ExternalLink } from 'lucide
 export default function Footer({ navigate }) {
   const handleNav = (path) => {
     navigate(path);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const MAPS_URL = "https://maps.app.goo.gl/NhQYhywYBYX1ffkk9";

@@ -7,16 +7,18 @@ import {
   ChevronLeft, 
   ChevronRight, 
   ShieldAlert,
-  BookOpen
+  BookOpen,
+  RefreshCw
 } from 'lucide-react';
 import { useCMSData } from '../hooks/useCMSData';
-import { getCachedCMSData, LOCAL_STORAGE_KEY, formatDateToYMD } from '../services/cmsService';
+import { getCachedCMSData, LOCAL_STORAGE_KEY, formatDateToYMD, isCMSNetworkFetched, forceRefreshCMSData, fetchCMSData } from '../services/cmsService';
 import { sortCurrentAffairsByDate, formatDisplayDate } from '../utils/dateUtils';
 import { 
   createSlug, 
   getDirectImageUrl, 
   getSecondaryImageUrl 
 } from '../utils/urlUtils';
+import Link from '../components/Link';
 
 /**
  * Safely decode URI components without throwing URIError on malformed sequences
@@ -88,32 +90,68 @@ function getCachedArticles() {
 const normalizeKey = (str) => String(str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
 /**
- * Resilient article matcher by decoded slug, raw slug, generated slug, title, or docId
+ * Canonical slug normalizer utilizing application's authoritative createSlug()
  */
-function findMatchingArticle(articles, targetSlug) {
-  if (!articles || !Array.isArray(articles) || articles.length === 0 || !targetSlug) return null;
-  const decodedSlug = safeDecode(targetSlug);
-  const targetNorm = normalizeKey(decodedSlug || targetSlug);
-
-  return articles.find(art => {
-    if (!art || typeof art !== 'object') return false;
-    const artTitle = art?.Title || art?.title || '';
-    const artRawSlug = art?.Slug || art?.slug || '';
-    const artDecodedSlug = safeDecode(artRawSlug);
-    const artGeneratedSlug = createSlug(artTitle);
-    const docId = art?.docId || art?.Doc_ID || art?.id || '';
-
-    return Boolean(
-      (artDecodedSlug && decodedSlug && artDecodedSlug.toLowerCase() === decodedSlug.toLowerCase()) ||
-      (artRawSlug && targetSlug && artRawSlug.toLowerCase() === targetSlug.toLowerCase()) ||
-      (artGeneratedSlug && decodedSlug && artGeneratedSlug.toLowerCase() === decodedSlug.toLowerCase()) ||
-      (artGeneratedSlug && targetSlug && artGeneratedSlug.toLowerCase() === targetSlug.toLowerCase()) ||
-      (targetNorm && normalizeKey(artRawSlug) === targetNorm) ||
-      (targetNorm && normalizeKey(artTitle) === targetNorm) ||
-      (targetNorm && docId && normalizeKey(docId) === targetNorm)
-    );
-  }) || null;
+function normalizeSlug(value) {
+  if (!value || typeof value !== 'string') return '';
+  const decoded = safeDecode(value).trim();
+  return createSlug(decoded)
+    .replace(/^-+|-+$/g, '')
+    .replace(/-+/g, '-');
 }
+
+/**
+ * Resilient, authoritative article matcher by canonical normalized slug, ID, or title
+ */
+function matchArticleInList(articles, targetSlug) {
+  if (!Array.isArray(articles) || articles.length === 0 || !targetSlug) return null;
+  const normalizedTarget = normalizeSlug(targetSlug);
+  if (!normalizedTarget) return null;
+  const alphaTarget = normalizedTarget.replace(/[^a-z0-9]/g, '');
+
+  for (const article of articles) {
+    if (!article || typeof article !== 'object') continue;
+
+    const articleSlug = article.Slug ?? article.slug;
+    const articleId = article.id ?? article.Id ?? article.docId ?? article.Doc_ID;
+    const articleTitle = article.Title ?? article.title;
+
+    // 1. Exact normalized slug match (Highest Priority)
+    if (articleSlug) {
+      const normSlug = normalizeSlug(articleSlug);
+      if (normSlug === normalizedTarget) {
+        return article;
+      }
+      // Alphanumeric bridge for hyphen/apostrophe variation (e.g. india-s-path vs indias-path)
+      if (alphaTarget && normSlug.replace(/[^a-z0-9]/g, '') === alphaTarget) {
+        return article;
+      }
+    }
+
+    // 2. ID match (if direct URL uses article ID)
+    if (articleId != null) {
+      const strId = String(articleId).trim().toLowerCase();
+      if (strId === normalizedTarget || strId === String(targetSlug).trim().toLowerCase()) {
+        return article;
+      }
+    }
+
+    // 3. Title fallback match (if article lacks slug or URL was generated from Title)
+    if (articleTitle) {
+      const normTitle = normalizeSlug(articleTitle);
+      if (normTitle === normalizedTarget) {
+        return article;
+      }
+      if (alphaTarget && normTitle.replace(/[^a-z0-9]/g, '') === alphaTarget) {
+        return article;
+      }
+    }
+  }
+
+  return null;
+}
+
+const findMatchingArticle = matchArticleInList;
 /**
  * Synchronous resolution of article from props, router navigation state, window memory, or session/local storage
  */
@@ -307,21 +345,23 @@ function estimateReadingTime(content) {
   }
 }
 
-export default function CurrentAffairsDetailPage({ slug, navigate, article: propArticle, initialArticle, item }) {
+export default function CurrentAffairsDetailPage({ slug: propSlug, id: propId, navigate, article: propArticle, initialArticle, item }) {
   const { data, loading: cmsLoading, isFetched: cmsFetched } = useCMSData();
 
-  const rawSlug = slug || '';
-  const decodedSlug = safeDecode(rawSlug);
-  const isRouterReady = Boolean(rawSlug && typeof rawSlug === 'string' && rawSlug.trim().length > 0);
+  // Extract target slug directly from props OR URL path fallback
+  const pathSlug = typeof window !== 'undefined' ? window.location.pathname.split('/').filter(Boolean).pop() : '';
+  const rawTarget = propSlug || propId || pathSlug || '';
+  const targetSlug = safeDecode(rawTarget).trim().toLowerCase();
 
-  // 1. INSTANT ZERO-SPINNER LOADING: Resolve article immediately from props, router state, memory, or storage cache
-  const initialArticleData = useMemo(() => {
-    return getImmediateArticle({ slug: rawSlug, propArticle, initialArticle, item });
-  }, [rawSlug, propArticle, initialArticle, item]);
+  // Instant synchronous resolution if article already exists in props, router state, or local cache
+  const immediateArticle = useMemo(() => {
+    return getImmediateArticle({ slug: targetSlug, propArticle, initialArticle, item });
+  }, [targetSlug, propArticle, initialArticle, item]);
 
-  const [article, setArticle] = useState(initialArticleData);
-  const [isLoading, setIsLoading] = useState(!initialArticleData);
-  const [isFetched, setIsFetched] = useState(Boolean(initialArticleData || (cmsFetched && !cmsLoading)));
+  // Single authoritative state: resolved article + not found flag
+  const [article, setArticle] = useState(immediateArticle);
+  const [isNotFound, setIsNotFound] = useState(false);
+  const [isRetrying, setIsRetrying] = useState(false);
 
   // Support both data?.articles and data?.currentAffairs with safe nullish fallback
   const rawArticles = Array.isArray(data?.articles)
@@ -330,77 +370,150 @@ export default function CurrentAffairsDetailPage({ slug, navigate, article: prop
       ? data.currentAffairs
       : [];
 
-  // Sorted list of articles (latest first)
+  // Sorted list of articles (latest first) - authoritative collection already displaying on page
   const sortedArticles = useMemo(() => {
     return sortCurrentAffairsByDate(rawArticles.filter(item => item && typeof item === 'object'));
   }, [rawArticles]);
 
-  const targetSlug = rawSlug;
-  const targetDecoded = decodedSlug;
-  const targetNorm = normalizeKey(targetDecoded || targetSlug);
+  // Single authoritative resolver effect
+  useEffect(() => {
+    let isMounted = true;
 
-  // Resilient article matching
+    async function resolveTargetArticle() {
+      if (!targetSlug) {
+        if (isMounted) setIsNotFound(true);
+        return;
+      }
+
+      // 1. If we already have the matching article in state, preserve it (never nullify!)
+      if (article && matchArticleInList([article], targetSlug)) {
+        return;
+      }
+
+      // 2. Check cached articles (0ms check)
+      const cached = getCachedArticles();
+      if (cached.length > 0) {
+        const cachedMatch = matchArticleInList(cached, targetSlug);
+        if (cachedMatch) {
+          if (isMounted) {
+            setArticle(cachedMatch);
+            setIsNotFound(false);
+          }
+          return;
+        }
+      }
+
+      // 3. Match against CMS collection (sortedArticles from useCMSData)
+      if (sortedArticles.length > 0) {
+        console.log('[CurrentAffairsDetail] targetSlug:', targetSlug);
+        console.log('[CurrentAffairsDetail] CMS articles count:', sortedArticles.length);
+        console.log(
+          '[CurrentAffairsDetail] CMS slugs:',
+          sortedArticles.map(a => ({
+            slug: a.slug,
+            Slug: a.Slug,
+            title: a.title,
+            Title: a.Title,
+            id: a.id,
+            Id: a.Id
+          }))
+        );
+
+        const found = matchArticleInList(sortedArticles, targetSlug);
+        console.log('[CurrentAffairsDetail] Matched result:', found ? (found.Title || found.title || found.slug) : null);
+
+        if (found) {
+          if (isMounted) {
+            setArticle(found);
+            setIsNotFound(false);
+          }
+          return;
+        }
+
+        // Only mark as not-found if CMS network fetch has completed and item isn't present
+        if (cmsFetched && !cmsLoading) {
+          if (isMounted) {
+            setIsNotFound(true);
+          }
+        }
+        return;
+      }
+
+      // 4. If sortedArticles is currently empty:
+      // While useCMSData is still loading / not fetched, keep loading!
+      if (cmsLoading || !cmsFetched) {
+        return;
+      }
+
+      // 5. If useCMSData completed with zero items, attempt direct fetch as safeguard
+      if (cmsFetched && !cmsLoading && sortedArticles.length === 0) {
+        try {
+          const freshData = await fetchCMSData(true);
+          const liveList = (freshData && (freshData.currentAffairs || freshData.articles)) || [];
+          const match = matchArticleInList(liveList, targetSlug);
+          if (match && isMounted) {
+            setArticle(match);
+            setIsNotFound(false);
+            return;
+          }
+        } catch (err) {
+          console.warn('[CMS Sync] Direct fetch safeguard encountered error:', err);
+        }
+
+        if (isMounted) {
+          setIsNotFound(true);
+        }
+      }
+    }
+
+    resolveTargetArticle();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [targetSlug, sortedArticles, cmsFetched, cmsLoading, article]);
+
+  // Resilient article index matching
   const currentIndex = useMemo(() => {
     if (!sortedArticles || sortedArticles.length === 0) return -1;
     const artToMatch = article;
     if (artToMatch) {
-      const artId = artToMatch?.id || artToMatch?.docId || artToMatch?.Doc_ID;
-      const artSlug = artToMatch?.Slug || artToMatch?.slug;
+      const artId = String(artToMatch?.id || artToMatch?.Id || artToMatch?.docId || artToMatch?.Doc_ID || '').toLowerCase().trim();
+      const artSlug = (artToMatch?.Slug || artToMatch?.slug || '').toLowerCase().trim();
       const idx = sortedArticles.findIndex(a => {
         if (!a || typeof a !== 'object') return false;
-        if (artId && (a.id === artId || a.docId === artId || a.Doc_ID === artId)) return true;
-        if (artSlug && (a.Slug === artSlug || a.slug === artSlug)) return true;
+        const aId = String(a?.id || a?.Id || a?.docId || a?.Doc_ID || '').toLowerCase().trim();
+        const aSlug = (a?.Slug || a?.slug || '').toLowerCase().trim();
+        if (artId && aId && artId === aId) return true;
+        if (artSlug && aSlug && artSlug === aSlug) return true;
         return false;
       });
       if (idx !== -1) return idx;
     }
-    return sortedArticles.findIndex(art => {
-      if (!art || typeof art !== 'object') return false;
-      const artTitle = art?.Title || art?.title || '';
-      const artRawSlug = art?.Slug || art?.slug || '';
-      const artDecodedSlug = safeDecode(artRawSlug);
-      const artGeneratedSlug = createSlug(artTitle);
-      const docId = art?.docId || art?.Doc_ID || art?.id || '';
+    return -1;
+  }, [sortedArticles, article]);
 
-      return Boolean(
-        (artDecodedSlug && targetDecoded && artDecodedSlug.toLowerCase() === targetDecoded.toLowerCase()) ||
-        (artRawSlug && targetSlug && artRawSlug.toLowerCase() === targetSlug.toLowerCase()) ||
-        (artGeneratedSlug && targetDecoded && artGeneratedSlug.toLowerCase() === targetDecoded.toLowerCase()) ||
-        (artGeneratedSlug && targetSlug && artGeneratedSlug.toLowerCase() === targetSlug.toLowerCase()) ||
-        (targetNorm && normalizeKey(artRawSlug) === targetNorm) ||
-        (targetNorm && normalizeKey(artTitle) === targetNorm) ||
-        (targetNorm && docId && normalizeKey(docId) === targetNorm)
-      );
-    });
-  }, [sortedArticles, article, targetSlug, targetDecoded, targetNorm]);
-
-  // Synchronize state when navigating to a new slug or passing new props
-  useEffect(() => {
-    const immediate = getImmediateArticle({ slug: rawSlug, propArticle, initialArticle, item });
-    if (immediate) {
-      setArticle(immediate);
-      setIsLoading(false);
-      setIsFetched(true);
-    }
-  }, [rawSlug, propArticle, initialArticle, item]);
-
-  // Silent background re-fetch: update article from freshly revalidated CMS data without showing loader
-  useEffect(() => {
-    if (sortedArticles && sortedArticles.length > 0) {
-      const fresh = findMatchingArticle(sortedArticles, rawSlug);
-      if (fresh) {
-        setArticle(fresh);
-        setIsLoading(false);
-        setIsFetched(true);
-      } else if (!article && cmsFetched && !cmsLoading) {
-        setIsLoading(false);
-        setIsFetched(true);
+  // Manual retry handler
+  const handleManualRetry = async () => {
+    setIsRetrying(true);
+    setIsNotFound(false);
+    try {
+      const freshData = await fetchCMSData(true);
+      const liveList = (freshData && (freshData.currentAffairs || freshData.articles)) || [];
+      const match = matchArticleInList(liveList, targetSlug);
+      if (match) {
+        setArticle(match);
+        setIsNotFound(false);
+      } else {
+        setIsNotFound(true);
       }
-    } else if (!article && cmsFetched && !cmsLoading) {
-      setIsLoading(false);
-      setIsFetched(true);
+    } catch (err) {
+      console.warn('[CMS Sync] Manual force refresh failed:', err);
+      setIsNotFound(true);
+    } finally {
+      setIsRetrying(false);
     }
-  }, [sortedArticles, rawSlug, cmsFetched, cmsLoading, article]);
+  };
 
   // Persist resolved article to window memory cache for instant reads
   useEffect(() => {
@@ -552,7 +665,32 @@ export default function CurrentAffairsDetailPage({ slug, navigate, article: prop
     }
     metaKeywords.content = uniqueKeywords.join(', ');
 
-    // 4. Dynamically inject expanded NewsArticle JSON-LD schema into document <head> on render
+    // 4. Production Open Graph & Twitter Social Metadata
+    const posterImg = banner
+      ? (banner.startsWith('http') ? banner : `https://egurukulamforias.com${banner}`)
+      : 'https://egurukulamforias.com/images/egurukulam_logo.png';
+
+    const updateMetaTag = (attr, key, val) => {
+      let el = document.querySelector(`meta[${attr}="${key}"]`);
+      if (!el) {
+        el = document.createElement('meta');
+        el.setAttribute(attr, key);
+        document.head.appendChild(el);
+      }
+      el.setAttribute('content', val);
+    };
+
+    updateMetaTag('property', 'og:type', 'article');
+    updateMetaTag('property', 'og:title', docTitle);
+    updateMetaTag('property', 'og:description', metaDescContent);
+    updateMetaTag('property', 'og:url', canonicalUrl);
+    updateMetaTag('property', 'og:image', posterImg);
+    updateMetaTag('name', 'twitter:card', 'summary_large_image');
+    updateMetaTag('name', 'twitter:title', docTitle);
+    updateMetaTag('name', 'twitter:description', metaDescContent);
+    updateMetaTag('name', 'twitter:image', posterImg);
+
+    // 5. Dynamically inject expanded NewsArticle JSON-LD schema into document <head>
     const scriptId = 'ca-newsarticle-jsonld';
     let scriptEl = document.getElementById(scriptId);
     if (!scriptEl) {
@@ -576,9 +714,7 @@ export default function CurrentAffairsDetailPage({ slug, navigate, article: prop
     const mentionEntities = fanOutTopics.map(tag => ({
       "@type": "Thing",
       "name": tag,
-      "url": typeof window !== 'undefined'
-        ? `${window.location.origin}/current-affairs?topic=${encodeURIComponent(tag)}`
-        : `https://egurukulamforias.com/current-affairs?topic=${encodeURIComponent(tag)}`
+      "url": `https://egurukulamforias.com/current-affairs?topic=${encodeURIComponent(tag)}`
     }));
 
     const authorEntity = {
@@ -608,7 +744,7 @@ export default function CurrentAffairsDetailPage({ slug, navigate, article: prop
         "@type": "WebPage",
         "@id": canonicalUrl
       },
-      "image": banner ? [banner] : [],
+      "image": posterImg ? [posterImg] : [],
       "author": authorEntity,
       "publisher": publisherEntity,
       "about": aboutEntities,
@@ -629,15 +765,59 @@ export default function CurrentAffairsDetailPage({ slug, navigate, article: prop
 
     scriptEl.textContent = JSON.stringify(schemaData);
 
+    // 6. Dynamically inject BreadcrumbList JSON-LD schema (Home -> Current Affairs -> Article)
+    const breadcrumbScriptId = 'ca-breadcrumbs-jsonld';
+    let breadcrumbEl = document.getElementById(breadcrumbScriptId);
+    if (!breadcrumbEl) {
+      breadcrumbEl = document.createElement('script');
+      breadcrumbEl.id = breadcrumbScriptId;
+      breadcrumbEl.type = 'application/ld+json';
+      document.head.appendChild(breadcrumbEl);
+    }
+
+    const breadcrumbData = {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://egurukulamforias.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Current Affairs",
+          "item": "https://egurukulamforias.com/current-affairs"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": docTitle,
+          "item": canonicalUrl
+        }
+      ]
+    };
+
+    breadcrumbEl.textContent = JSON.stringify(breadcrumbData);
+
     return () => {
       const el = document.getElementById(scriptId);
       if (el) el.remove();
+
+      const bcEl = document.getElementById(breadcrumbScriptId);
+      if (bcEl) bcEl.remove();
 
       // Reset canonical to /current-affairs when navigating away
       const cLink = document.querySelector('link[rel="canonical"]');
       if (cLink) {
         cLink.setAttribute('href', 'https://egurukulamforias.com/current-affairs');
       }
+
+      // Reset og:type to website
+      const ogType = document.querySelector('meta[property="og:type"]');
+      if (ogType) ogType.setAttribute('content', 'website');
     };
   }, [article, categoryBadges, fanOutTopics]);
 
@@ -687,68 +867,175 @@ export default function CurrentAffairsDetailPage({ slug, navigate, article: prop
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // 4. ELIMINATE FULL-SCREEN CANVAS ANIMATIONS:
-  // Use only lightweight inline skeleton placeholders when waiting for CMS data and keep navigation mounted
-  if (!article) {
-    if (!isRouterReady || isLoading || !isFetched) {
-      return (
-        <main className="min-h-screen bg-[#FFFDF8] text-[#221814] py-12 px-4 sm:px-6 lg:px-8">
-          <div className="max-w-4xl mx-auto space-y-8 animate-pulse">
-            <div className="sticky z-20 bg-[#FAF6EE] p-4 sm:p-5 rounded-3xl border border-[#D5C3B0] shadow-sm flex items-center justify-between" style={{ top: 'var(--site-header-height, 134px)' }}>
-              <button
-                type="button"
-                onClick={() => navigate('/current-affairs')}
-                className="inline-flex items-center gap-2 text-xs sm:text-sm font-serif font-bold text-[#8C3A27] hover:text-[#732D1B] transition-colors cursor-pointer"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                <span>Back to Current Affairs</span>
-              </button>
-              <div className="h-4 w-28 bg-[#D5C3B0]/30 rounded-full"></div>
-            </div>
+  // 4. ELIMINATE FULL-SCREEN CANVAS ANIMATIONS & PREVENT PREMATURE 404:
+  // Render clean SkeletonLoadingView while loading
+  const isLoading = !article && !isNotFound && (cmsLoading || !cmsFetched || isRetrying);
 
-            <div className="space-y-6 pt-4">
-              <div className="flex gap-2">
-                <div className="h-6 w-24 bg-[#D5C3B0]/30 rounded-md"></div>
-                <div className="h-6 w-32 bg-[#D5C3B0]/20 rounded-md"></div>
-              </div>
-              <div className="h-10 sm:h-14 w-4/5 bg-[#D5C3B0]/30 rounded-2xl"></div>
-              <div className="h-4 w-48 bg-[#D5C3B0]/20 rounded-md"></div>
-              <div className="h-72 w-full bg-[#D5C3B0]/15 rounded-3xl mt-6"></div>
-              <div className="space-y-3 pt-4">
-                <div className="h-4 w-full bg-[#D5C3B0]/20 rounded"></div>
-                <div className="h-4 w-11/12 bg-[#D5C3B0]/20 rounded"></div>
-                <div className="h-4 w-4/5 bg-[#D5C3B0]/20 rounded"></div>
-              </div>
-            </div>
-          </div>
-        </main>
-      );
-    }
-
+  if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#FFFDF8] text-[#221814] py-16 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-xl mx-auto space-y-6 text-center bg-[#FAF6EE] p-8 sm:p-12 rounded-3xl border border-[#D5C3B0] shadow-sm">
-          <ShieldAlert className="w-12 h-12 text-[#8C3A27] mx-auto opacity-80" />
-          <h2 className="font-serif-header text-2xl sm:text-3xl font-extrabold text-[#221814]">
-            {sortedArticles.length === 0 ? "No Current Affairs published yet" : "Dispatch Not Found"}
-          </h2>
-          <p className="text-xs sm:text-sm font-serif italic text-[#5C4028] font-semibold leading-relaxed">
-            {sortedArticles.length === 0 
-              ? "We are currently preparing today's analytical dispatches. Please check back shortly." 
-              : "The requested Current Affairs article could not be located or may have been archived."}
-          </p>
-          <div className="pt-2">
+      <main className="min-h-screen bg-[#FFFDF8] text-[#221814] py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-4xl mx-auto space-y-8 animate-pulse">
+          <div className="sticky z-20 bg-[#FAF6EE] p-4 sm:p-5 rounded-3xl border border-[#D5C3B0] shadow-sm flex items-center justify-between" style={{ top: 'var(--site-header-height, 134px)' }}>
             <button
               type="button"
               onClick={() => navigate('/current-affairs')}
-              className="btn-terracotta-pill text-xs py-3 px-6 font-serif font-bold cursor-pointer inline-flex items-center gap-2"
+              className="inline-flex items-center gap-2 text-xs sm:text-sm font-serif font-bold text-[#8C3A27] hover:text-[#732D1B] transition-colors cursor-pointer"
             >
               <ArrowLeft className="w-4 h-4" />
               <span>Back to Current Affairs</span>
             </button>
+            <div className="h-4 w-28 bg-[#D5C3B0]/30 rounded-full"></div>
+          </div>
+
+          <div className="space-y-6 pt-4">
+            <div className="flex gap-2">
+              <div className="h-6 w-24 bg-[#D5C3B0]/30 rounded-md"></div>
+              <div className="h-6 w-32 bg-[#D5C3B0]/20 rounded-md"></div>
+            </div>
+            <div className="h-10 sm:h-14 w-4/5 bg-[#D5C3B0]/30 rounded-2xl"></div>
+            <div className="h-4 w-48 bg-[#D5C3B0]/20 rounded-md"></div>
+            <div className="h-72 w-full bg-[#D5C3B0]/15 rounded-3xl mt-6"></div>
+            <div className="space-y-3 pt-4">
+              <div className="h-4 w-full bg-[#D5C3B0]/20 rounded"></div>
+              <div className="h-4 w-11/12 bg-[#D5C3B0]/20 rounded"></div>
+              <div className="h-4 w-4/5 bg-[#D5C3B0]/20 rounded"></div>
+            </div>
           </div>
         </div>
-      </div>
+      </main>
+    );
+  }
+
+  // When loading finishes, if article is still not found, show latest dispatches with clean header.
+  if (!article) {
+    const recentDispatches = (sortedArticles && sortedArticles.length > 0)
+      ? sortedArticles.slice(0, 6)
+      : [];
+
+    return (
+      <main className="min-h-screen bg-[#FFFDF8] text-[#221814] py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-4xl mx-auto space-y-10">
+          {/* Top Sub-bar with header height offset */}
+          <div 
+            className="sticky z-20 bg-[#FAF6EE] p-4 sm:p-5 rounded-3xl border border-[#D5C3B0] shadow-sm flex items-center justify-between" 
+            style={{ top: 'var(--site-header-height, 134px)' }}
+          >
+            <button
+              type="button"
+              onClick={() => navigate('/current-affairs')}
+              className="inline-flex items-center gap-2 text-xs sm:text-sm font-serif font-bold text-[#8C3A27] hover:text-[#732D1B] transition-colors cursor-pointer"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Back to Current Affairs</span>
+            </button>
+            <span className="text-xs font-mono font-bold text-[#7A6B5D] uppercase tracking-wider">
+              Daily Editorial Briefings
+            </span>
+          </div>
+
+          {/* Clean Editorial Notice Card */}
+          <div className="bg-[#FAF6EE] p-8 sm:p-10 rounded-3xl border border-[#D5C3B0] shadow-sm text-center space-y-4 max-w-2xl mx-auto">
+            <div className="w-12 h-12 rounded-full bg-[#8C3A27]/10 text-[#8C3A27] flex items-center justify-center mx-auto">
+              <BookOpen className="w-6 h-6" />
+            </div>
+            <h1 className="font-serif-header text-2xl sm:text-3xl font-extrabold text-[#221814]">
+              Select an article below
+            </h1>
+            <p className="text-xs sm:text-sm font-serif italic text-[#5C4028] font-semibold leading-relaxed max-w-lg mx-auto">
+              The requested article could not be located in our active dispatches. Explore the latest published editorial analyses below, or retry fetching.
+            </p>
+            <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={handleManualRetry}
+                disabled={isRetrying}
+                className="btn-terracotta-pill text-xs py-2.5 px-6 font-serif font-bold cursor-pointer inline-flex items-center gap-2"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isRetrying ? 'animate-spin' : ''}`} />
+                <span>{isRetrying ? 'Checking Live Sheet...' : 'Retry Fetch'}</span>
+              </button>
+              <Link
+                to="/current-affairs"
+                navigate={navigate}
+                className="btn-terracotta-outline-pill text-xs py-2.5 px-6 font-serif font-bold cursor-pointer inline-flex items-center gap-2 no-underline"
+              >
+                <span>Explore All Dispatches</span>
+                <ArrowLeft className="w-4 h-4 rotate-180" />
+              </Link>
+            </div>
+          </div>
+
+          {/* Latest Published Dispatches Grid */}
+          {recentDispatches.length > 0 && (
+            <div className="space-y-6 pt-4">
+              <div className="flex items-center justify-between border-b border-[#D5C3B0]/60 pb-3">
+                <h2 className="font-serif-header text-xl sm:text-2xl font-bold text-[#221814]">
+                  Latest Published Dispatches
+                </h2>
+                <Link
+                  to="/current-affairs"
+                  navigate={navigate}
+                  className="text-xs font-serif font-bold text-[#8C3A27] hover:text-[#732D1B] hover:underline cursor-pointer no-underline"
+                >
+                  View All &rarr;
+                </Link>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {recentDispatches.map((item, idx) => {
+                  const itemTitle = item.Title || item.title || 'Current Affairs';
+                  const itemDate = formatDisplayDate(item.Date || item.date) || 'Recent';
+                  const itemCategory = item.Category || item.category || 'General Studies';
+                  const itemSlug = item.Slug || item.slug || createSlug(itemTitle);
+                  const itemSummary = item.Short_Summary || item.short_summary || item.Summary || item.summary || '';
+
+                  return (
+                    <Link
+                      key={idx}
+                      to={`/current-affairs/${encodeURIComponent(itemSlug)}`}
+                      state={{ article: item }}
+                      navigate={navigate}
+                      className="card-parchment-3d rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0] overflow-hidden flex flex-col justify-between hover:border-[#8C3A27] transition-all shadow-sm group text-left cursor-pointer p-6 space-y-4 no-underline block"
+                    >
+                      <div className="space-y-3 flex-1">
+                        <div className="flex items-center justify-between text-xs gap-2">
+                          <span className="inline-flex items-center gap-1.5 font-mono text-[#8C3A27] font-bold bg-[#8C3A27]/10 px-2.5 py-1 rounded-md border border-[#8C3A27]/20">
+                            <Tag className="w-3 h-3" />
+                            <span>{itemCategory}</span>
+                          </span>
+                          <span className="inline-flex items-center gap-1 font-serif text-[#7A6B5D] italic font-semibold">
+                            <Calendar className="w-3 h-3" />
+                            <span>{itemDate}</span>
+                          </span>
+                        </div>
+
+                        <h3 className="font-serif-header text-base font-bold text-[#221814] leading-snug group-hover:text-[#8C3A27] transition-colors line-clamp-2">
+                          {itemTitle}
+                        </h3>
+
+                        {itemSummary && (
+                          <p className="text-xs text-[#3D3028] font-sans font-medium leading-relaxed line-clamp-3">
+                            {itemSummary}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="p-0">
+                        <span
+                          className="w-full inline-flex items-center justify-center gap-2 btn-terracotta-outline-pill text-xs py-2 px-4 font-serif font-bold transition-all cursor-pointer group/btn group-hover:bg-[#8C3A27] group-hover:text-white"
+                        >
+                          <BookOpen className="w-3.5 h-3.5" />
+                          <span>READ DISPATCH &rarr;</span>
+                        </span>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      </main>
     );
   }
 
@@ -904,33 +1191,35 @@ export default function CurrentAffairsDetailPage({ slug, navigate, article: prop
           
           {/* Left: All Daily Current Affairs Return Button */}
           <div className="flex items-center gap-3 w-full sm:w-auto">
-            <button
-              type="button"
-              onClick={() => navigate('/current-affairs')}
-              className="btn-terracotta-outline-pill text-xs py-2.5 px-6 font-serif font-bold cursor-pointer shrink-0 w-full sm:w-auto"
+            <Link
+              to="/current-affairs"
+              navigate={navigate}
+              className="btn-terracotta-outline-pill text-xs py-2.5 px-6 font-serif font-bold cursor-pointer shrink-0 w-full sm:w-auto inline-flex items-center justify-center no-underline"
             >
               <span>← All Daily Current Affairs</span>
-            </button>
+            </Link>
 
             {prevArticle && (
-              <button
-                type="button"
-                onClick={() => navigateToArticle(prevArticle)}
-                className="hidden md:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0]/60 hover:border-[#8C3A27] transition-all group cursor-pointer text-xs font-serif font-bold text-[#221814] hover:text-[#8C3A27]"
+              <Link
+                to={`/current-affairs/${encodeURIComponent(safeDecode(prevArticle.Slug || prevArticle.slug || createSlug(prevArticle.Title || prevArticle.title)))}`}
+                state={{ article: prevArticle }}
+                navigate={navigate}
+                className="hidden md:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0]/60 hover:border-[#8C3A27] transition-all group cursor-pointer text-xs font-serif font-bold text-[#221814] hover:text-[#8C3A27] no-underline"
                 title={prevArticle?.Title || prevArticle?.title || 'Previous Dispatch'}
               >
                 <ChevronLeft className="w-4 h-4 text-[#8C3A27] group-hover:-translate-x-0.5 transition-transform" />
                 <span>Previous</span>
-              </button>
+              </Link>
             )}
           </div>
 
           {/* Right: READ NEXT Card */}
           {nextArticle && (
-            <button
-              type="button"
-              onClick={() => navigateToArticle(nextArticle)}
-              className="flex items-center justify-end text-right gap-3 p-3 sm:p-3.5 px-5 rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0]/60 hover:border-[#8C3A27] transition-all group cursor-pointer w-full sm:w-auto max-w-md shadow-2xs hover:shadow-xs sm:ml-auto"
+            <Link
+              to={`/current-affairs/${encodeURIComponent(safeDecode(nextArticle.Slug || nextArticle.slug || createSlug(nextArticle.Title || nextArticle.title)))}`}
+              state={{ article: nextArticle }}
+              navigate={navigate}
+              className="flex items-center justify-end text-right gap-3 p-3 sm:p-3.5 px-5 rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0]/60 hover:border-[#8C3A27] transition-all group cursor-pointer w-full sm:w-auto max-w-md shadow-2xs hover:shadow-xs sm:ml-auto no-underline"
             >
               <div className="space-y-0.5">
                 <span className="text-[10px] font-mono uppercase font-bold text-[#8C3A27] tracking-wider block">
@@ -941,7 +1230,7 @@ export default function CurrentAffairsDetailPage({ slug, navigate, article: prop
                 </p>
               </div>
               <ChevronRight className="w-5 h-5 text-[#8C3A27] shrink-0 group-hover:translate-x-1 transition-transform" />
-            </button>
+            </Link>
           )}
 
         </div>

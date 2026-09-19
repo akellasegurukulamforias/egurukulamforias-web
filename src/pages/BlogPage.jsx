@@ -10,6 +10,7 @@ import { useCMSData } from '../hooks/useCMSData';
 import { createSlug, getDirectImageUrl } from './CurrentAffairsReader';
 import { sortCurrentAffairsByDate, formatDisplayDate } from '../utils/dateUtils';
 import RisingDawnLoader from '../components/RisingDawnLoader';
+import Link from '../components/Link';
 
 export default function BlogPage({ navigate }) {
   const CURRENT_AFFAIRS_URL = "https://www.iasmentoring.com/current_affairs.html";
@@ -104,11 +105,23 @@ export default function BlogPage({ navigate }) {
                     ? rawTags.split(',').map(t => t.trim()).filter(Boolean)
                     : [];
 
+                // URL-safe slug resolution matching application router
+                const rawSlug = item?.Slug || item?.slug || createSlug(title);
+                let slug = rawSlug;
+                try {
+                  slug = decodeURIComponent(rawSlug);
+                } catch (e) {
+                  slug = rawSlug;
+                }
+                const articleUrl = `/current-affairs/${encodeURIComponent(slug || createSlug(title))}`;
+
                 return (
-                  <div 
+                  <Link 
                     key={idx} 
-                    className="card-parchment-3d rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0] overflow-hidden flex flex-col justify-between hover:border-[#8C3A27] transition-all shadow-sm group text-left cursor-pointer"
-                    onClick={() => handleOpenArticle(item)}
+                    to={articleUrl}
+                    navigate={navigate}
+                    state={{ article: item }}
+                    className="card-parchment-3d rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0] overflow-hidden flex flex-col justify-between hover:border-[#8C3A27] transition-all shadow-sm group text-left cursor-pointer no-underline block"
                   >
                     {/* Banner Image */}
                     {bannerImage && (
@@ -153,21 +166,16 @@ export default function BlogPage({ navigate }) {
                       )}
                     </div>
 
-                    {/* Action Button */}
+                    {/* Action Button (Styled visual pill inside anchor) */}
                     <div className="p-6 pt-0">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleOpenArticle(item);
-                        }}
-                        className="w-full inline-flex items-center justify-center gap-2 btn-terracotta-outline-pill text-xs py-2.5 px-4 font-serif font-bold transition-all cursor-pointer group/btn hover:bg-[#8C3A27] hover:text-white"
+                      <span
+                        className="w-full inline-flex items-center justify-center gap-2 btn-terracotta-outline-pill text-xs py-2.5 px-4 font-serif font-bold transition-all cursor-pointer group/btn group-hover:bg-[#8C3A27] group-hover:text-white"
                       >
                         <BookOpen className="w-3.5 h-3.5" />
                         <span>READ FULL ANALYSIS →</span>
-                      </button>
+                      </span>
                     </div>
-                  </div>
+                  </Link>
                 );
               })}
             </div>

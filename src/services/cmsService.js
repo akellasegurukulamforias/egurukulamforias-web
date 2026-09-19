@@ -398,27 +398,48 @@ export function getCachedCMSData() {
 
 let cachedCMSData = getCachedCMSData();
 let fetchPromise = null;
+let bypassPromise = null;
 let cmsNetworkFetched = false;
 
 export function isCMSNetworkFetched() {
   return cmsNetworkFetched;
 }
 
-export async function fetchCMSData(forceRevalidate = false) {
-  if (cachedCMSData && !forceRevalidate) {
+export async function fetchCMSData(forceRevalidate = false, bypassCache = false, slug = null) {
+  const shouldBypass = Boolean(forceRevalidate || bypassCache);
+
+  if (cachedCMSData && !shouldBypass) {
     return cachedCMSData;
   }
 
-  if (fetchPromise) {
+  if (fetchPromise && !shouldBypass) {
     return fetchPromise;
   }
 
-  fetchPromise = (async () => {
+  if (shouldBypass && bypassPromise) {
+    return bypassPromise;
+  }
+
+  const runFetch = async () => {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const timeoutId = setTimeout(() => controller.abort(), 9000);
 
     try {
-      const response = await fetch(CMS_API_ENDPOINT, {
+      let endpointUrl = CMS_API_ENDPOINT;
+      const queryParts = [];
+      if (shouldBypass) {
+        queryParts.push(`t=${Date.now()}`);
+        queryParts.push('nocache=true');
+      }
+      if (slug) {
+        queryParts.push(`slug=${encodeURIComponent(slug)}`);
+      }
+      if (queryParts.length > 0) {
+        const separator = endpointUrl.includes('?') ? '&' : '?';
+        endpointUrl += separator + queryParts.join('&');
+      }
+
+      const response = await fetch(endpointUrl, {
         method: 'GET',
         headers: {
           'Accept': 'application/json'
@@ -530,11 +551,25 @@ export async function fetchCMSData(forceRevalidate = false) {
         testSeries: []
       };
     } finally {
-      fetchPromise = null;
+      if (!shouldBypass) {
+        fetchPromise = null;
+      } else {
+        bypassPromise = null;
+      }
     }
-  })();
+  };
 
-  return fetchPromise;
+  if (!shouldBypass) {
+    fetchPromise = runFetch();
+    return fetchPromise;
+  }
+
+  bypassPromise = runFetch();
+  return bypassPromise;
+}
+
+export async function forceRefreshCMSData(slug = null) {
+  return fetchCMSData(true, true, slug);
 }
 
 export function clearCMSCache() {

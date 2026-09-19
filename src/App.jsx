@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import Header from './components/Header';
 import Footer from './components/Footer';
-import DesktopViewPrompt from './components/DesktopViewPrompt';
 import AnnouncementPopup from './components/AnnouncementPopup';
 import FloatingSocialDock from './components/FloatingSocialDock';
 import { useCMSData } from './hooks/useCMSData';
@@ -16,7 +15,6 @@ import ResourcesPage from './pages/ResourcesPage';
 import ConnectPage from './pages/ConnectPage';
 import CurrentAffairsDetailPage from './pages/CurrentAffairsDetailPage';
 import ResourceDetailPage from './pages/ResourceDetailPage';
-import ParticleConvergenceLoader from './components/ParticleConvergenceLoader';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -111,22 +109,41 @@ export default function App() {
   const [isPopupOpen, setIsPopupOpen] = useState(false);
   const [popupInitialIndex, setPopupInitialIndex] = useState(0);
   const [popupSelectedItem, setPopupSelectedItem] = useState(null);
-  const { data: cmsData, loading: cmsLoading } = useCMSData();
-
-  const hasCachedData = Boolean(
-    cmsData && (
-      (Array.isArray(cmsData.currentAffairs) && cmsData.currentAffairs.length > 0) ||
-      (Array.isArray(cmsData.resources) && cmsData.resources.length > 0)
-    )
-  );
+  const { data: cmsData } = useCMSData();
+  const isPopStateRef = useRef(false);
 
   useEffect(() => {
     const handlePopState = () => {
+      isPopStateRef.current = true;
       setCurrentPath((window.location.pathname + window.location.search) || '/');
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
+
+  // Centralized Scroll Restoration: Synchronously reset scroll to top on normal route navigation before paint
+  useLayoutEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    if (isPopStateRef.current) {
+      // Browser back/forward navigation: allow browser to restore scroll position naturally
+      isPopStateRef.current = false;
+      return;
+    }
+
+    // Check if URL has a hash target
+    if (window.location.hash) {
+      const targetId = window.location.hash.slice(1);
+      const targetElement = document.getElementById(targetId);
+      if (targetElement) {
+        targetElement.scrollIntoView();
+        return;
+      }
+    }
+
+    // Normal forward client navigation: immediate reset to top (no smooth animation abort glitch)
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }, [currentPath]);
 
   // Default metadata reset for top-level pages
   useEffect(() => {
@@ -137,7 +154,7 @@ export default function App() {
 
     if (!isDetailPage) {
       const titles = {
-        '/': 'e-Gurukulam for IAS | Tradition of Wisdom & Modern Rigor',
+        '/': "Akella Raghavendra's e-Gurukulam For IAS",
         '/about': 'About Us | e-Gurukulam for IAS',
         '/philosophy': 'About Us | e-Gurukulam for IAS',
         '/programs': 'UPSC Mentorship Programs | e-Gurukulam for IAS',
@@ -176,7 +193,22 @@ export default function App() {
 
       let metaDesc = document.querySelector('meta[name="description"]');
       if (metaDesc) {
-        metaDesc.setAttribute('content', 'e-Gurukulam for IAS - Premium UPSC Civil Services Examination mentoring, daily editorial current affairs analysis, comprehensive syllabus breakdown, and categorized PYQs.');
+        if (normalizedPath === '/') {
+          metaDesc.setAttribute('content', 'Prepare for UPSC Civil Services with Akella Raghavendra Sir through focused mentorship, practical strategy, current affairs, study resources, and disciplined preparation.');
+        } else {
+          metaDesc.setAttribute('content', 'e-Gurukulam for IAS - Premium UPSC Civil Services Examination mentoring, daily editorial current affairs analysis, comprehensive syllabus breakdown, and categorized PYQs.');
+        }
+      }
+
+      if (normalizedPath === '/') {
+        let ogTitle = document.querySelector('meta[property="og:title"]');
+        if (ogTitle) ogTitle.setAttribute('content', "Akella Raghavendra's e-Gurukulam For IAS");
+        let ogDesc = document.querySelector('meta[property="og:description"]');
+        if (ogDesc) ogDesc.setAttribute('content', 'Prepare for UPSC Civil Services with Akella Raghavendra Sir through focused mentorship, practical strategy, current affairs, study resources, and disciplined preparation.');
+        let twTitle = document.querySelector('meta[name="twitter:title"]');
+        if (twTitle) twTitle.setAttribute('content', "Akella Raghavendra's e-Gurukulam For IAS");
+        let twDesc = document.querySelector('meta[name="twitter:description"]');
+        if (twDesc) twDesc.setAttribute('content', 'Prepare for UPSC Civil Services with Akella Raghavendra Sir through focused mentorship, practical strategy, current affairs, study resources, and disciplined preparation.');
       }
     }
   }, [currentPath]);
@@ -193,12 +225,12 @@ export default function App() {
   }, [currentPath]);
 
   const navigate = (path, options = {}) => {
+    isPopStateRef.current = false;
     const currentFull = typeof window !== 'undefined' ? (window.location.pathname + window.location.search) : '';
     if (currentFull !== path || options?.state) {
       window.history.pushState(options?.state || {}, '', path);
     }
     setCurrentPath(path);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleOpenPopup = (indexOrItem = 0) => {
@@ -353,16 +385,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen flex flex-col foxing-vignette bg-[#F3EBD9] text-[#2C221E] selection:bg-[#8C3A27] selection:text-[#FCFAF6]">
-      {/* Desktop Mode Recommendation Popup for Mobile Users */}
-      <DesktopViewPrompt />
 
-      {/* Global Route Guard & Data Hydration Instant Transition */}
-      <ParticleConvergenceLoader 
-        isReady={!cmsLoading} 
-        minimal={hasCachedData}
-        label="Hydrating Knowledge Base..."
-        sublabel="e-Gurukulam for IAS • Tradition of Wisdom & Modern Rigor"
-      />
 
       {/* Dynamic Fanned Deck Google Sheet CMS Live Ticker / Announcement Popup Modal */}
       <AnnouncementPopup 

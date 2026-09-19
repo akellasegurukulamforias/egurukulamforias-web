@@ -567,9 +567,13 @@ export default function Header({ currentPath, navigate, onOpenPopup }) {
             if (item.isBadge) return null;
             const isActive = currentPath === item.path || (item.path !== '/' && currentPath.startsWith(item.path));
             return (
-              <button
+              <a
                 key={item.path}
-                onClick={() => handleNavClick(item.path)}
+                href={item.path}
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleNavClick(item.path);
+                }}
                 className={`nav-link manuscript-link transition-colors py-1 shrink-0 ${
                   isActive
                     ? 'text-[#8C3A27] border-b-2 border-[#8C3A27]'
@@ -577,7 +581,7 @@ export default function Header({ currentPath, navigate, onOpenPopup }) {
                 }`}
               >
                 {item.label}
-              </button>
+              </a>
             );
           })}
 
@@ -869,13 +873,17 @@ export default function Header({ currentPath, navigate, onOpenPopup }) {
           </div>
 
           {/* "Begin Your Journey With Us" CTA Button */}
-          <button
-            onClick={() => handleNavClick('/contact')}
-            className="btn-terracotta-pill text-xs py-2 px-4 shrink-0 whitespace-nowrap ml-2 shadow-xs"
+          <a
+            href="/contact"
+            onClick={(e) => {
+              e.preventDefault();
+              handleNavClick('/contact');
+            }}
+            className="btn-terracotta-pill text-xs py-2 px-4 shrink-0 whitespace-nowrap ml-2 shadow-xs inline-flex items-center no-underline"
           >
             <span className="btn-label" style={{ whiteSpace: 'nowrap' }}>Begin Your Journey With Us</span>
             <ArrowUpRight className="w-3.5 h-3.5" />
-          </button>
+          </a>
         </nav>
 
         {/* Mobile Menu Toggle Button */}
@@ -952,7 +960,7 @@ export default function Header({ currentPath, navigate, onOpenPopup }) {
                           <span>Trending Dispatches</span>
                         </div>
                         <div className="space-y-1">
-                          {defaultSuggestions.trendingCA.slice(0, 3).map((ca, idx) => (
+                          {defaultSuggestions.trendingCA.map((ca, idx) => (
                             <a
                               key={ca.slug || idx}
                               href={`/current-affairs/${encodeURIComponent(ca.slug)}`}
@@ -961,35 +969,37 @@ export default function Header({ currentPath, navigate, onOpenPopup }) {
                                 setSearchQuery('');
                                 handleNavClick(`/current-affairs/${encodeURIComponent(ca.slug)}`);
                               }}
-                              className="block p-1.5 rounded-md hover:bg-[#FAF6EE]"
+                              className="block p-1.5 rounded-md hover:bg-[#FAF6EE] text-left transition-colors"
                             >
                               <span className="text-xs font-serif font-bold text-[#221814] block line-clamp-1">{ca.title}</span>
-                              <span className="text-[10px] text-[#8C3A27] font-mono">Current Affairs {ca.gsTag ? `• ${ca.gsTag}` : ''}</span>
+                              <span className="text-[9px] text-[#7A6B5D]">{ca.date}</span>
                             </a>
                           ))}
                         </div>
                       </div>
                     )}
 
-                    <div className="pt-2">
-                      <div className="px-1 pb-1 text-[10px] font-mono font-bold uppercase text-[#8C3A27] flex items-center gap-1.5">
-                        <FileText className="w-3 h-3 text-[#8C3A27]" />
-                        <span>High-Frequency PYQ Topics</span>
+                    {defaultSuggestions.pyqShortcuts.length > 0 && (
+                      <div className="pt-2">
+                        <div className="px-1 pb-1 text-[10px] font-mono font-bold uppercase text-[#8C3A27] flex items-center gap-1.5">
+                          <FileText className="w-3 h-3 text-[#8C3A27]" />
+                          <span>Quick PYQs</span>
+                        </div>
+                        <div className="space-y-1">
+                          {defaultSuggestions.pyqShortcuts.map((topic) => (
+                            <button
+                              key={topic.id}
+                              type="button"
+                              onClick={() => setSearchQuery(topic.query)}
+                              className="w-full flex items-center justify-between p-1.5 rounded-md hover:bg-[#FAF6EE] text-left"
+                            >
+                              <span className="text-xs font-serif font-bold text-[#221814]">{topic.label}</span>
+                              <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-[#D4AF37]/20 text-[#8C3A27]">{topic.stage}</span>
+                            </button>
+                          ))}
+                        </div>
                       </div>
-                      <div className="space-y-1">
-                        {defaultSuggestions.pyqShortcuts.map((topic) => (
-                          <button
-                            key={topic.id}
-                            type="button"
-                            onClick={() => setSearchQuery(topic.query)}
-                            className="w-full flex items-center justify-between p-1.5 rounded-md hover:bg-[#FAF6EE] text-left"
-                          >
-                            <span className="text-xs font-serif font-bold text-[#221814]">{topic.label}</span>
-                            <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-[#D4AF37]/20 text-[#8C3A27]">{topic.stage}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
+                    )}
                   </div>
                 ) : (
                   /* Mobile Active Typing Filter */
@@ -1041,26 +1051,34 @@ export default function Header({ currentPath, navigate, onOpenPopup }) {
             if (item.isBadge) {
               return (
                 <div key={item.path} className="pt-2">
-                  <button
-                    onClick={() => handleNavClick(item.path)}
-                    className="btn-terracotta-pill text-xs py-2.5 px-6 w-full justify-center"
+                  <a
+                    href={item.path}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleNavClick(item.path);
+                    }}
+                    className="btn-terracotta-pill text-xs py-2.5 px-6 w-full justify-center inline-flex items-center no-underline"
                   >
                     <span className="btn-label">{item.label}</span>
                     <ArrowUpRight className="w-3.5 h-3.5" />
-                  </button>
+                  </a>
                 </div>
               );
             }
             return (
-              <button
+              <a
                 key={item.path}
-                onClick={() => handleNavClick(item.path)}
-                className={`block w-full text-left font-serif text-sm font-bold uppercase tracking-wider py-2 border-b border-[#D5C3B0]/40 ${
+                href={item.path}
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleNavClick(item.path);
+                }}
+                className={`block w-full text-left font-serif text-sm font-bold uppercase tracking-wider py-2 border-b border-[#D5C3B0]/40 no-underline ${
                   isActive ? 'text-[#8C3A27]' : 'text-[#140C08]'
                 }`}
               >
                 {item.label}
-              </button>
+              </a>
             );
           })}
         </div>

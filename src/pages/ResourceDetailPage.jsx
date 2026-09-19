@@ -31,11 +31,11 @@ import {
   extractPYQPaperLabel,
   getPYQPaperUrl,
   sortPYQPapers,
-  getCachedCMSData
+  getCachedCMSData,
+  isCMSNetworkFetched
 } from '../services/cmsService';
 import { sortCurrentAffairsByDate, formatDisplayDate, parseDateToTimestamp } from '../utils/dateUtils';
 import { createSlug, getDirectImageUrl, getSecondaryImageUrl } from '../utils/urlUtils';
-import ParticleConvergenceLoader from '../components/ParticleConvergenceLoader';
 
 /**
  * Clean and optimize raw HTML for high-fidelity native editorial typography
@@ -530,7 +530,7 @@ export default function ResourceDetailPage({ slug, folder, year, stage, stream, 
 
   // 1. Explicit Loading & Fetched States (0ms if initialResource found)
   const [isLoading, setIsLoading] = useState(!initialResource);
-  const [isFetched, setIsFetched] = useState(Boolean(initialResource || (cmsFetched && !cmsLoading)));
+  const [isFetched, setIsFetched] = useState(Boolean(initialResource || isCMSNetworkFetched()));
 
   // Sorted list of active resources (latest first)
   const sortedResources = useMemo(() => {
@@ -565,7 +565,7 @@ export default function ResourceDetailPage({ slug, folder, year, stage, stream, 
     if (initialResource) {
       setIsLoading(false);
       setIsFetched(true);
-    } else {
+    } else if (!isCMSNetworkFetched()) {
       setIsLoading(true);
       setIsFetched(false);
     }
@@ -584,12 +584,12 @@ export default function ResourceDetailPage({ slug, folder, year, stage, stream, 
       // Resource matched successfully (from cache or fresh network response)
       setIsLoading(false);
       setIsFetched(true);
-    } else if (!cmsLoading && cmsFetched) {
-      // Network/cache query has completely settled and resource is verified absent
+    } else if (isCMSNetworkFetched()) {
+      // Live network fetch has completely settled and resource is verified absent
       setIsLoading(false);
       setIsFetched(true);
     } else {
-      // Network fetch actively pending
+      // Live network fetch actively pending
       setIsLoading(true);
       setIsFetched(false);
     }
@@ -888,7 +888,32 @@ export default function ResourceDetailPage({ slug, folder, year, stage, stream, 
       ].filter(Boolean).join(', ');
       metaKeywords.setAttribute('content', keywordsList);
 
-      // 5. Inject semantic Schema.org JSON-LD in head
+      // 5. Open Graph & Twitter Social Metadata
+      const updateMetaTag = (attr, key, val) => {
+        let el = document.querySelector(`meta[${attr}="${key}"]`);
+        if (!el) {
+          el = document.createElement('meta');
+          el.setAttribute(attr, key);
+          document.head.appendChild(el);
+        }
+        el.setAttribute('content', val);
+      };
+
+      const posterImg = bannerImage
+        ? (bannerImage.startsWith('http') ? bannerImage : `https://egurukulamforias.com${bannerImage}`)
+        : 'https://egurukulamforias.com/images/egurukulam_logo.png';
+
+      updateMetaTag('property', 'og:type', 'article');
+      updateMetaTag('property', 'og:title', pageTitle);
+      updateMetaTag('property', 'og:description', descContent);
+      updateMetaTag('property', 'og:url', canonicalUrl);
+      updateMetaTag('property', 'og:image', posterImg);
+      updateMetaTag('name', 'twitter:card', 'summary_large_image');
+      updateMetaTag('name', 'twitter:title', pageTitle);
+      updateMetaTag('name', 'twitter:description', descContent);
+      updateMetaTag('name', 'twitter:image', posterImg);
+
+      // 6. Inject semantic Schema.org JSON-LD in head
       const schemaId = 'resource-schema-jsonld';
       let schemaScript = document.getElementById(schemaId);
       if (!schemaScript) {
@@ -1005,7 +1030,7 @@ export default function ResourceDetailPage({ slug, folder, year, stage, stream, 
           '@type': 'Article',
           'headline': title,
           'description': descContent,
-          'image': bannerImage ? [bannerImage] : [],
+          'image': posterImg ? [posterImg] : [],
           'educationalAlignment': {
             '@type': 'AlignmentObject',
             'alignmentType': 'educationalSubject',
@@ -1024,6 +1049,43 @@ export default function ResourceDetailPage({ slug, folder, year, stage, stream, 
       }
 
       schemaScript.textContent = JSON.stringify(schemaData);
+
+      // 7. Inject BreadcrumbList JSON-LD
+      const breadcrumbScriptId = 'resource-breadcrumbs-jsonld';
+      let breadcrumbScript = document.getElementById(breadcrumbScriptId);
+      if (!breadcrumbScript) {
+        breadcrumbScript = document.createElement('script');
+        breadcrumbScript.id = breadcrumbScriptId;
+        breadcrumbScript.type = 'application/ld+json';
+        document.head.appendChild(breadcrumbScript);
+      }
+
+      const breadcrumbsItems = [
+        {
+          '@type': 'ListItem',
+          'position': 1,
+          'name': 'Home',
+          'item': 'https://egurukulamforias.com/'
+        },
+        {
+          '@type': 'ListItem',
+          'position': 2,
+          'name': isPYQ ? 'Previous Year Questions' : (isSyllabus ? 'Syllabus' : 'Resources'),
+          'item': isPYQ ? 'https://egurukulamforias.com/resources/pyqs' : (isSyllabus ? 'https://egurukulamforias.com/resources/upsc-syllabus' : 'https://egurukulamforias.com/resources')
+        },
+        {
+          '@type': 'ListItem',
+          'position': 3,
+          'name': title,
+          'item': canonicalUrl
+        }
+      ];
+
+      breadcrumbScript.textContent = JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'BreadcrumbList',
+        'itemListElement': breadcrumbsItems
+      });
     }
 
     return () => {
@@ -1032,6 +1094,13 @@ export default function ResourceDetailPage({ slug, folder, year, stage, stream, 
       if (schemaScript) {
         schemaScript.remove();
       }
+      const bcScript = document.getElementById('resource-breadcrumbs-jsonld');
+      if (bcScript) {
+        bcScript.remove();
+      }
+      // Reset og:type to website
+      const ogType = document.querySelector('meta[property="og:type"]');
+      if (ogType) ogType.setAttribute('content', 'website');
     };
   }, [article, title, shortSummary, bannerImage, isPYQ, isSyllabus, detectedYear, detectedStage, paperName, pyqQuestions, category]);
 
@@ -1069,58 +1138,195 @@ export default function ResourceDetailPage({ slug, folder, year, stage, stream, 
   // 3. Catching Route Hydration Delays
   const isRouterReady = Boolean(slug && typeof slug === 'string' && slug.trim().length > 0);
 
-  // 1. GLOBAL ROUTE GUARD: PARTICLE CONVERGENCE LOADER WHILE ROUTE/DATA IS HYDRATING
-  // If isLoading OR !isFetched, OR router is not ready: NEVER render Not Found screen!
+  // 1. INLINE LIGHTWEIGHT SKELETON PLACEHOLDER WHILE ROUTE/DATA IS SYNCING
+  // Keeps header, navigation, and page framework mounted immediately
   if (!isRouterReady || isLoading || !isFetched) {
+    const backLink = folder === 'upsc-syllabus' 
+      ? '/resources/upsc-syllabus' 
+      : folder === 'pyqs' 
+        ? (year ? `/resources/pyqs/${year}` : '/resources/pyqs') 
+        : '/resources';
+    const backLabel = folder === 'upsc-syllabus' 
+      ? 'Back to UPSC Syllabus' 
+      : folder === 'pyqs' 
+        ? (year ? `Back to ${year} PYQs` : 'Back to All PYQs') 
+        : 'Back to Resources';
+
     return (
-      <ParticleConvergenceLoader
-        isReady={false}
-        label={isPYQ ? "Hydrating Question Paper..." : isSyllabus ? "Hydrating Syllabus..." : "Hydrating Study Resource..."}
-        sublabel="e-Gurukulam for IAS • Tradition of Wisdom & Modern Rigor"
-        fullScreen={true}
-      />
+      <main className="min-h-screen bg-[#FFFDF8] text-[#221814] py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-4xl mx-auto space-y-8 animate-pulse">
+          <div 
+            className="sticky z-20 bg-[#FAF6EE] p-4 sm:p-5 rounded-3xl border border-[#D5C3B0] shadow-sm flex items-center justify-between" 
+            style={{ top: 'var(--site-header-height, 134px)' }}
+          >
+            <button
+              type="button"
+              onClick={() => navigate(backLink)}
+              className="inline-flex items-center gap-2 text-xs sm:text-sm font-serif font-bold text-[#8C3A27] hover:text-[#732D1B] transition-colors cursor-pointer"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>{backLabel}</span>
+            </button>
+            <div className="h-4 w-28 bg-[#D5C3B0]/30 rounded-full"></div>
+          </div>
+
+          <div className="space-y-6 pt-4">
+            <div className="flex gap-2">
+              <div className="h-6 w-24 bg-[#D5C3B0]/30 rounded-md"></div>
+              <div className="h-6 w-32 bg-[#D5C3B0]/20 rounded-md"></div>
+            </div>
+            <div className="h-10 sm:h-14 w-4/5 bg-[#D5C3B0]/30 rounded-2xl"></div>
+            <div className="h-4 w-48 bg-[#D5C3B0]/20 rounded-md"></div>
+            <div className="h-72 w-full bg-[#D5C3B0]/15 rounded-3xl mt-6"></div>
+            <div className="space-y-3 pt-4">
+              <div className="h-4 w-full bg-[#D5C3B0]/20 rounded"></div>
+              <div className="h-4 w-11/12 bg-[#D5C3B0]/20 rounded"></div>
+              <div className="h-4 w-4/5 bg-[#D5C3B0]/20 rounded"></div>
+            </div>
+          </div>
+        </div>
+      </main>
     );
   }
 
-  // 2. RESOURCE NOT FOUND STATE (STRICT INVARIANT: ONLY AFTER CMS QUERY IS COMPLETE)
-  // If isFetched AND !isLoading AND !resource: Render "Resource Not Found"
+  // 2. RESOURCE NOT FOUND STATE (ONLY AFTER LIVE CMS QUERY IS CONFIRMED COMPLETE)
   if (isFetched && !isLoading && !resource) {
+    const backLink = folder === 'upsc-syllabus' 
+      ? '/resources/upsc-syllabus' 
+      : folder === 'pyqs' 
+        ? (year ? `/resources/pyqs/${year}` : '/resources/pyqs') 
+        : '/resources';
+    const backLabel = folder === 'upsc-syllabus' 
+      ? 'Back to UPSC Syllabus' 
+      : folder === 'pyqs' 
+        ? (year ? `Back to ${year} PYQs` : 'Back to All PYQs') 
+        : 'Back to Resources';
+
+    const recentResources = sortedResources.slice(0, 3);
+
     return (
-      <div className="min-h-screen bg-[#FFFDF8] text-[#221814] py-16 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-xl mx-auto space-y-6 text-center bg-[#FAF6EE] p-8 sm:p-12 rounded-3xl border border-[#D5C3B0] shadow-sm">
-          <ShieldAlert className="w-12 h-12 text-[#8C3A27] mx-auto opacity-80" />
-          <h2 className="font-serif-header text-2xl sm:text-3xl font-extrabold text-[#221814]">
-            Resource Not Found
-          </h2>
-          <p className="text-xs sm:text-sm font-serif italic text-[#5C4028] font-semibold leading-relaxed">
-            The requested study resource could not be located or may have been archived.
-          </p>
-          <div className="pt-2">
+      <main className="min-h-screen bg-[#FFFDF8] text-[#221814] py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-4xl mx-auto space-y-10">
+          {/* Top Sub-bar with header height offset */}
+          <div 
+            className="sticky z-20 bg-[#FAF6EE] p-4 sm:p-5 rounded-3xl border border-[#D5C3B0] shadow-sm flex items-center justify-between" 
+            style={{ top: 'var(--site-header-height, 134px)' }}
+          >
             <button
               type="button"
-              onClick={() => {
-                if (folder === 'upsc-syllabus') {
-                  navigate('/resources/upsc-syllabus');
-                } else if (folder === 'pyqs') {
-                  navigate(year ? `/resources/pyqs/${year}` : '/resources/pyqs');
-                } else {
-                  navigate('/resources');
-                }
-              }}
-              className="btn-terracotta-pill text-xs py-3 px-6 font-serif font-bold cursor-pointer inline-flex items-center gap-2"
+              onClick={() => navigate(backLink)}
+              className="inline-flex items-center gap-2 text-xs sm:text-sm font-serif font-bold text-[#8C3A27] hover:text-[#732D1B] transition-colors cursor-pointer"
             >
               <ArrowLeft className="w-4 h-4" />
-              <span>
-                {folder === 'upsc-syllabus'
-                  ? 'Back to UPSC Syllabus'
-                  : folder === 'pyqs'
-                    ? year ? `Back to ${year} PYQs` : 'Back to All PYQs'
-                    : 'Back to Resources'}
-              </span>
+              <span>{backLabel}</span>
             </button>
+            <span className="text-xs font-mono font-bold text-[#7A6B5D] uppercase tracking-wider">
+              Knowledge Repository
+            </span>
           </div>
+
+          {/* Clean Editorial Notice Card */}
+          <div className="bg-[#FAF6EE] p-8 sm:p-10 rounded-3xl border border-[#D5C3B0] shadow-sm text-center space-y-4 max-w-2xl mx-auto">
+            <div className="w-12 h-12 rounded-full bg-[#8C3A27]/10 text-[#8C3A27] flex items-center justify-center mx-auto">
+              <BookOpen className="w-6 h-6" />
+            </div>
+            <h1 className="font-serif-header text-2xl sm:text-3xl font-extrabold text-[#221814]">
+              Resource Archived or Moved
+            </h1>
+            <p className="text-xs sm:text-sm font-serif italic text-[#5C4028] font-semibold leading-relaxed max-w-lg mx-auto">
+              The requested study resource or paper could not be located in our active index. Explore our latest available materials below, or browse the repository.
+            </p>
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => navigate(backLink)}
+                className="btn-terracotta-pill text-xs py-2.5 px-6 font-serif font-bold cursor-pointer inline-flex items-center gap-2"
+              >
+                <span>{backLabel}</span>
+                <ArrowLeft className="w-4 h-4 rotate-180" />
+              </button>
+            </div>
+          </div>
+
+          {/* Latest Available Resources Grid */}
+          {recentResources.length > 0 && (
+            <div className="space-y-6 pt-4">
+              <div className="flex items-center justify-between border-b border-[#D5C3B0]/60 pb-3">
+                <h2 className="font-serif-header text-xl sm:text-2xl font-bold text-[#221814]">
+                  Latest Available Resources
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => navigate('/resources')}
+                  className="text-xs font-serif font-bold text-[#8C3A27] hover:text-[#732D1B] hover:underline cursor-pointer"
+                >
+                  View All &rarr;
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {recentResources.map((item, idx) => {
+                  const itemTitle = item.Title || item.title || 'Study Resource';
+                  const itemDate = formatDisplayDate(item.Date || item.date) || 'Recent';
+                  const itemCategory = item.Category || item.category || 'Study Material';
+                  const itemSlug = item.slug || item.Slug || createSlug(itemTitle);
+                  const itemSummary = item.Short_Summary || item.short_summary || item.Summary || item.summary || item.Description || item.description || '';
+
+                  let targetUrl = `/resources/${encodeURIComponent(itemSlug)}`;
+                  if (isSyllabusResource(item)) {
+                    targetUrl = `/resources/upsc-syllabus/${encodeURIComponent(itemSlug)}`;
+                  } else if (isPYQResource(item)) {
+                    targetUrl = `/resources/pyqs/${encodeURIComponent(itemSlug)}`;
+                  }
+
+                  return (
+                    <div
+                      key={idx}
+                      className="card-parchment-3d rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0] overflow-hidden flex flex-col justify-between hover:border-[#8C3A27] transition-all shadow-sm group text-left cursor-pointer p-6 space-y-4"
+                      onClick={() => navigate(targetUrl, { state: { resource: item } })}
+                    >
+                      <div className="space-y-3 flex-1">
+                        <div className="flex items-center justify-between text-xs gap-2">
+                          <span className="inline-flex items-center gap-1.5 font-mono text-[#8C3A27] font-bold bg-[#8C3A27]/10 px-2.5 py-1 rounded-md border border-[#8C3A27]/20">
+                            <Tag className="w-3 h-3" />
+                            <span>{itemCategory}</span>
+                          </span>
+                          <span className="inline-flex items-center gap-1 font-serif text-[#7A6B5D] italic font-semibold">
+                            <Calendar className="w-3 h-3" />
+                            <span>{itemDate}</span>
+                          </span>
+                        </div>
+
+                        <h3 className="font-serif-header text-base font-bold text-[#221814] leading-snug group-hover:text-[#8C3A27] transition-colors line-clamp-2">
+                          {itemTitle}
+                        </h3>
+
+                        {itemSummary && (
+                          <p className="text-xs text-[#3D3028] font-sans font-medium leading-relaxed line-clamp-3">
+                            {itemSummary}
+                          </p>
+                        )}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(targetUrl, { state: { resource: item } });
+                        }}
+                        className="w-full inline-flex items-center justify-center gap-2 btn-terracotta-outline-pill text-xs py-2 px-4 font-serif font-bold transition-all cursor-pointer group/btn hover:bg-[#8C3A27] hover:text-white"
+                      >
+                        <BookOpen className="w-3.5 h-3.5" />
+                        <span>OPEN RESOURCE &rarr;</span>
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
-      </div>
+      </main>
     );
   }
 
