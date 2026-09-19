@@ -11,10 +11,9 @@ const __dirname = path.dirname(__filename);
 
 const BASE_URL = 'https://egurukulamforias.com';
 const CMS_API_ENDPOINT = 'https://script.google.com/macros/s/AKfycbyOt8dZ7S9ot1Zy3GyyXgsDTPsrF016odbaXhf9DXXPMllvQzmQvKabubXZFzRra51x/exec';
-const PUBLIC_DIR = path.resolve(__dirname, '../public');
-const SITEMAP_PATH = path.join(PUBLIC_DIR, 'sitemap.xml');
-const DIST_DIR = path.resolve(__dirname, '../dist');
-const LOCAL_BACKUP_PATH = path.resolve(__dirname, '../src/data/current_affairs.json');
+// NOTE: Production sitemaps are served dynamically on Vercel via api/sitemap.xml.
+// Never write sitemap.xml to public/ or dist/, because static files shadow Vercel serverless rewrites.
+const PREVIEW_OUTPUT_PATH = path.resolve(__dirname, 'sitemap-preview.xml');
 
 // Helper to get today's date in YYYY-MM-DD format
 function getTodayYMD() {
@@ -177,7 +176,7 @@ async function fetchCMSArticlesAndResources() {
   try {
     console.log('[Sitemap] Fetching active current affairs and resources from Google Apps Script CMS...');
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 12000);
+    const timeout = setTimeout(() => controller.abort(), 30000);
 
     const response = await fetch(CMS_API_ENDPOINT, {
       method: 'GET',
@@ -200,19 +199,7 @@ async function fetchCMSArticlesAndResources() {
     console.log(`[Sitemap] Fetched ${activeAffairs.length} active current affairs and ${activeResources.length} active resources from live CMS.`);
     return { currentAffairs: activeAffairs, resources: activeResources };
   } catch (err) {
-    console.warn(`[Sitemap] Warning: Could not fetch from live CMS endpoint (${err.message}). Using local backup data.`);
-    try {
-      if (fs.existsSync(LOCAL_BACKUP_PATH)) {
-        const rawBackup = fs.readFileSync(LOCAL_BACKUP_PATH, 'utf8');
-        const backupList = JSON.parse(rawBackup);
-        if (Array.isArray(backupList)) {
-          console.log(`[Sitemap] Loaded ${backupList.length} articles from local backup file.`);
-          return { currentAffairs: backupList.filter(isItemActive), resources: [] };
-        }
-      }
-    } catch (readErr) {
-      console.error('[Sitemap] Failed to read local backup:', readErr.message);
-    }
+    console.warn(`[Sitemap] Warning: Could not fetch from live CMS endpoint (${err.message}).`);
     return { currentAffairs: [], resources: [] };
   }
 }
@@ -392,21 +379,10 @@ async function generateSitemap() {
     ''
   ].join('\n');
 
-  // 4. Ensure public/ directory exists and write sitemap.xml
-  if (!fs.existsSync(PUBLIC_DIR)) {
-    fs.mkdirSync(PUBLIC_DIR, { recursive: true });
-  }
-
-  fs.writeFileSync(SITEMAP_PATH, xmlContent, 'utf8');
-  console.log(`[Sitemap] Generated sitemap.xml with ${urlEntries.length} total URLs (${STATIC_ROUTES.length} static + ${articleCount} current affairs + ${resourceCount} resources).`);
-  console.log(`[Sitemap] Output saved to: ${SITEMAP_PATH}`);
-
-  // 5. Also sync to dist/ if dist/ folder already exists (e.g. in post-build steps)
-  if (fs.existsSync(DIST_DIR)) {
-    const distSitemap = path.join(DIST_DIR, 'sitemap.xml');
-    fs.writeFileSync(distSitemap, xmlContent, 'utf8');
-    console.log(`[Sitemap] Synced sitemap.xml to dist folder: ${distSitemap}`);
-  }
+  // 4. Save preview XML to scripts/sitemap-preview.xml (do NOT write to public/ or dist/)
+  fs.writeFileSync(PREVIEW_OUTPUT_PATH, xmlContent, 'utf8');
+  console.log(`[Sitemap Preview] Generated sitemap preview with ${urlEntries.length} total URLs (${STATIC_ROUTES.length} static + ${articleCount} current affairs + ${resourceCount} resources).`);
+  console.log(`[Sitemap Preview] Output saved to: ${PREVIEW_OUTPUT_PATH}`);
 }
 
 generateSitemap().catch(err => {

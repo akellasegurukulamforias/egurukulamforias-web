@@ -430,23 +430,13 @@ export default function CurrentAffairsDetailPage({ slug: propSlug, id: propId, n
           return;
         }
 
-        // Only mark as not-found if CMS network fetch has completed and item isn't present
-        if (cmsFetched && !cmsLoading) {
-          if (isMounted) {
-            setIsNotFound(true);
-          }
+        // If not found in current collection but live network fetch is still pending, keep waiting in loading state
+        if (!isCMSNetworkFetched() || cmsLoading || !cmsFetched) {
+          return;
         }
-        return;
-      }
 
-      // 4. If sortedArticles is currently empty:
-      // While useCMSData is still loading / not fetched, keep loading!
-      if (cmsLoading || !cmsFetched) {
-        return;
-      }
-
-      // 5. If useCMSData completed with zero items, attempt direct fetch as safeguard
-      if (cmsFetched && !cmsLoading && sortedArticles.length === 0) {
+        // Live network fetch has completed, but article wasn't found in sortedArticles.
+        // Attempt a direct fetch safeguard to be 100% sure before marking not-found
         try {
           const freshData = await fetchCMSData(true);
           const liveList = (freshData && (freshData.currentAffairs || freshData.articles)) || [];
@@ -463,6 +453,31 @@ export default function CurrentAffairsDetailPage({ slug: propSlug, id: propId, n
         if (isMounted) {
           setIsNotFound(true);
         }
+        return;
+      }
+
+      // 4. If sortedArticles is currently empty:
+      // While useCMSData is still loading / not fetched / network pending, keep loading!
+      if (cmsLoading || !cmsFetched || !isCMSNetworkFetched()) {
+        return;
+      }
+
+      // 5. If live CMS fetch completed with zero items, attempt direct fetch as safeguard
+      try {
+        const freshData = await fetchCMSData(true);
+        const liveList = (freshData && (freshData.currentAffairs || freshData.articles)) || [];
+        const match = matchArticleInList(liveList, targetSlug);
+        if (match && isMounted) {
+          setArticle(match);
+          setIsNotFound(false);
+          return;
+        }
+      } catch (err) {
+        console.warn('[CMS Sync] Direct fetch safeguard encountered error:', err);
+      }
+
+      if (isMounted) {
+        setIsNotFound(true);
       }
     }
 
@@ -868,8 +883,8 @@ export default function CurrentAffairsDetailPage({ slug: propSlug, id: propId, n
   };
 
   // 4. ELIMINATE FULL-SCREEN CANVAS ANIMATIONS & PREVENT PREMATURE 404:
-  // Render clean SkeletonLoadingView while loading
-  const isLoading = !article && !isNotFound && (cmsLoading || !cmsFetched || isRetrying);
+  const isNetworkPending = !isCMSNetworkFetched();
+  const isLoading = !article && !isNotFound && (cmsLoading || !cmsFetched || isNetworkPending || isRetrying);
 
   if (isLoading) {
     return (

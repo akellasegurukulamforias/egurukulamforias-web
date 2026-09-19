@@ -422,7 +422,7 @@ export async function fetchCMSData(forceRevalidate = false, bypassCache = false,
 
   const runFetch = async () => {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 9000);
+    const timeoutId = setTimeout(() => controller.abort(), 25000);
 
     try {
       let endpointUrl = CMS_API_ENDPOINT;

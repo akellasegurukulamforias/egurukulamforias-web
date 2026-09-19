@@ -18,19 +18,6 @@ const STATIC_ROUTES = [
   { path: '/resources/pyqs', priority: '0.8', changefreq: 'daily' }
 ];
 
-// Fallback high-yield articles in case CMS network fetch drops
-const FALLBACK_DISPATCHES = [
-  { title: "UPI Merchant Discount Rate (MDR): Will it Affect UPI Usage?", slug: "upi-merchant-discount-rate-mdr-will-it-affect-upi-usage", date: "2026-09-17" },
-  { title: "How India Became a Major Destination for Wild Animals", slug: "how-india-became-a-major-destination-for-wild-animals", date: "2026-09-16" },
-  { title: "Important Helpline Numbers in India and the World", slug: "important-helpline-numbers-in-india-and-the-world", date: "2026-09-15" },
-  { title: "BRICS & Climate Change", slug: "brics-climate-change", date: "2026-09-14" },
-  { title: "BRICS: India's Vision", slug: "brics-india-s-vision", date: "2026-09-13" },
-  { title: "Sea Change: Five New Acts to Accelerate Growth in India's Maritime Sector", slug: "sea-change-five-new-acts-to-accelerate-growth-in-india-s-maritime-sector", date: "2026-09-12" },
-  { title: "BRICS De-Dollarisation & Global Trade: Can BRICS Reshape the Global Economic Order?", slug: "brics-de-dollarisation-global-trade-can-brics-reshape-the-global-economic-order", date: "2026-09-11" },
-  { title: "Bridging the Gap: Infrastructure, Human Rights, and Last-Mile Governance", slug: "bridging-the-gap-infrastructure-human-rights-and-last-mile-governance", date: "2026-09-10" },
-  { title: "Domestic Workers Legal Protection", slug: "domestic-workers-legal-protection", date: "2026-09-10" },
-  { title: "Dedicated Freight Corridors", slug: "freight-corridors", date: "2026-09-09" }
-];
 
 function getTodayYMD() {
   const now = new Date();
@@ -137,13 +124,14 @@ export default async function handler(req, res) {
       }
     }
 
-    // 2. Fetch Live CMS Data with an AbortController timeout (6 seconds)
+    // 2. Fetch Live CMS Data with an AbortController timeout (25 seconds)
     let currentAffairs = [];
     let resources = [];
+    let isLiveCms = false;
 
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 6000);
+      const timeoutId = setTimeout(() => controller.abort(), 25000);
 
       const cmsResponse = await fetch(CMS_API_ENDPOINT, {
         method: 'GET',
@@ -159,14 +147,10 @@ export default async function handler(req, res) {
 
         currentAffairs = rawAffairs.filter(isItemActive);
         resources = rawResources.filter(isItemActive);
+        isLiveCms = true;
       }
     } catch (fetchErr) {
-      console.warn('[Sitemap Serverless] CMS fetch warning, falling back to static backup:', fetchErr.message);
-    }
-
-    // Fallback if CMS fetch yielded 0 articles
-    if (currentAffairs.length === 0) {
-      currentAffairs = FALLBACK_DISPATCHES;
+      console.warn('[Sitemap Serverless] CMS fetch warning, serving core static routes only:', fetchErr.message);
     }
 
     // 3. Process Dynamic Current Affairs (Priority 0.9)
@@ -317,7 +301,13 @@ export default async function handler(req, res) {
     ].join('\n');
 
     res.setHeader('Content-Type', 'application/xml; charset=utf-8');
-    res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate=86400');
+    if (isLiveCms) {
+      res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate=86400');
+      res.setHeader('X-Sitemap-Source', 'live-cms');
+    } else {
+      res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
+      res.setHeader('X-Sitemap-Source', 'static-only-cms-unavailable');
+    }
     return res.status(200).send(xml);
   } catch (err) {
     console.error('[Sitemap Serverless] Critical error generating dynamic sitemap:', err);
@@ -340,7 +330,8 @@ export default async function handler(req, res) {
     ].join('\n');
 
     res.setHeader('Content-Type', 'application/xml; charset=utf-8');
-    res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=3600');
+    res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
+    res.setHeader('X-Sitemap-Source', 'emergency-fallback');
     return res.status(200).send(fallbackXml);
   }
 }
