@@ -177,6 +177,38 @@ export default function App() {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
   }, [currentPath]);
 
+  // Synchronous Canonical & OpenGraph URL Management for ALL routes (Top-level + Detail pages)
+  useLayoutEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const rawPath = (currentPath || '/').split('?')[0].split('#')[0];
+    const normalizedPath = rawPath.toLowerCase().replace(/\/+$/, '') || '/';
+    let target = ROUTE_REDIRECTS[normalizedPath] || normalizedPath;
+    if (target.startsWith('/blog/')) {
+      target = target.replace('/blog/', '/current-affairs/');
+    }
+
+    const canonicalHref = target === '/' 
+      ? 'https://egurukulamforias.com/' 
+      : `https://egurukulamforias.com${target}`;
+
+    let canonical = document.querySelector('link[rel="canonical"]');
+    if (!canonical) {
+      canonical = document.createElement('link');
+      canonical.setAttribute('rel', 'canonical');
+      document.head.appendChild(canonical);
+    }
+    canonical.setAttribute('href', canonicalHref);
+
+    let ogUrl = document.querySelector('meta[property="og:url"]');
+    if (!ogUrl) {
+      ogUrl = document.createElement('meta');
+      ogUrl.setAttribute('property', 'og:url');
+      document.head.appendChild(ogUrl);
+    }
+    ogUrl.setAttribute('content', canonicalHref);
+  }, [currentPath]);
+
   // Default metadata reset for top-level pages
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -245,19 +277,6 @@ export default function App() {
 
       document.title = seoData.title;
 
-      const canonicalTarget = ROUTE_REDIRECTS[normalizedPath] || normalizedPath;
-      const canonicalHref = canonicalTarget === '/' 
-        ? 'https://egurukulamforias.com/' 
-        : `https://egurukulamforias.com${canonicalTarget}`;
-
-      let canonical = document.querySelector('link[rel="canonical"]');
-      if (!canonical) {
-        canonical = document.createElement('link');
-        canonical.setAttribute('rel', 'canonical');
-        document.head.appendChild(canonical);
-      }
-      canonical.setAttribute('href', canonicalHref);
-
       const updateTag = (selector, attr, key, content) => {
         let el = document.querySelector(selector);
         if (!el) {
@@ -271,7 +290,6 @@ export default function App() {
       updateTag('meta[name="description"]', 'name', 'description', seoData.description);
       updateTag('meta[property="og:title"]', 'property', 'og:title', seoData.title);
       updateTag('meta[property="og:description"]', 'property', 'og:description', seoData.description);
-      updateTag('meta[property="og:url"]', 'property', 'og:url', canonicalHref);
       updateTag('meta[name="twitter:title"]', 'name', 'twitter:title', seoData.title);
       updateTag('meta[name="twitter:description"]', 'name', 'twitter:description', seoData.description);
     }

@@ -22,6 +22,41 @@
     <title>Akella Raghavendra's e-Gurukulam for IAS</title>
     <meta name="description" content="Prepare for UPSC Civil Services with Akella Raghavendra Sir through focused mentorship, practical strategy, current affairs, study resources, and disciplined preparation." />
     <link rel="canonical" href="https://egurukulamforias.com/" />
+    <script>
+      (function() {
+        try {
+          var redirects = {
+            '/home': '/',
+            '/courses': '/programs',
+            '/connect': '/contact',
+            '/admission': '/contact',
+            '/philosophy': '/about',
+            '/sadhana': '/test-series',
+            '/repository': '/resources',
+            '/blog': '/current-affairs',
+            '/insights': '/current-affairs',
+            '/journal': '/current-affairs'
+          };
+          var path = (window.location.pathname || '/').split('?')[0].split('#')[0].toLowerCase().replace(/\/+$/, '') || '/';
+          var target = redirects[path] || path;
+          if (target.indexOf('/blog/') === 0) {
+            target = target.replace('/blog/', '/current-affairs/');
+          }
+          var canonicalUrl = target === '/' ? 'https://egurukulamforias.com/' : 'https://egurukulamforias.com' + target;
+          var link = document.querySelector('link[rel="canonical"]');
+          if (!link) {
+            link = document.createElement('link');
+            link.rel = 'canonical';
+            document.head.appendChild(link);
+          }
+          link.href = canonicalUrl;
+          var ogUrl = document.querySelector('meta[property="og:url"]');
+          if (ogUrl) {
+            ogUrl.content = canonicalUrl;
+          }
+        } catch(e) {}
+      })();
+    </script>
 
     <!-- Open Graph & Social Cards -->
     <meta property="og:site_name" content="e-Gurukulam for IAS" />

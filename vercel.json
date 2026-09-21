@@ -76,15 +76,15 @@
     },
     {
       "source": "/resources/:slug*",
-      "destination": "/index.html"
+      "destination": "/api/html"
     },
     {
       "source": "/current-affairs/:slug*",
-      "destination": "/index.html"
+      "destination": "/api/html"
     },
     {
-      "source": "/((?!sitemap\\.xml|robots\\.txt|favicon|apple-touch-icon|.*\\.[\\w]+$).*)",
-      "destination": "/index.html"
+      "source": "/((?!sitemap\\.xml|robots\\.txt|favicon|apple-touch-icon|assets/|api/|.*\\.[\\w]+$).*)",
+      "destination": "/api/html"
     }
   ],
   "headers": [

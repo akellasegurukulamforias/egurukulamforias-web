@@ -825,12 +825,6 @@ export default function CurrentAffairsDetailPage({ slug: propSlug, id: propId, n
       const bcEl = document.getElementById(breadcrumbScriptId);
       if (bcEl) bcEl.remove();
 
-      // Reset canonical to /current-affairs when navigating away
-      const cLink = document.querySelector('link[rel="canonical"]');
-      if (cLink) {
-        cLink.setAttribute('href', 'https://egurukulamforias.com/current-affairs');
-      }
-
       // Reset og:type to website
       const ogType = document.querySelector('meta[property="og:type"]');
       if (ogType) ogType.setAttribute('content', 'website');

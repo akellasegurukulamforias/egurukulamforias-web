@@ -222,9 +222,10 @@ export default function ResourcesPage({ navigate, folder, pyqYear, pyqStage, pyq
       schemaName = 'UPSC Civil Services Examination Syllabus Directory';
     } else if (folder === 'pyqs') {
       if (pyqYear) {
-        pageTitle = `UPSC Civil Services ${pyqYear} ${activeStage} Question Papers (PYQs) | Akella Raghavendra's e-Gurukulam for IAS`;
+        const streamSlug = pyqStream ? `/${pyqStream.toLowerCase()}` : '';
+        pageTitle = `UPSC Civil Services ${pyqYear} ${activeStage}${pyqStream ? ` ${pyqStream.replace('-', ' ')}` : ''} Question Papers (PYQs) | Akella Raghavendra's e-Gurukulam for IAS`;
         pageDesc = `Download and analyze UPSC Civil Services ${pyqYear} ${activeStage} Previous Year Question Papers with detailed syllabus mapping.`;
-        canonicalUrl = `https://egurukulamforias.com/resources/pyqs/${pyqYear}/${activeStage.toLowerCase()}`;
+        canonicalUrl = `https://egurukulamforias.com/resources/pyqs/${pyqYear}/${activeStage.toLowerCase()}${streamSlug}`;
         schemaType = 'Quiz';
         schemaName = `UPSC Civil Services ${pyqYear} ${activeStage} Question Papers (PYQs)`;
       } else {
