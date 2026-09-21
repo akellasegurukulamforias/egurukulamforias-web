@@ -49,6 +49,7 @@ import {
 import { createSlug, getDirectImageUrl, getSecondaryImageUrl } from '../utils/urlUtils';
 import { sortCurrentAffairsByDate, formatDisplayDate } from '../utils/dateUtils';
 import PdfViewerModal from '../components/PdfViewerModal';
+import Link from '../components/Link';
 
 function PYQPaperCard({ item, navigate }) {
   const title = item.Title || item.title || 'Untitled Paper';
@@ -68,9 +69,10 @@ function PYQPaperCard({ item, navigate }) {
   const paperTargetUrl = getPYQPaperUrl(item);
 
   return (
-    <div
-      className="card-parchment-3d rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0] overflow-hidden flex flex-col justify-between hover:border-[#8C3A27] transition-all shadow-sm group text-left cursor-pointer h-full"
-      onClick={() => navigate(paperTargetUrl)}
+    <Link
+      to={paperTargetUrl}
+      navigate={navigate}
+      className="card-parchment-3d rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0] overflow-hidden flex flex-col justify-between hover:border-[#8C3A27] transition-all shadow-sm group text-left cursor-pointer h-full no-underline"
     >
       {bannerImage ? (
         <div className="aspect-[4/3] w-full overflow-hidden rounded-t-lg bg-black/5 relative">
@@ -140,19 +142,14 @@ function PYQPaperCard({ item, navigate }) {
       </div>
 
       <div className="p-4 sm:p-5 pt-0">
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            navigate(paperTargetUrl);
-          }}
-          className="w-full inline-flex items-center justify-center gap-2 btn-terracotta-pill text-xs py-2.5 px-4 font-serif font-bold transition-all cursor-pointer shadow-xs hover:shadow-md"
+        <span
+          className="w-full inline-flex items-center justify-center gap-2 btn-terracotta-pill text-xs py-2.5 px-4 font-serif font-bold transition-all shadow-xs group-hover:shadow-md"
         >
           <FileText className="w-3.5 h-3.5" />
           <span>VIEW QUESTION PAPER &rarr;</span>
-        </button>
+        </span>
       </div>
-    </div>
+    </Link>
   );
 }
 
@@ -209,30 +206,30 @@ export default function ResourcesPage({ navigate, folder, pyqYear, pyqStage, pyq
     }
   }, [pyqStream]);
 
-  // Automated SEO & Schema: Document Title, Meta Description, Canonical Link, and JSON-LD
+  // Automated SEO & Schema: Document Title, Meta Description, Canonical Link, Social Tags, and JSON-LD
   useEffect(() => {
-    let pageTitle = 'Digital Learning & Study Resources | e-Gurukulam for IAS';
-    let pageDesc = 'Comprehensive digital library, syllabus micro-notes, previous year question papers, and study resources for UPSC Civil Services Examination.';
+    let pageTitle = "Resources | Akella Raghavendra's e-Gurukulam for IAS";
+    let pageDesc = "Explore authentic UPSC study resources, comprehensive civil services syllabus breakdowns, categorized previous year questions (PYQs), and prep notes.";
     let canonicalUrl = 'https://egurukulamforias.com/resources';
     let schemaType = 'CollectionPage';
     let schemaName = 'Digital Learning & Study Resources';
 
     if (folder === 'upsc-syllabus') {
-      pageTitle = 'UPSC Civil Services Syllabus Directory & Micro-Notes | e-Gurukulam for IAS';
-      pageDesc = 'Comprehensive UPSC Civil Services Examination Syllabus directory covering Prelims and Mains (GS I, II, III, IV, Essay, and Optionals) with micro-notes.';
+      pageTitle = "UPSC CSE Syllabus Breakdown | Akella Raghavendra's e-Gurukulam for IAS";
+      pageDesc = "Detailed UPSC Civil Services Examination syllabus breakdown covering Prelims and Mains (General Studies I–IV, Essay, and Optionals) with topic analysis.";
       canonicalUrl = 'https://egurukulamforias.com/resources/upsc-syllabus';
       schemaType = 'Course';
       schemaName = 'UPSC Civil Services Examination Syllabus Directory';
     } else if (folder === 'pyqs') {
       if (pyqYear) {
-        pageTitle = `UPSC Civil Services ${pyqYear} ${activeStage} Question Papers (PYQs) | e-Gurukulam for IAS`;
+        pageTitle = `UPSC Civil Services ${pyqYear} ${activeStage} Question Papers (PYQs) | Akella Raghavendra's e-Gurukulam for IAS`;
         pageDesc = `Download and analyze UPSC Civil Services ${pyqYear} ${activeStage} Previous Year Question Papers with detailed syllabus mapping.`;
         canonicalUrl = `https://egurukulamforias.com/resources/pyqs/${pyqYear}/${activeStage.toLowerCase()}`;
         schemaType = 'Quiz';
         schemaName = `UPSC Civil Services ${pyqYear} ${activeStage} Question Papers (PYQs)`;
       } else {
-        pageTitle = 'UPSC Civil Services Previous Year Questions (PYQs) Archive | e-Gurukulam for IAS';
-        pageDesc = 'Authentic repository of UPSC Civil Services Preliminary and Mains Examination previous year question papers (PYQs) with answer synopses.';
+        pageTitle = "UPSC Previous Year Questions (PYQs) | Akella Raghavendra's e-Gurukulam for IAS";
+        pageDesc = "Authentic archive of UPSC Civil Services Examination previous year question papers (PYQs) categorized by year, stage (Prelims/Mains), and subject.";
         canonicalUrl = 'https://egurukulamforias.com/resources/pyqs';
         schemaType = 'CollectionPage';
         schemaName = 'UPSC Civil Services Previous Year Questions (PYQs) Archive';
@@ -258,6 +255,23 @@ export default function ResourcesPage({ navigate, folder, pyqYear, pyqStage, pyq
       document.head.appendChild(canonicalLink);
     }
     canonicalLink.href = canonicalUrl;
+
+    // Open Graph & Twitter Social Metadata
+    const updateMetaTag = (attr, key, val) => {
+      let el = document.querySelector(`meta[${attr}="${key}"]`);
+      if (!el) {
+        el = document.createElement('meta');
+        el.setAttribute(attr, key);
+        document.head.appendChild(el);
+      }
+      el.setAttribute('content', val);
+    };
+
+    updateMetaTag('property', 'og:title', pageTitle);
+    updateMetaTag('property', 'og:description', pageDesc);
+    updateMetaTag('property', 'og:url', canonicalUrl);
+    updateMetaTag('name', 'twitter:title', pageTitle);
+    updateMetaTag('name', 'twitter:description', pageDesc);
 
     // Automated JSON-LD Schema
     const scriptId = 'resources-page-jsonld';
@@ -603,14 +617,14 @@ export default function ResourcesPage({ navigate, folder, pyqYear, pyqStage, pyq
         {/* 1. TOP STICKY BREADCRUMB & BACK NAVIGATION */}
         <section className="sticky z-20 bg-[#FAF6EE] p-4 sm:p-5 border-b border-[#D5C3B0] shadow-xs m-0 mt-0" style={{ top: 'var(--site-header-height)' }}>
           <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
-            <button
-              type="button"
-              onClick={() => navigate('/resources')}
-              className="inline-flex items-center gap-2 text-xs sm:text-sm font-serif font-bold text-[#8C3A27] hover:text-[#732D1B] transition-colors cursor-pointer group"
+            <Link
+              to="/resources"
+              navigate={navigate}
+              className="inline-flex items-center gap-2 text-xs sm:text-sm font-serif font-bold text-[#8C3A27] hover:text-[#732D1B] transition-colors cursor-pointer group no-underline"
             >
               <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
               <span>Back to All Resources</span>
-            </button>
+            </Link>
 
             <div className="flex items-center gap-2 text-xs">
               <span className="font-mono text-[#8C3A27] font-bold bg-[#8C3A27]/10 px-3 py-1 rounded-md border border-[#8C3A27]/20 flex items-center gap-1.5">
@@ -697,10 +711,11 @@ export default function ResourcesPage({ navigate, folder, pyqYear, pyqStage, pyq
                   const itemSlug = item.slug || item.Slug || item.id || item.ID || createSlug(title);
 
                   return (
-                    <div
+                    <Link
                       key={idx}
-                      className="card-parchment-3d rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0] overflow-hidden flex flex-col justify-between hover:border-[#8C3A27] transition-all shadow-sm group text-left cursor-pointer"
-                      onClick={() => navigate(`/resources/upsc-syllabus/${itemSlug}`)}
+                      to={`/resources/upsc-syllabus/${itemSlug}`}
+                      navigate={navigate}
+                      className="card-parchment-3d rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0] overflow-hidden flex flex-col justify-between hover:border-[#8C3A27] transition-all shadow-sm group text-left cursor-pointer no-underline"
                     >
                       {bannerImage ? (
                         <div className="w-full h-48 overflow-hidden bg-black/5 relative">
@@ -759,19 +774,14 @@ export default function ResourcesPage({ navigate, folder, pyqYear, pyqStage, pyq
                       </div>
 
                       <div className="p-6 pt-0">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`/resources/upsc-syllabus/${itemSlug}`);
-                          }}
-                          className="w-full inline-flex items-center justify-center gap-2 btn-terracotta-outline-pill text-xs py-2.5 px-4 font-serif font-bold transition-all cursor-pointer group/btn hover:bg-[#8C3A27] hover:text-white"
+                        <span
+                          className="w-full inline-flex items-center justify-center gap-2 btn-terracotta-outline-pill text-xs py-2.5 px-4 font-serif font-bold transition-all cursor-pointer group/btn group-hover:bg-[#8C3A27] group-hover:text-white"
                         >
                           <BookOpen className="w-3.5 h-3.5" />
                           <span>VIEW SYLLABUS &rarr;</span>
-                        </button>
+                        </span>
                       </div>
-                    </div>
+                    </Link>
                   );
                 })}
               </div>
@@ -801,20 +811,20 @@ export default function ResourcesPage({ navigate, folder, pyqYear, pyqStage, pyq
               Looking for PYQ breakdowns, analytical study articles, or comprehensive video lecture series?
             </p>
             <div className="flex flex-wrap items-center justify-center gap-3">
-              <button
-                type="button"
-                onClick={() => navigate('/resources')}
-                className="btn-terracotta-pill text-xs py-2.5 px-6 font-serif font-bold cursor-pointer"
+              <Link
+                to="/resources"
+                navigate={navigate}
+                className="btn-terracotta-pill text-xs py-2.5 px-6 font-serif font-bold cursor-pointer no-underline inline-block"
               >
                 &larr; Return to All Study Resources
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate('/courses')}
-                className="btn-terracotta-outline-pill text-xs py-2.5 px-6 font-serif font-bold cursor-pointer"
+              </Link>
+              <Link
+                to="/programs"
+                navigate={navigate}
+                className="btn-terracotta-outline-pill text-xs py-2.5 px-6 font-serif font-bold cursor-pointer no-underline inline-block"
               >
                 Explore Video Courses &rarr;
-              </button>
+              </Link>
             </div>
           </div>
         </section>
@@ -832,35 +842,30 @@ export default function ResourcesPage({ navigate, folder, pyqYear, pyqStage, pyq
         <section className="sticky z-20 bg-[#FAF6EE] p-4 sm:p-5 border-b border-[#D5C3B0] shadow-xs m-0 mt-0" style={{ top: 'var(--site-header-height)' }}>
           <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-2 sm:gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  if (pyqYear) {
-                    navigate('/resources/pyqs');
-                  } else {
-                    navigate('/resources');
-                  }
-                }}
-                className="inline-flex items-center gap-2 text-xs sm:text-sm font-serif font-bold text-[#8C3A27] hover:text-[#732D1B] transition-colors cursor-pointer group"
+              <Link
+                to={pyqYear ? '/resources/pyqs' : '/resources'}
+                navigate={navigate}
+                className="inline-flex items-center gap-2 text-xs sm:text-sm font-serif font-bold text-[#8C3A27] hover:text-[#732D1B] transition-colors cursor-pointer group no-underline"
               >
                 <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
                 <span>{pyqYear ? 'Back to All PYQ Years' : 'Back to All Resources'}</span>
-              </button>
+              </Link>
 
               {pyqYear ? (
                 <div className="hidden sm:flex items-center gap-1.5 text-xs font-serif font-medium text-[#7A6B5D] pl-3 border-l border-[#D5C3B0]/60">
-                  <span onClick={() => navigate('/resources')} className="hover:text-[#8C3A27] cursor-pointer">Resources</span>
+                  <Link to="/resources" navigate={navigate} className="hover:text-[#8C3A27] cursor-pointer no-underline text-inherit">Resources</Link>
                   <span>/</span>
-                  <span onClick={() => navigate('/resources/pyqs')} className="hover:text-[#8C3A27] cursor-pointer">PYQs</span>
+                  <Link to="/resources/pyqs" navigate={navigate} className="hover:text-[#8C3A27] cursor-pointer no-underline text-inherit">PYQs</Link>
                   <span>/</span>
-                  <span onClick={() => navigate(`/resources/pyqs/${pyqYear}`)} className="hover:text-[#8C3A27] cursor-pointer font-bold text-[#8C3A27]">{pyqYear}</span>
+                  <Link to={`/resources/pyqs/${pyqYear}`} navigate={navigate} className="hover:text-[#8C3A27] cursor-pointer font-bold text-[#8C3A27] no-underline">{pyqYear}</Link>
                   <span>/</span>
-                  <span 
-                    onClick={() => navigate(`/resources/pyqs/${pyqYear}/${activeStage.toLowerCase()}`)} 
-                    className={`hover:text-[#8C3A27] cursor-pointer font-bold ${selectedStream === 'OVERVIEW' ? 'text-[#8C3A27]' : 'text-[#7A6B5D]'}`}
+                  <Link 
+                    to={`/resources/pyqs/${pyqYear}/${activeStage.toLowerCase()}`}
+                    navigate={navigate}
+                    className={`hover:text-[#8C3A27] cursor-pointer font-bold no-underline ${selectedStream === 'OVERVIEW' ? 'text-[#8C3A27]' : 'text-[#7A6B5D]'}`}
                   >
                     {activeStage}
-                  </span>
+                  </Link>
                   {selectedStream !== 'OVERVIEW' && (
                     <>
                       <span>/</span>
@@ -872,7 +877,7 @@ export default function ResourcesPage({ navigate, folder, pyqYear, pyqStage, pyq
                 </div>
               ) : (
                 <div className="hidden sm:flex items-center gap-1.5 text-xs font-serif font-medium text-[#7A6B5D] pl-3 border-l border-[#D5C3B0]/60">
-                  <span onClick={() => navigate('/resources')} className="hover:text-[#8C3A27] cursor-pointer">Resources</span>
+                  <Link to="/resources" navigate={navigate} className="hover:text-[#8C3A27] cursor-pointer no-underline text-inherit">Resources</Link>
                   <span>/</span>
                   <span className="text-[#8C3A27] font-bold">Previous Year Questions</span>
                 </div>
@@ -978,10 +983,13 @@ export default function ResourcesPage({ navigate, folder, pyqYear, pyqStage, pyq
                     return (
                       <div
                         key={year}
-                        className="card-parchment-3d rounded-2xl bg-gradient-to-br from-[#FFFDF8] via-[#FAF6EE] to-[#F5ECE0] border-2 border-[#8C3A27]/30 hover:border-[#8C3A27] overflow-hidden flex flex-col justify-between transition-all shadow-md hover:shadow-xl group text-left cursor-pointer relative ring-1 ring-[#8C3A27]/10"
-                        onClick={() => navigate(`/resources/pyqs/${year}`)}
+                        className="card-parchment-3d rounded-2xl bg-gradient-to-br from-[#FFFDF8] via-[#FAF6EE] to-[#F5ECE0] border-2 border-[#8C3A27]/30 hover:border-[#8C3A27] overflow-hidden flex flex-col justify-between transition-all shadow-md hover:shadow-xl group text-left relative ring-1 ring-[#8C3A27]/10"
                       >
-                        <div className="w-full bg-gradient-to-r from-[#6C1D18] via-[#8C3A27] to-[#732415] p-5 text-white flex flex-col justify-between relative overflow-hidden">
+                        <Link
+                          to={`/resources/pyqs/${year}`}
+                          navigate={navigate}
+                          className="w-full bg-gradient-to-r from-[#6C1D18] via-[#8C3A27] to-[#732415] p-5 text-white flex flex-col justify-between relative overflow-hidden no-underline block"
+                        >
                           <div className="flex items-center justify-between z-10">
                             <span className="font-mono text-xl sm:text-2xl font-black tracking-wider text-white">
                               {year}
@@ -998,10 +1006,14 @@ export default function ResourcesPage({ navigate, folder, pyqYear, pyqStage, pyq
                               Prelims: {yrPrelims.length}
                             </span>
                           </div>
-                        </div>
+                        </Link>
 
                         <div className="p-6 space-y-4 flex-1 flex flex-col justify-between">
-                          <div className="space-y-2">
+                          <Link
+                            to={`/resources/pyqs/${year}`}
+                            navigate={navigate}
+                            className="space-y-2 block no-underline text-inherit"
+                          >
                             <p className="text-xs text-[#7A6B5D] font-mono font-bold uppercase tracking-wider">
                               Available Papers:
                             </p>
@@ -1013,7 +1025,7 @@ export default function ResourcesPage({ navigate, folder, pyqYear, pyqStage, pyq
                                   <div key={idx} className="text-xs sm:text-sm font-serif font-bold text-[#221814] flex items-center justify-between gap-2 truncate">
                                     <div className="flex items-center gap-2 truncate">
                                       <span className="w-1.5 h-1.5 rounded-full bg-[#8C3A27] shrink-0"></span>
-                                      <span className="truncate">{pName}</span>
+                                      <span className="truncate group-hover:text-[#8C3A27] transition-colors">{pName}</span>
                                     </div>
                                     <span className="text-[10px] font-mono font-bold text-[#7A6B5D] shrink-0">
                                       {pStage}
@@ -1027,29 +1039,23 @@ export default function ResourcesPage({ navigate, folder, pyqYear, pyqStage, pyq
                                 </p>
                               )}
                             </div>
-                          </div>
+                          </Link>
 
                           <div className="pt-4 border-t border-[#D5C3B0]/40 grid grid-cols-2 gap-2">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                navigate(`/resources/pyqs/${year}/prelims`);
-                              }}
-                              className="w-full inline-flex items-center justify-center gap-1 btn-terracotta-outline-pill text-[11px] py-2 px-2 font-serif font-bold transition-all cursor-pointer shadow-2xs hover:bg-[#8C3A27] hover:text-white"
+                            <Link
+                              to={`/resources/pyqs/${year}/prelims`}
+                              navigate={navigate}
+                              className="w-full inline-flex items-center justify-center gap-1 btn-terracotta-outline-pill text-[11px] py-2 px-2 font-serif font-bold transition-all cursor-pointer shadow-2xs hover:bg-[#8C3A27] hover:text-white no-underline"
                             >
                               <span>Prelims ({yrPrelims.length})</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                navigate(`/resources/pyqs/${year}/mains`);
-                              }}
-                              className="w-full inline-flex items-center justify-center gap-1 btn-terracotta-pill text-[11px] py-2 px-2 font-serif font-bold transition-all cursor-pointer shadow-xs hover:shadow-md"
+                            </Link>
+                            <Link
+                              to={`/resources/pyqs/${year}/mains`}
+                              navigate={navigate}
+                              className="w-full inline-flex items-center justify-center gap-1 btn-terracotta-pill text-[11px] py-2 px-2 font-serif font-bold transition-all cursor-pointer shadow-xs hover:shadow-md no-underline"
                             >
                               <span>Mains ({yrMains.length}) &rarr;</span>
-                            </button>
+                            </Link>
                           </div>
                         </div>
                       </div>
@@ -1065,10 +1071,14 @@ export default function ResourcesPage({ navigate, folder, pyqYear, pyqStage, pyq
                 {/* Level 3: Stage Selection Folder Cards / Tabs */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* Prelims Stage Card */}
-                  <button
-                    type="button"
-                    onClick={() => handleStageClick('Prelims')}
-                    className={`p-5 rounded-2xl border-2 transition-all text-left flex items-center justify-between gap-4 cursor-pointer ${
+                  <Link
+                    to={`/resources/pyqs/${pyqYear}/prelims`}
+                    navigate={navigate}
+                    onClick={() => {
+                      setActiveStage('Prelims');
+                      setSelectedStream('OVERVIEW');
+                    }}
+                    className={`p-5 rounded-2xl border-2 transition-all text-left flex items-center justify-between gap-4 cursor-pointer no-underline ${
                       activeStage === 'Prelims'
                         ? 'bg-gradient-to-br from-[#FFFDF8] via-[#FAF6EE] to-[#F5ECE0] border-[#8C3A27] shadow-md ring-2 ring-[#8C3A27]/20'
                         : 'bg-[#FAF6EE]/70 border-[#D5C3B0] hover:border-[#8C3A27]/60 hover:bg-[#FAF6EE] shadow-2xs'
@@ -1105,13 +1115,17 @@ export default function ResourcesPage({ navigate, folder, pyqYear, pyqStage, pyq
                         {prelimsPapers.length} {prelimsPapers.length === 1 ? 'Paper' : 'Papers'}
                       </span>
                     </div>
-                  </button>
+                  </Link>
 
                   {/* Mains Stage Card */}
-                  <button
-                    type="button"
-                    onClick={() => handleStageClick('Mains')}
-                    className={`p-5 rounded-2xl border-2 transition-all text-left flex items-center justify-between gap-4 cursor-pointer ${
+                  <Link
+                    to={`/resources/pyqs/${pyqYear}/mains`}
+                    navigate={navigate}
+                    onClick={() => {
+                      setActiveStage('Mains');
+                      setSelectedStream('OVERVIEW');
+                    }}
+                    className={`p-5 rounded-2xl border-2 transition-all text-left flex items-center justify-between gap-4 cursor-pointer no-underline ${
                       activeStage === 'Mains'
                         ? 'bg-gradient-to-br from-[#FFFDF8] via-[#FAF6EE] to-[#F5ECE0] border-[#8C3A27] shadow-md ring-2 ring-[#8C3A27]/20'
                         : 'bg-[#FAF6EE]/70 border-[#D5C3B0] hover:border-[#8C3A27]/60 hover:bg-[#FAF6EE] shadow-2xs'
@@ -1148,7 +1162,7 @@ export default function ResourcesPage({ navigate, folder, pyqYear, pyqStage, pyq
                         {mainsPapers.length} {mainsPapers.length === 1 ? 'Paper' : 'Papers'}
                       </span>
                     </div>
-                  </button>
+                  </Link>
                 </div>
 
                 {/* Level 4: Stream Selection Pills */}
@@ -1159,12 +1173,16 @@ export default function ResourcesPage({ navigate, folder, pyqYear, pyqStage, pyq
                   </span>
                   {availableStreams.map((st) => {
                     const isSelected = selectedStream === st.id;
+                    const streamTarget = st.id === 'OVERVIEW'
+                      ? `/resources/pyqs/${pyqYear}/${activeStage.toLowerCase()}`
+                      : `/resources/pyqs/${pyqYear}/${activeStage.toLowerCase()}/${st.id.toLowerCase().replace('_', '-')}`;
                     return (
-                      <button
+                      <Link
                         key={st.id}
-                        type="button"
-                        onClick={() => handleStreamClick(st.id)}
-                        className={`px-3.5 py-1.5 rounded-xl text-xs font-serif font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                        to={streamTarget}
+                        navigate={navigate}
+                        onClick={() => setSelectedStream(st.id)}
+                        className={`px-3.5 py-1.5 rounded-xl text-xs font-serif font-bold transition-all cursor-pointer flex items-center gap-1.5 no-underline ${
                           isSelected
                             ? 'bg-[#8C3A27] text-white shadow-xs'
                             : 'bg-[#FFFDF8] text-[#3D3028] hover:text-[#8C3A27] border border-[#D5C3B0] hover:border-[#8C3A27]'
@@ -1176,7 +1194,7 @@ export default function ResourcesPage({ navigate, folder, pyqYear, pyqStage, pyq
                         }`}>
                           {st.count}
                         </span>
-                      </button>
+                      </Link>
                     );
                   })}
                 </div>
@@ -1364,9 +1382,11 @@ export default function ResourcesPage({ navigate, folder, pyqYear, pyqStage, pyq
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                           {/* Card 1 (Folder): "General Studies" */}
                           {mainsGSPapers.length > 0 && (
-                            <div
-                              onClick={() => handleStreamClick('GENERAL_STUDIES')}
-                              className="card-parchment-3d rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0] hover:border-[#8C3A27] p-6 flex flex-col justify-between transition-all shadow-sm hover:shadow-md group text-left cursor-pointer h-full"
+                            <Link
+                              to={`/resources/pyqs/${pyqYear}/mains/general-studies`}
+                              navigate={navigate}
+                              onClick={() => setSelectedStream('GENERAL_STUDIES')}
+                              className="card-parchment-3d rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0] hover:border-[#8C3A27] p-6 flex flex-col justify-between transition-all shadow-sm hover:shadow-md group text-left cursor-pointer h-full no-underline"
                             >
                               <div className="space-y-4">
                                 <div className="flex items-center justify-between">
@@ -1389,24 +1409,24 @@ export default function ResourcesPage({ navigate, folder, pyqYear, pyqStage, pyq
                               </div>
 
                               <div className="pt-6 border-t border-[#D5C3B0]/40 mt-6">
-                                <button
-                                  type="button"
-                                  className="w-full inline-flex items-center justify-center gap-2 btn-terracotta-pill text-xs py-2.5 px-4 font-serif font-bold transition-all shadow-xs hover:shadow-md cursor-pointer"
+                                <span
+                                  className="w-full inline-flex items-center justify-center gap-2 btn-terracotta-pill text-xs py-2.5 px-4 font-serif font-bold transition-all shadow-xs group-hover:shadow-md"
                                 >
                                   <span>Open GS Papers &rarr;</span>
-                                </button>
+                                </span>
                               </div>
-                            </div>
+                            </Link>
                           )}
 
                           {/* Card 2 (Direct Paper): "Essay Paper" */}
                           {mainsEssayPapers.length > 0 && mainsEssayPapers.map((paper, idx) => {
                             const paperUrl = getPYQPaperUrl(paper);
                             return (
-                              <div
+                              <Link
                                 key={`essay-${idx}`}
-                                onClick={() => navigate(paperUrl)}
-                                className="card-parchment-3d rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0] hover:border-[#8C3A27] p-6 flex flex-col justify-between transition-all shadow-sm hover:shadow-md group text-left cursor-pointer h-full"
+                                to={paperUrl}
+                                navigate={navigate}
+                                className="card-parchment-3d rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0] hover:border-[#8C3A27] p-6 flex flex-col justify-between transition-all shadow-sm hover:shadow-md group text-left cursor-pointer h-full no-underline"
                               >
                                 <div className="space-y-4">
                                   <div className="flex items-center justify-between">
@@ -1429,24 +1449,25 @@ export default function ResourcesPage({ navigate, folder, pyqYear, pyqStage, pyq
                                 </div>
 
                                 <div className="pt-6 border-t border-[#D5C3B0]/40 mt-6">
-                                  <button
-                                    type="button"
-                                    className="w-full inline-flex items-center justify-center gap-2 btn-terracotta-pill text-xs py-2.5 px-4 font-serif font-bold transition-all shadow-xs hover:shadow-md cursor-pointer"
+                                  <span
+                                    className="w-full inline-flex items-center justify-center gap-2 btn-terracotta-pill text-xs py-2.5 px-4 font-serif font-bold transition-all shadow-xs group-hover:shadow-md"
                                   >
                                     <span>View Question Paper &rarr;</span>
-                                  </button>
+                                  </span>
                                 </div>
-                              </div>
+                              </Link>
                             );
                           })}
 
                           {/* Card 3 (Folder / Cards): "Optional Subjects" */}
                           {Object.keys(mainsOptionalBySubject).length > 0 ? (
                             Object.entries(mainsOptionalBySubject).map(([subj, papers], idx) => (
-                              <div
+                              <Link
                                 key={`opt-${idx}`}
-                                onClick={() => handleStreamClick('OPTIONAL')}
-                                className="card-parchment-3d rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0] hover:border-[#8C3A27] p-6 flex flex-col justify-between transition-all shadow-sm hover:shadow-md group text-left cursor-pointer h-full"
+                                to={`/resources/pyqs/${pyqYear}/mains/optional`}
+                                navigate={navigate}
+                                onClick={() => setSelectedStream('OPTIONAL')}
+                                className="card-parchment-3d rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0] hover:border-[#8C3A27] p-6 flex flex-col justify-between transition-all shadow-sm hover:shadow-md group text-left cursor-pointer h-full no-underline"
                               >
                                 <div className="space-y-4">
                                   <div className="flex items-center justify-between">
@@ -1469,19 +1490,20 @@ export default function ResourcesPage({ navigate, folder, pyqYear, pyqStage, pyq
                                 </div>
 
                                 <div className="pt-6 border-t border-[#D5C3B0]/40 mt-6">
-                                  <button
-                                    type="button"
-                                    className="w-full inline-flex items-center justify-center gap-2 btn-terracotta-pill text-xs py-2.5 px-4 font-serif font-bold transition-all shadow-xs hover:shadow-md cursor-pointer"
+                                  <span
+                                    className="w-full inline-flex items-center justify-center gap-2 btn-terracotta-pill text-xs py-2.5 px-4 font-serif font-bold transition-all shadow-xs group-hover:shadow-md"
                                   >
                                     <span>Open Optional &rarr;</span>
-                                  </button>
+                                  </span>
                                 </div>
-                              </div>
+                              </Link>
                             ))
                           ) : mainsOptionalPapers.length > 0 ? (
-                            <div
-                              onClick={() => handleStreamClick('OPTIONAL')}
-                              className="card-parchment-3d rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0] hover:border-[#8C3A27] p-6 flex flex-col justify-between transition-all shadow-sm hover:shadow-md group text-left cursor-pointer h-full"
+                            <Link
+                              to={`/resources/pyqs/${pyqYear}/mains/optional`}
+                              navigate={navigate}
+                              onClick={() => setSelectedStream('OPTIONAL')}
+                              className="card-parchment-3d rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0] hover:border-[#8C3A27] p-6 flex flex-col justify-between transition-all shadow-sm hover:shadow-md group text-left cursor-pointer h-full no-underline"
                             >
                               <div className="space-y-4">
                                 <div className="flex items-center justify-between">
@@ -1504,14 +1526,13 @@ export default function ResourcesPage({ navigate, folder, pyqYear, pyqStage, pyq
                               </div>
 
                               <div className="pt-6 border-t border-[#D5C3B0]/40 mt-6">
-                                <button
-                                  type="button"
-                                  className="w-full inline-flex items-center justify-center gap-2 btn-terracotta-pill text-xs py-2.5 px-4 font-serif font-bold transition-all shadow-xs hover:shadow-md cursor-pointer"
+                                <span
+                                  className="w-full inline-flex items-center justify-center gap-2 btn-terracotta-pill text-xs py-2.5 px-4 font-serif font-bold transition-all shadow-xs group-hover:shadow-md"
                                 >
                                   <span>Open Optional &rarr;</span>
-                                </button>
+                                </span>
                               </div>
-                            </div>
+                            </Link>
                           ) : null}
 
                           {/* Empty state if no papers exist */}
@@ -1575,20 +1596,20 @@ export default function ResourcesPage({ navigate, folder, pyqYear, pyqStage, pyq
               Looking for micro-syllabus breakdowns or comprehensive video lecture series?
             </p>
             <div className="flex flex-wrap items-center justify-center gap-3">
-              <button
-                type="button"
-                onClick={() => navigate('/resources')}
-                className="btn-terracotta-pill text-xs py-2.5 px-6 font-serif font-bold cursor-pointer"
+              <Link
+                to="/resources"
+                navigate={navigate}
+                className="btn-terracotta-pill text-xs py-2.5 px-6 font-serif font-bold cursor-pointer no-underline inline-block"
               >
                 &larr; Return to All Study Resources
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate('/resources/upsc-syllabus')}
-                className="btn-terracotta-outline-pill text-xs py-2.5 px-6 font-serif font-bold cursor-pointer"
+              </Link>
+              <Link
+                to="/resources/upsc-syllabus"
+                navigate={navigate}
+                className="btn-terracotta-outline-pill text-xs py-2.5 px-6 font-serif font-bold cursor-pointer no-underline inline-block"
               >
                 UPSC Syllabus Hub &rarr;
-              </button>
+              </Link>
             </div>
           </div>
         </section>
@@ -1721,9 +1742,10 @@ export default function ResourcesPage({ navigate, folder, pyqYear, pyqStage, pyq
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {/* 1. DYNAMIC UPSC SYLLABUS FOLDER HUB CARD */}
               {showSyllabusFolderInMain && (
-                <div 
-                  className="card-parchment-3d rounded-2xl bg-gradient-to-br from-[#FFFDF8] via-[#FAF6EE] to-[#F5ECE0] border-2 border-[#8C3A27]/30 hover:border-[#8C3A27] overflow-hidden flex flex-col justify-between transition-all shadow-md hover:shadow-xl group text-left cursor-pointer relative ring-1 ring-[#8C3A27]/10"
-                  onClick={() => navigate('/resources/upsc-syllabus')}
+                <Link 
+                  to="/resources/upsc-syllabus"
+                  navigate={navigate}
+                  className="card-parchment-3d rounded-2xl bg-gradient-to-br from-[#FFFDF8] via-[#FAF6EE] to-[#F5ECE0] border-2 border-[#8C3A27]/30 hover:border-[#8C3A27] overflow-hidden flex flex-col justify-between transition-all shadow-md hover:shadow-xl group text-left cursor-pointer relative ring-1 ring-[#8C3A27]/10 no-underline"
                 >
                   {/* Folder Tab / Visual Layer Header */}
                   <div className="w-full bg-gradient-to-r from-[#6C1D18] via-[#8C3A27] to-[#732415] p-5 text-white flex flex-col justify-between relative overflow-hidden">
@@ -1799,27 +1821,23 @@ export default function ResourcesPage({ navigate, folder, pyqYear, pyqStage, pyq
 
                     {/* Folder Action CTA */}
                     <div className="pt-4 border-t border-[#D5C3B0]/40">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate('/resources/upsc-syllabus');
-                        }}
-                        className="w-full inline-flex items-center justify-center gap-2 btn-terracotta-pill text-xs py-2.5 px-4 font-serif font-bold transition-all cursor-pointer shadow-xs hover:shadow-md"
+                      <span
+                        className="w-full inline-flex items-center justify-center gap-2 btn-terracotta-pill text-xs py-2.5 px-4 font-serif font-bold transition-all cursor-pointer shadow-xs group-hover:shadow-md"
                       >
                         <FolderOpen className="w-3.5 h-3.5" />
                         <span>EXPLORE SYLLABUS FOLDER &rarr;</span>
-                      </button>
+                      </span>
                     </div>
                   </div>
-                </div>
+                </Link>
               )}
 
               {/* 2. DYNAMIC PREVIOUS YEAR QUESTIONS (PYQS) FOLDER HUB CARD */}
               {showPYQFolderInMain && (
-                <div 
-                  className="card-parchment-3d rounded-2xl bg-gradient-to-br from-[#FFFDF8] via-[#FAF6EE] to-[#F5ECE0] border-2 border-[#8C3A27]/30 hover:border-[#8C3A27] overflow-hidden flex flex-col justify-between transition-all shadow-md hover:shadow-xl group text-left cursor-pointer relative ring-1 ring-[#8C3A27]/10"
-                  onClick={() => navigate('/resources/pyqs')}
+                <Link 
+                  to="/resources/pyqs"
+                  navigate={navigate}
+                  className="card-parchment-3d rounded-2xl bg-gradient-to-br from-[#FFFDF8] via-[#FAF6EE] to-[#F5ECE0] border-2 border-[#8C3A27]/30 hover:border-[#8C3A27] overflow-hidden flex flex-col justify-between transition-all shadow-md hover:shadow-xl group text-left cursor-pointer relative ring-1 ring-[#8C3A27]/10 no-underline"
                 >
                   {/* Folder Tab / Visual Layer Header */}
                   <div className="w-full bg-gradient-to-r from-[#6C1D18] via-[#8C3A27] to-[#732415] p-5 text-white flex flex-col justify-between relative overflow-hidden">
@@ -1885,23 +1903,18 @@ export default function ResourcesPage({ navigate, folder, pyqYear, pyqStage, pyq
 
                     {/* Folder Action CTA */}
                     <div className="pt-4 border-t border-[#D5C3B0]/40">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate('/resources/pyqs');
-                        }}
-                        className="w-full inline-flex items-center justify-center gap-2 btn-terracotta-pill text-xs py-2.5 px-4 font-serif font-bold transition-all cursor-pointer shadow-xs hover:shadow-md"
+                      <span
+                        className="w-full inline-flex items-center justify-center gap-2 btn-terracotta-pill text-xs py-2.5 px-4 font-serif font-bold transition-all cursor-pointer shadow-xs group-hover:shadow-md"
                       >
                         <FolderOpen className="w-3.5 h-3.5" />
                         <span>EXPLORE PYQS FOLDER &rarr;</span>
-                      </button>
+                      </span>
                     </div>
                   </div>
-                </div>
+                </Link>
               )}
 
-              {/* 2. NON-SYLLABUS STUDY RESOURCES (PYQs, Notes, Strategy Guides) */}
+              {/* 3. NON-SYLLABUS STUDY RESOURCES (PYQs, Notes, Strategy Guides) */}
               {filteredNonSyllabusResources.map((item, idx) => {
                 const title = item.Title || item.title || 'Untitled Resource';
                 const date = formatDisplayDate(item.Date || item.date) || 'Recent';
@@ -1915,12 +1928,21 @@ export default function ResourcesPage({ navigate, folder, pyqYear, pyqStage, pyq
                   item.Image || item.image ||
                   item.Thumbnail || item.thumbnail;
                 const bannerImage = getDirectImageUrl(rawBanner);
+                const itemSlug = item.slug || item.Slug || item.id || item.ID || createSlug(title);
+
+                let targetUrl = `/resources/${encodeURIComponent(itemSlug)}`;
+                if (isSyllabusResource(item)) {
+                  targetUrl = `/resources/upsc-syllabus/${encodeURIComponent(itemSlug)}`;
+                } else if (isPYQResource(item)) {
+                  targetUrl = getPYQPaperUrl(item);
+                }
 
                 return (
-                  <div 
+                  <Link 
                     key={idx} 
-                    className="card-parchment-3d rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0] overflow-hidden flex flex-col justify-between hover:border-[#8C3A27] transition-all shadow-sm group text-left cursor-pointer"
-                    onClick={() => handleOpenResource(item)}
+                    to={targetUrl}
+                    navigate={navigate}
+                    className="card-parchment-3d rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0] overflow-hidden flex flex-col justify-between hover:border-[#8C3A27] transition-all shadow-sm group text-left cursor-pointer no-underline"
                   >
                     {/* Banner Image or Thematic Header */}
                     {bannerImage ? (
@@ -1984,19 +2006,14 @@ export default function ResourcesPage({ navigate, folder, pyqYear, pyqStage, pyq
 
                     {/* Action Button */}
                     <div className="p-6 pt-0">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleOpenResource(item);
-                        }}
-                        className="w-full inline-flex items-center justify-center gap-2 btn-terracotta-outline-pill text-xs py-2.5 px-4 font-serif font-bold transition-all cursor-pointer group/btn hover:bg-[#8C3A27] hover:text-white"
+                      <span
+                        className="w-full inline-flex items-center justify-center gap-2 btn-terracotta-outline-pill text-xs py-2.5 px-4 font-serif font-bold transition-all cursor-pointer group/btn group-hover:bg-[#8C3A27] group-hover:text-white"
                       >
                         <BookOpen className="w-3.5 h-3.5" />
                         <span>READ RESOURCE &rarr;</span>
-                      </button>
+                      </span>
                     </div>
-                  </div>
+                  </Link>
                 );
               })}
             </div>

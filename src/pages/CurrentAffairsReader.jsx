@@ -79,7 +79,7 @@ export default function CurrentAffairsReader({ slug, navigate }) {
           </p>
           <button
             type="button"
-            onClick={() => navigate('/blog')}
+            onClick={() => navigate('/current-affairs')}
             className="btn-terracotta-pill text-xs py-2.5 px-5 font-serif font-bold cursor-pointer"
           >
             Back to Current Affairs
@@ -123,7 +123,7 @@ export default function CurrentAffairsReader({ slug, navigate }) {
           <div className="flex items-center justify-between">
             <button
               type="button"
-              onClick={() => navigate('/blog')}
+              onClick={() => navigate('/current-affairs')}
               className="inline-flex items-center gap-2 text-xs sm:text-sm font-serif font-bold text-[#8C3A27] hover:text-[#732D1B] transition-colors cursor-pointer"
             >
               <ArrowLeft className="w-4 h-4" />
@@ -277,7 +277,7 @@ export default function CurrentAffairsReader({ slug, navigate }) {
             <div>
               <button
                 type="button"
-                onClick={() => navigate('/blog')}
+                onClick={() => navigate('/current-affairs')}
                 className="btn-terracotta-pill text-xs py-3 px-6 font-serif font-bold cursor-pointer"
               >
                 <span>Return to Daily Dispatches</span>
@@ -290,7 +290,7 @@ export default function CurrentAffairsReader({ slug, navigate }) {
         <div className="flex flex-wrap items-center justify-between gap-4 p-5 bg-[#FAF6EE] rounded-3xl border border-[#D5C3B0]">
           <button
             type="button"
-            onClick={() => navigate('/blog')}
+            onClick={() => navigate('/current-affairs')}
             className="btn-terracotta-outline-pill text-xs py-2.5 px-5 font-serif font-bold cursor-pointer"
           >
             <span>← Back to Current Affairs</span>

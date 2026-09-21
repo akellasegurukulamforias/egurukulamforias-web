@@ -603,8 +603,9 @@ export default function CurrentAffairsDetailPage({ slug: propSlug, id: propId, n
     const banner = getDirectImageUrl(rawBanner);
     const isoDate = formatDateToYMD(article?.Date || article?.date);
 
-    // 1. Set document title: article headline, "Daily UPSC Current Affairs", and "e-Gurukulam for IAS"
-    document.title = `${docTitle} | Daily UPSC Current Affairs | e-Gurukulam for IAS`;
+    // 1. Set document title: article headline and Akella Raghavendra's e-Gurukulam for IAS
+    const pageTitle = `${docTitle} | Akella Raghavendra's e-Gurukulam for IAS`;
+    document.title = pageTitle;
 
     // 2. Extract Syllabus Areas & GS Papers for Content & AI Query Fan-Out
     const rawContentStr = String(
@@ -696,12 +697,12 @@ export default function CurrentAffairsDetailPage({ slug: propSlug, id: propId, n
     };
 
     updateMetaTag('property', 'og:type', 'article');
-    updateMetaTag('property', 'og:title', docTitle);
+    updateMetaTag('property', 'og:title', pageTitle);
     updateMetaTag('property', 'og:description', metaDescContent);
     updateMetaTag('property', 'og:url', canonicalUrl);
     updateMetaTag('property', 'og:image', posterImg);
     updateMetaTag('name', 'twitter:card', 'summary_large_image');
-    updateMetaTag('name', 'twitter:title', docTitle);
+    updateMetaTag('name', 'twitter:title', pageTitle);
     updateMetaTag('name', 'twitter:description', metaDescContent);
     updateMetaTag('name', 'twitter:image', posterImg);
 

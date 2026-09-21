@@ -4,29 +4,36 @@
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-T5W96019N1"></script>
     <script>
+      (function() {
+        var hostname = window.location.hostname.toLowerCase();
+        var isProd = hostname === 'egurukulamforias.com' || hostname === 'www.egurukulamforias.com';
+        if (!isProd) {
+          window['ga-disable-G-T5W96019N1'] = true;
+        }
+      })();
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
       gtag('js', new Date());
-      gtag('config', 'G-T5W96019N1');
+      gtag('config', 'G-T5W96019N1', { send_page_view: false });
     </script>
 
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Akella Raghavendra's e-Gurukulam For IAS</title>
+    <title>Akella Raghavendra's e-Gurukulam for IAS</title>
     <meta name="description" content="Prepare for UPSC Civil Services with Akella Raghavendra Sir through focused mentorship, practical strategy, current affairs, study resources, and disciplined preparation." />
     <link rel="canonical" href="https://egurukulamforias.com/" />
 
     <!-- Open Graph & Social Cards -->
     <meta property="og:site_name" content="e-Gurukulam for IAS" />
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="Akella Raghavendra's e-Gurukulam For IAS" />
+    <meta property="og:title" content="Akella Raghavendra's e-Gurukulam for IAS" />
     <meta property="og:description" content="Prepare for UPSC Civil Services with Akella Raghavendra Sir through focused mentorship, practical strategy, current affairs, study resources, and disciplined preparation." />
     <meta property="og:url" content="https://egurukulamforias.com/" />
     <meta property="og:image" content="https://egurukulamforias.com/images/Logo.png" />
 
     <!-- Twitter Cards -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Akella Raghavendra's e-Gurukulam For IAS" />
+    <meta name="twitter:title" content="Akella Raghavendra's e-Gurukulam for IAS" />
     <meta name="twitter:description" content="Prepare for UPSC Civil Services with Akella Raghavendra Sir through focused mentorship, practical strategy, current affairs, study resources, and disciplined preparation." />
     <meta name="twitter:image" content="https://egurukulamforias.com/images/Logo.png" />
 

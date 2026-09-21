@@ -8,6 +8,7 @@ build
 .next
 .out
 *.zip
+scripts/sitemap-preview.xml
 
 # Local Environment Variables
 .env

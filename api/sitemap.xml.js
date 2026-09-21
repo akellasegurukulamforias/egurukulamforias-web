@@ -11,7 +11,6 @@ const STATIC_ROUTES = [
   { path: '/programs', priority: '0.8', changefreq: 'weekly' },
   { path: '/test-series', priority: '0.8', changefreq: 'weekly' },
   { path: '/about', priority: '0.8', changefreq: 'weekly' },
-  { path: '/connect', priority: '0.8', changefreq: 'weekly' },
   { path: '/contact', priority: '0.8', changefreq: 'weekly' },
   { path: '/resources', priority: '0.8', changefreq: 'weekly' },
   { path: '/resources/upsc-syllabus', priority: '0.8', changefreq: 'daily' },

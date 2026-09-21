@@ -18,8 +18,10 @@ import {
   Sparkles,
   Award,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  RefreshCw
 } from 'lucide-react';
+import Link from '../components/Link';
 import { useCMSData } from '../hooks/useCMSData';
 import { 
   isSyllabusResource, 
@@ -32,7 +34,9 @@ import {
   getPYQPaperUrl,
   sortPYQPapers,
   getCachedCMSData,
-  isCMSNetworkFetched
+  isCMSNetworkFetched,
+  fetchCMSData,
+  LOCAL_STORAGE_KEY
 } from '../services/cmsService';
 import { sortCurrentAffairsByDate, formatDisplayDate, parseDateToTimestamp } from '../utils/dateUtils';
 import { createSlug, getDirectImageUrl, getSecondaryImageUrl } from '../utils/urlUtils';
@@ -467,133 +471,373 @@ function parsePYQQuestions(rawHtml) {
   return { questions: parsed, downloadLink };
 }
 
+/**
+ * Safely decode URI components without throwing URIError on malformed sequences
+ */
+function safeDecode(val) {
+  if (!val || typeof val !== 'string') return '';
+  try {
+    return decodeURIComponent(val);
+  } catch (e) {
+    try {
+      return unescape(val);
+    } catch (err) {
+      return val;
+    }
+  }
+}
+
+/**
+ * Helper to check active status
+ */
+const isItemActive = (obj) => {
+  if (!obj || typeof obj !== 'object') return false;
+  if (obj.Active === false || obj.active === false || obj.Is_Active === false || obj.is_active === false) return false;
+  if (obj.Status && String(obj.Status).toLowerCase() === 'inactive') return false;
+  if (obj.status && String(obj.status).toLowerCase() === 'inactive') return false;
+  return true;
+};
+
 // Helper to normalize string keys by stripping non-alphanumeric characters
 const normalizeKey = (str) => String(str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
-export default function ResourceDetailPage({ slug, folder, year, stage, stream, navigate }) {
-  const { data, loading: cmsLoading, isFetched: cmsFetched } = useCMSData();
+/**
+ * Canonical slug normalizer utilizing application's authoritative createSlug()
+ */
+function normalizeSlug(value) {
+  if (!value || typeof value !== 'string') return '';
+  const decoded = safeDecode(value).trim();
+  return createSlug(decoded)
+    .replace(/^-+|-+$/g, '')
+    .replace(/-+/g, '-');
+}
 
-  // Helper to check active status
-  const isItemActive = (obj) => {
-    if (!obj || typeof obj !== 'object') return false;
-    if (obj.Active === false || obj.active === false || obj.Is_Active === false || obj.is_active === false) return false;
-    if (obj.Status && String(obj.Status).toLowerCase() === 'inactive') return false;
-    if (obj.status && String(obj.status).toLowerCase() === 'inactive') return false;
-    return true;
-  };
+/**
+ * Resilient, authoritative resource matcher by canonical normalized slug, ID, or title
+ */
+function matchResourceInList(resources, targetSlug) {
+  if (!Array.isArray(resources) || resources.length === 0 || !targetSlug) return null;
+  const normalizedTarget = normalizeSlug(targetSlug);
+  if (!normalizedTarget) return null;
+  const alphaTarget = normalizedTarget.replace(/[^a-z0-9]/g, '');
 
-  const targetSlug = slug || '';
-  const targetNorm = normalizeKey(targetSlug);
+  for (const res of resources) {
+    if (!res || typeof res !== 'object') continue;
+    if (!isItemActive(res)) continue;
 
-  // Synchronous resolution of initial resource from router state or cache for 0ms render
-  const initialResource = useMemo(() => {
-    // 1. Navigation / router history state
-    if (typeof window !== 'undefined') {
-      const historyArt = 
-        window.history?.state?.usr?.article || 
-        window.history?.state?.article || 
-        window.history?.state?.usr?.item || 
-        window.history?.state?.item;
-      if (historyArt && typeof historyArt === 'object') {
-        const artSlug = historyArt.slug || historyArt.Slug || createSlug(historyArt.Title || historyArt.title || '');
-        const docId = historyArt.docId || historyArt.Doc_ID || historyArt.id || '';
-        if (
-          artSlug === targetSlug ||
-          normalizeKey(artSlug) === targetNorm ||
-          normalizeKey(historyArt.Title || historyArt.title || '') === targetNorm ||
-          (docId && normalizeKey(docId) === targetNorm)
-        ) {
-          return historyArt;
-        }
+    const resSlug = res.Slug ?? res.slug;
+    const resId = res.id ?? res.Id ?? res.docId ?? res.Doc_ID ?? res.ID;
+    const resTitle = res.Title ?? res.title;
+
+    // 1. Exact normalized slug match (Highest Priority)
+    if (resSlug) {
+      const normSlug = normalizeSlug(resSlug);
+      if (normSlug === normalizedTarget) {
+        return res;
+      }
+      // Alphanumeric bridge for hyphen/apostrophe variation
+      if (alphaTarget && normSlug.replace(/[^a-z0-9]/g, '') === alphaTarget) {
+        return res;
       }
     }
 
-    // 2. Synchronous cached CMS data from localStorage
-    const cached = getCachedCMSData();
-    const cachedResources = Array.isArray(cached?.resources) ? cached.resources.filter(isItemActive) : [];
-    if (cachedResources.length > 0 && targetSlug) {
-      const found = cachedResources.find(art => {
-        const artTitle = art.Title || art.title || '';
-        const artSlug = art.slug || art.Slug || createSlug(artTitle);
-        const docId = art.docId || art.Doc_ID || art.id || '';
-        return (
-          artSlug === targetSlug ||
-          normalizeKey(artSlug) === targetNorm ||
-          normalizeKey(artTitle) === targetNorm ||
-          (docId && normalizeKey(docId) === targetNorm)
-        );
-      });
-      if (found) return found;
+    // 2. ID match (if direct URL uses ID)
+    if (resId != null) {
+      const strId = String(resId).trim().toLowerCase();
+      if (strId === normalizedTarget || strId === String(targetSlug).trim().toLowerCase()) {
+        return res;
+      }
     }
-    return null;
-  }, [targetSlug, targetNorm]);
 
-  // 1. Explicit Loading & Fetched States (0ms if initialResource found)
-  const [isLoading, setIsLoading] = useState(!initialResource);
-  const [isFetched, setIsFetched] = useState(Boolean(initialResource || isCMSNetworkFetched()));
+    // 3. Title fallback match (if resource lacks slug or URL was generated from Title)
+    if (resTitle) {
+      const normTitle = normalizeSlug(resTitle);
+      if (normTitle === normalizedTarget) {
+        return res;
+      }
+      if (alphaTarget && normTitle.replace(/[^a-z0-9]/g, '') === alphaTarget) {
+        return res;
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Safe sessionStorage / localStorage cached resource reader (reads official egk_cms_data_v7 cache first)
+ */
+function getCachedResources() {
+  if (typeof window === 'undefined') return [];
+  // 1. Direct official CMS Cache from cmsService (0ms synchronous read of localStorage 'egk_cms_data_v7')
+  try {
+    const cmsData = getCachedCMSData();
+    if (cmsData && typeof cmsData === 'object' && Array.isArray(cmsData.resources) && cmsData.resources.length > 0) {
+      return cmsData.resources.filter(isItemActive);
+    }
+  } catch (e) {}
+
+  // 2. Direct read of LOCAL_STORAGE_KEY or 'egk_cms_data_v7'
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_KEY) || localStorage.getItem('egk_cms_data_v7');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed?.resources)) return parsed.resources.filter(isItemActive);
+      if (Array.isArray(parsed)) return parsed.filter(isItemActive);
+    }
+  } catch (e) {}
+
+  // 3. Fallbacks to session/local storage
+  try {
+    const sessionData = sessionStorage.getItem('cms_data') || sessionStorage.getItem('resources_cache') || sessionStorage.getItem('cms_resources');
+    if (sessionData) {
+      const parsed = JSON.parse(sessionData);
+      if (Array.isArray(parsed)) return parsed.filter(isItemActive);
+      if (Array.isArray(parsed?.resources)) return parsed.resources.filter(isItemActive);
+    }
+  } catch (e) {}
+  try {
+    const localData = localStorage.getItem('cms_data') || localStorage.getItem('resources_cache') || localStorage.getItem('cms_resources');
+    if (localData) {
+      const parsed = JSON.parse(localData);
+      if (Array.isArray(parsed)) return parsed.filter(isItemActive);
+      if (Array.isArray(parsed?.resources)) return parsed.resources.filter(isItemActive);
+    }
+  } catch (e) {}
+  return [];
+}
+
+/**
+ * Synchronous resolution of resource from props, router navigation state, window memory, or session/local storage
+ */
+function getImmediateResource({ slug, propResource, initialResource, item }) {
+  const rawSlug = slug || '';
+
+  // 1. Direct props
+  const directProp = propResource || initialResource || item;
+  if (directProp && typeof directProp === 'object') {
+    if (!rawSlug || matchResourceInList([directProp], rawSlug)) {
+      return directProp;
+    }
+  }
+
+  // 2. Direct official CMS Cache from LocalStorage ('egk_cms_data_v7') for 0ms instant load
+  const storedResources = getCachedResources();
+  if (storedResources.length > 0) {
+    const foundStored = matchResourceInList(storedResources, rawSlug);
+    if (foundStored) return foundStored;
+  }
+
+  // 3. Navigation / router history state
+  if (typeof window !== 'undefined') {
+    const historyArt = 
+      window.history?.state?.usr?.resource || 
+      window.history?.state?.resource || 
+      window.history?.state?.usr?.article || 
+      window.history?.state?.article || 
+      window.history?.state?.usr?.item || 
+      window.history?.state?.item;
+    if (historyArt && typeof historyArt === 'object') {
+      if (!rawSlug || matchResourceInList([historyArt], rawSlug)) {
+        return historyArt;
+      }
+    }
+  }
+
+  // 4. Window global memory cache
+  if (typeof window !== 'undefined') {
+    const memList = [
+      ...(Array.isArray(window.__RESOURCES_CACHE__) ? window.__RESOURCES_CACHE__ : []),
+      ...(Array.isArray(window.CMS_DATA?.resources) ? window.CMS_DATA.resources : []),
+      ...(Array.isArray(window.__CMS_DATA__?.resources) ? window.__CMS_DATA__.resources : [])
+    ];
+    if (memList.length > 0) {
+      const foundMem = matchResourceInList(memList, rawSlug);
+      if (foundMem) return foundMem;
+    }
+  }
+
+  return null;
+}
+
+export default function ResourceDetailPage({ slug: propSlug, folder, year, stage, stream, navigate, article: propArticle, initialArticle, item }) {
+  const { data, loading: cmsLoading, isFetched: cmsFetched } = useCMSData();
+
+  // Extract target slug directly from props OR URL path fallback
+  const pathSlug = typeof window !== 'undefined' ? window.location.pathname.split('/').filter(Boolean).pop() : '';
+  const rawTarget = propSlug || pathSlug || '';
+  const targetSlug = safeDecode(rawTarget).trim().toLowerCase();
+  const targetNorm = normalizeKey(targetSlug);
+
+  // Instant synchronous resolution if resource already exists in props, router state, or local cache
+  const immediateResource = useMemo(() => {
+    return getImmediateResource({ slug: targetSlug, propResource: propArticle || initialArticle || item });
+  }, [targetSlug, propArticle, initialArticle, item]);
+
+  // Single authoritative state: resolved resource + not found flag + retrying flag
+  const [article, setArticle] = useState(immediateResource);
+  const [isNotFound, setIsNotFound] = useState(false);
+  const [isRetrying, setIsRetrying] = useState(false);
+  const resource = article;
+
+  // Active resources from CMS
+  const rawResources = Array.isArray(data?.resources) ? data.resources.filter(isItemActive) : [];
 
   // Sorted list of active resources (latest first)
   const sortedResources = useMemo(() => {
-    const list = Array.isArray(data?.resources) && data.resources.length > 0
-      ? data.resources.filter(isItemActive)
-      : (Array.isArray(getCachedCMSData()?.resources) ? getCachedCMSData().resources.filter(isItemActive) : []);
-    return sortCurrentAffairsByDate(list);
-  }, [data?.resources]);
+    return sortCurrentAffairsByDate(rawResources);
+  }, [rawResources]);
 
-  // Resilient article matching: direct slug, normalized slug, normalized title, or docId
+  // Single authoritative resolver effect with live fetch fallback safeguard
+  useEffect(() => {
+    let isMounted = true;
+
+    async function resolveTargetResource() {
+      if (!targetSlug) {
+        if (isMounted) setIsNotFound(true);
+        return;
+      }
+
+      // 1. If we already have the matching resource in state, preserve it (never nullify!)
+      if (article && matchResourceInList([article], targetSlug)) {
+        return;
+      }
+
+      // 2. Check cached resources (0ms check)
+      const cached = getCachedResources();
+      if (cached.length > 0) {
+        const cachedMatch = matchResourceInList(cached, targetSlug);
+        if (cachedMatch) {
+          if (isMounted) {
+            setArticle(cachedMatch);
+            setIsNotFound(false);
+          }
+          return;
+        }
+      }
+
+      // 3. Match against CMS collection (sortedResources from useCMSData)
+      if (sortedResources.length > 0) {
+        const found = matchResourceInList(sortedResources, targetSlug);
+        if (found) {
+          if (isMounted) {
+            setArticle(found);
+            setIsNotFound(false);
+          }
+          return;
+        }
+
+        // If not found in current collection but live network fetch is still pending, keep waiting in loading state
+        if (!isCMSNetworkFetched() || cmsLoading || !cmsFetched) {
+          return;
+        }
+
+        // Live network fetch has completed, but resource wasn't found in sortedResources.
+        // Attempt a direct fetch safeguard to be 100% sure before marking not-found
+        try {
+          const freshData = await fetchCMSData(true);
+          const liveList = (freshData && Array.isArray(freshData.resources))
+            ? freshData.resources.filter(isItemActive)
+            : [];
+          const match = matchResourceInList(liveList, targetSlug);
+          if (match && isMounted) {
+            setArticle(match);
+            setIsNotFound(false);
+            return;
+          }
+        } catch (err) {
+          console.warn('[CMS Sync] Direct fetch safeguard encountered error:', err);
+        }
+
+        if (isMounted) {
+          setIsNotFound(true);
+        }
+        return;
+      }
+
+      // 4. If sortedResources is currently empty:
+      // While useCMSData is still loading / not fetched / network pending, keep loading!
+      if (cmsLoading || !cmsFetched || !isCMSNetworkFetched()) {
+        return;
+      }
+
+      // 5. If live CMS fetch completed with zero items, attempt direct fetch as safeguard
+      try {
+        const freshData = await fetchCMSData(true);
+        const liveList = (freshData && Array.isArray(freshData.resources))
+          ? freshData.resources.filter(isItemActive)
+          : [];
+        const match = matchResourceInList(liveList, targetSlug);
+        if (match && isMounted) {
+          setArticle(match);
+          setIsNotFound(false);
+          return;
+        }
+      } catch (err) {
+        console.warn('[CMS Sync] Direct fetch safeguard encountered error:', err);
+      }
+
+      if (isMounted) {
+        setIsNotFound(true);
+      }
+    }
+
+    resolveTargetResource();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [targetSlug, sortedResources, cmsFetched, cmsLoading, article]);
+
+  // Resilient article index matching
   const currentIndex = useMemo(() => {
     if (!sortedResources || sortedResources.length === 0) return -1;
-    return sortedResources.findIndex(art => {
-      const artTitle = art.Title || art.title || '';
-      const artSlug = art.slug || art.Slug || createSlug(artTitle);
-      const docId = art.docId || art.Doc_ID || art.id || '';
-
-      return (
-        artSlug === targetSlug ||
-        normalizeKey(artSlug) === targetNorm ||
-        normalizeKey(artTitle) === targetNorm ||
-        (docId && normalizeKey(docId) === targetNorm)
-      );
+    if (!article) return -1;
+    const artId = String(article?.id || article?.Id || article?.docId || article?.Doc_ID || article?.ID || '').toLowerCase().trim();
+    const artSlug = (article?.Slug || article?.slug || '').toLowerCase().trim();
+    return sortedResources.findIndex(a => {
+      if (!a || typeof a !== 'object') return false;
+      const aId = String(a?.id || a?.Id || a?.docId || a?.Doc_ID || a?.ID || '').toLowerCase().trim();
+      const aSlug = (a?.Slug || a?.slug || '').toLowerCase().trim();
+      if (artId && aId && artId === aId) return true;
+      if (artSlug && aSlug && artSlug === aSlug) return true;
+      return false;
     });
-  }, [sortedResources, targetSlug, targetNorm]);
+  }, [sortedResources, article]);
 
-  const article = currentIndex !== -1 ? sortedResources[currentIndex] : initialResource;
-  const resource = article;
+  // Manual retry handler
+  const handleManualRetry = async () => {
+    setIsRetrying(true);
+    setIsNotFound(false);
+    try {
+      const freshData = await fetchCMSData(true);
+      const liveList = (freshData && Array.isArray(freshData.resources))
+        ? freshData.resources.filter(isItemActive)
+        : [];
+      const match = matchResourceInList(liveList, targetSlug);
+      if (match) {
+        setArticle(match);
+        setIsNotFound(false);
+      } else {
+        setIsNotFound(true);
+      }
+    } catch (err) {
+      console.warn('[CMS Sync] Manual force refresh failed:', err);
+      setIsNotFound(true);
+    } finally {
+      setIsRetrying(false);
+    }
+  };
 
-  // 1. State Initialization: Reset isLoading and isFetched when route parameters change
+  // Persist resolved resource to window memory cache for instant reads
   useEffect(() => {
-    if (initialResource) {
-      setIsLoading(false);
-      setIsFetched(true);
-    } else if (!isCMSNetworkFetched()) {
-      setIsLoading(true);
-      setIsFetched(false);
+    if (article && typeof window !== 'undefined') {
+      window.__RESOURCES_CACHE__ = window.__RESOURCES_CACHE__ || [];
+      if (!window.__RESOURCES_CACHE__.some(a => (a.id && a.id === article.id) || (a.Slug && a.Slug === article.Slug) || (a.slug && a.slug === article.slug))) {
+        window.__RESOURCES_CACHE__.push(article);
+      }
     }
-  }, [slug, folder, year, stage, stream, initialResource]);
-
-  // 2. Explicit Route Resolution Guard & Catching Route Hydration Delays
-  useEffect(() => {
-    // If router is hydrating or slug is not ready yet, keep displaying the loader
-    if (!slug || typeof slug !== 'string' || !slug.trim()) {
-      setIsLoading(true);
-      setIsFetched(false);
-      return;
-    }
-
-    if (resource) {
-      // Resource matched successfully (from cache or fresh network response)
-      setIsLoading(false);
-      setIsFetched(true);
-    } else if (isCMSNetworkFetched()) {
-      // Live network fetch has completely settled and resource is verified absent
-      setIsLoading(false);
-      setIsFetched(true);
-    } else {
-      // Live network fetch actively pending
-      setIsLoading(true);
-      setIsFetched(false);
-    }
-  }, [resource, cmsLoading, cmsFetched, slug]);
+  }, [article]);
 
   // Determine if this resource is in the syllabus context
   const isSyllabus = useMemo(() => {
@@ -819,11 +1063,11 @@ export default function ResourceDetailPage({ slug, folder, year, stage, stream, 
       const isoDate = formatToYMD(article.Date || article.date);
 
       // 1. Set document title
-      let pageTitle = `${title} | e-Gurukulam for IAS`;
+      let pageTitle = `${title} | Akella Raghavendra's e-Gurukulam for IAS`;
       if (isPYQ) {
-        pageTitle = `${paperName} (${detectedYear}) - UPSC ${detectedStage} PYQs | e-Gurukulam for IAS`;
+        pageTitle = `${paperName} (${detectedYear}) - UPSC ${detectedStage} PYQs | Akella Raghavendra's e-Gurukulam for IAS`;
       } else if (isSyllabus) {
-        pageTitle = `${title} - UPSC Civil Services Syllabus | e-Gurukulam for IAS`;
+        pageTitle = `${title} - UPSC Civil Services Syllabus | Akella Raghavendra's e-Gurukulam for IAS`;
       }
       document.title = pageTitle;
 
@@ -1135,12 +1379,14 @@ export default function ResourceDetailPage({ slug, folder, year, stage, stream, 
     }
   };
 
-  // 3. Catching Route Hydration Delays
-  const isRouterReady = Boolean(slug && typeof slug === 'string' && slug.trim().length > 0);
+  // 3. Catching Route Hydration Delays & Loading Condition
+  const isRouterReady = Boolean(targetSlug && targetSlug.length > 0);
+  const isNetworkPending = !isCMSNetworkFetched();
+  const isLoading = !article && !isNotFound && (cmsLoading || !cmsFetched || isNetworkPending || isRetrying);
 
   // 1. INLINE LIGHTWEIGHT SKELETON PLACEHOLDER WHILE ROUTE/DATA IS SYNCING
   // Keeps header, navigation, and page framework mounted immediately
-  if (!isRouterReady || isLoading || !isFetched) {
+  if (!isRouterReady || isLoading) {
     const backLink = folder === 'upsc-syllabus' 
       ? '/resources/upsc-syllabus' 
       : folder === 'pyqs' 
@@ -1190,7 +1436,7 @@ export default function ResourceDetailPage({ slug, folder, year, stage, stream, 
   }
 
   // 2. RESOURCE NOT FOUND STATE (ONLY AFTER LIVE CMS QUERY IS CONFIRMED COMPLETE)
-  if (isFetched && !isLoading && !resource) {
+  if (!article) {
     const backLink = folder === 'upsc-syllabus' 
       ? '/resources/upsc-syllabus' 
       : folder === 'pyqs' 
@@ -1234,17 +1480,26 @@ export default function ResourceDetailPage({ slug, folder, year, stage, stream, 
               Resource Archived or Moved
             </h1>
             <p className="text-xs sm:text-sm font-serif italic text-[#5C4028] font-semibold leading-relaxed max-w-lg mx-auto">
-              The requested study resource or paper could not be located in our active index. Explore our latest available materials below, or browse the repository.
+              The requested study resource or paper could not be located in our active index. Explore our latest available materials below, or retry fetching.
             </p>
-            <div className="pt-2">
+            <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
               <button
                 type="button"
-                onClick={() => navigate(backLink)}
+                onClick={handleManualRetry}
+                disabled={isRetrying}
                 className="btn-terracotta-pill text-xs py-2.5 px-6 font-serif font-bold cursor-pointer inline-flex items-center gap-2"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isRetrying ? 'animate-spin' : ''}`} />
+                <span>{isRetrying ? 'Checking Live Sheet...' : 'Retry Fetch'}</span>
+              </button>
+              <Link
+                to={backLink}
+                navigate={navigate}
+                className="btn-terracotta-outline-pill text-xs py-2.5 px-6 font-serif font-bold cursor-pointer inline-flex items-center gap-2 no-underline"
               >
                 <span>{backLabel}</span>
                 <ArrowLeft className="w-4 h-4 rotate-180" />
-              </button>
+              </Link>
             </div>
           </div>
 
@@ -1255,13 +1510,13 @@ export default function ResourceDetailPage({ slug, folder, year, stage, stream, 
                 <h2 className="font-serif-header text-xl sm:text-2xl font-bold text-[#221814]">
                   Latest Available Resources
                 </h2>
-                <button
-                  type="button"
-                  onClick={() => navigate('/resources')}
-                  className="text-xs font-serif font-bold text-[#8C3A27] hover:text-[#732D1B] hover:underline cursor-pointer"
+                <Link
+                  to="/resources"
+                  navigate={navigate}
+                  className="text-xs font-serif font-bold text-[#8C3A27] hover:text-[#732D1B] hover:underline cursor-pointer no-underline"
                 >
                   View All &rarr;
-                </button>
+                </Link>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -1276,14 +1531,16 @@ export default function ResourceDetailPage({ slug, folder, year, stage, stream, 
                   if (isSyllabusResource(item)) {
                     targetUrl = `/resources/upsc-syllabus/${encodeURIComponent(itemSlug)}`;
                   } else if (isPYQResource(item)) {
-                    targetUrl = `/resources/pyqs/${encodeURIComponent(itemSlug)}`;
+                    targetUrl = getPYQPaperUrl(item);
                   }
 
                   return (
-                    <div
+                    <Link
                       key={idx}
-                      className="card-parchment-3d rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0] overflow-hidden flex flex-col justify-between hover:border-[#8C3A27] transition-all shadow-sm group text-left cursor-pointer p-6 space-y-4"
-                      onClick={() => navigate(targetUrl, { state: { resource: item } })}
+                      to={targetUrl}
+                      navigate={navigate}
+                      state={{ resource: item }}
+                      className="card-parchment-3d rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0] overflow-hidden flex flex-col justify-between hover:border-[#8C3A27] transition-all shadow-sm group text-left cursor-pointer p-6 space-y-4 no-underline"
                     >
                       <div className="space-y-3 flex-1">
                         <div className="flex items-center justify-between text-xs gap-2">
@@ -1308,18 +1565,15 @@ export default function ResourceDetailPage({ slug, folder, year, stage, stream, 
                         )}
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate(targetUrl, { state: { resource: item } });
-                        }}
-                        className="w-full inline-flex items-center justify-center gap-2 btn-terracotta-outline-pill text-xs py-2 px-4 font-serif font-bold transition-all cursor-pointer group/btn hover:bg-[#8C3A27] hover:text-white"
-                      >
-                        <BookOpen className="w-3.5 h-3.5" />
-                        <span>OPEN RESOURCE &rarr;</span>
-                      </button>
-                    </div>
+                      <div className="pt-2">
+                        <span
+                          className="w-full inline-flex items-center justify-center gap-2 btn-terracotta-outline-pill text-xs py-2 px-4 font-serif font-bold transition-all cursor-pointer group/btn group-hover:bg-[#8C3A27] group-hover:text-white"
+                        >
+                          <BookOpen className="w-3.5 h-3.5" />
+                          <span>OPEN RESOURCE &rarr;</span>
+                        </span>
+                      </div>
+                    </Link>
                   );
                 })}
               </div>

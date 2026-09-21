@@ -141,12 +141,6 @@ const STATIC_ROUTES = [
     lastmod: getTodayYMD()
   },
   {
-    path: '/connect',
-    priority: '0.8',
-    changefreq: 'weekly',
-    lastmod: getTodayYMD()
-  },
-  {
     path: '/contact',
     priority: '0.8',
     changefreq: 'weekly',

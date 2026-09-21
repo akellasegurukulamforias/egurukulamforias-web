@@ -102,6 +102,20 @@ function NotFoundPage({ navigate }) {
   );
 }
 
+// Authoritative Canonical Route Redirection Mapping for Consolidated URLs
+export const ROUTE_REDIRECTS = {
+  '/home': '/',
+  '/blog': '/current-affairs',
+  '/insights': '/current-affairs',
+  '/journal': '/current-affairs',
+  '/connect': '/contact',
+  '/courses': '/programs',
+  '/philosophy': '/about',
+  '/sadhana': '/test-series',
+  '/repository': '/resources',
+  '/admission': '/contact'
+};
+
 export default function App() {
   const [currentPath, setCurrentPath] = useState(
     typeof window !== 'undefined' ? (window.location.pathname + window.location.search) : '/'
@@ -111,6 +125,7 @@ export default function App() {
   const [popupSelectedItem, setPopupSelectedItem] = useState(null);
   const { data: cmsData } = useCMSData();
   const isPopStateRef = useRef(false);
+  const lastTrackedPathRef = useRef(null);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -120,6 +135,23 @@ export default function App() {
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
+
+  // Client-Side Canonical Redirect Enforcer: Synchronously rewrite legacy/consolidated URL aliases
+  useLayoutEffect(() => {
+    if (typeof window === 'undefined') return;
+    const rawPath = (currentPath || '/').split('?')[0].split('#')[0];
+    const normalizedPath = rawPath.toLowerCase().replace(/\/$/, '') || '/';
+
+    let target = ROUTE_REDIRECTS[normalizedPath];
+    if (!target && normalizedPath.startsWith('/blog/')) {
+      target = normalizedPath.replace('/blog/', '/current-affairs/');
+    }
+
+    if (target && target !== normalizedPath) {
+      window.history.replaceState({}, '', target);
+      setCurrentPath(target);
+    }
+  }, [currentPath]);
 
   // Centralized Scroll Restoration: Synchronously reset scroll to top on normal route navigation before paint
   useLayoutEffect(() => {
@@ -147,38 +179,76 @@ export default function App() {
 
   // Default metadata reset for top-level pages
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+
     const rawPath = (currentPath || '/').split('?')[0].split('#')[0];
     const normalizedPath = rawPath.toLowerCase().replace(/\/$/, '') || '/';
     const isDetailPage = normalizedPath.startsWith('/current-affairs/') || 
                          (normalizedPath.startsWith('/resources/') && normalizedPath !== '/resources' && normalizedPath !== '/resources/upsc-syllabus' && normalizedPath !== '/resources/pyqs');
 
     if (!isDetailPage) {
-      const titles = {
-        '/': "Akella Raghavendra's e-Gurukulam For IAS",
-        '/about': 'About Us | e-Gurukulam for IAS',
-        '/philosophy': 'About Us | e-Gurukulam for IAS',
-        '/programs': 'UPSC Mentorship Programs | e-Gurukulam for IAS',
-        '/courses': 'UPSC Mentorship Programs | e-Gurukulam for IAS',
-        '/mentorship': 'UPSC Mentorship Programs | e-Gurukulam for IAS',
-        '/ias-with-life': 'UPSC Mentorship Programs | e-Gurukulam for IAS',
-        '/test-series': 'Test Series & Sadhana | e-Gurukulam for IAS',
-        '/sadhana': 'Test Series & Sadhana | e-Gurukulam for IAS',
-        '/current-affairs': 'Daily UPSC Current Affairs & Editorial Analysis | e-Gurukulam for IAS',
-        '/blog': 'Daily UPSC Current Affairs & Editorial Analysis | e-Gurukulam for IAS',
-        '/insights': 'Daily UPSC Current Affairs & Editorial Analysis | e-Gurukulam for IAS',
-        '/journal': 'Daily UPSC Current Affairs & Editorial Analysis | e-Gurukulam for IAS',
-        '/resources': 'UPSC Resources, Syllabus & PYQs | e-Gurukulam for IAS',
-        '/repository': 'UPSC Resources, Syllabus & PYQs | e-Gurukulam for IAS',
-        '/resources/upsc-syllabus': 'UPSC CSE Syllabus Breakdown | e-Gurukulam for IAS',
-        '/resources/pyqs': 'UPSC Previous Year Questions (PYQs) | e-Gurukulam for IAS',
-        '/contact': 'Connect & Admissions | e-Gurukulam for IAS',
-        '/connect': 'Connect & Admissions | e-Gurukulam for IAS',
-        '/apply': 'Connect & Admissions | e-Gurukulam for IAS',
-        '/admission': 'Connect & Admissions | e-Gurukulam for IAS',
+      const routeSEO = {
+        '/': {
+          title: "Akella Raghavendra's e-Gurukulam for IAS",
+          description: "Prepare for UPSC Civil Services with Akella Raghavendra Sir through focused mentorship, practical strategy, current affairs, study resources, and disciplined preparation."
+        },
+        '/programs': {
+          title: "Programs | Akella Raghavendra's e-Gurukulam for IAS",
+          description: "Explore structured UPSC mentorship programs, tiered guidance models, and holistic civil services preparation roadmaps designed by Akella Raghavendra Sir."
+        },
+        '/mentorship': {
+          title: "Mentorship | Akella Raghavendra's e-Gurukulam for IAS",
+          description: "Learn about Akella Raghavendra Sir's personalized UPSC mentorship philosophy, offering disciplined direction, strategic partnership, and individual guidance."
+        },
+        '/current-affairs': {
+          title: "Current Affairs | Akella Raghavendra's e-Gurukulam for IAS",
+          description: "Access daily UPSC current affairs, in-depth editorial analysis, and syllabus-mapped dispatches curated for Civil Services Examination preparation."
+        },
+        '/resources': {
+          title: "Resources | Akella Raghavendra's e-Gurukulam for IAS",
+          description: "Explore authentic UPSC study resources, comprehensive civil services syllabus breakdowns, categorized previous year questions (PYQs), and prep notes."
+        },
+        '/contact': {
+          title: "Contact | Akella Raghavendra's e-Gurukulam for IAS",
+          description: "Connect with Akella Raghavendra's e-Gurukulam for IAS. Book a personal mentorship appointment, enquire about admissions, or visit our Hyderabad center."
+        },
+        '/about': {
+          title: "About Us | Akella Raghavendra's e-Gurukulam for IAS",
+          description: "Learn about Sri Akella Raghavendra, Founder and Chief Mentor of e-Gurukulam for IAS, and our dedicated pedagogical philosophy for UPSC Civil Services mentoring."
+        },
+        '/ias-with-life': {
+          title: "Programs | Akella Raghavendra's e-Gurukulam for IAS",
+          description: "Explore structured UPSC mentorship programs, tiered guidance models, and holistic civil services preparation roadmaps designed by Akella Raghavendra Sir."
+        },
+        '/test-series': {
+          title: "Test Series & Sadhana | Akella Raghavendra's e-Gurukulam for IAS",
+          description: "Practice authentic UPSC Prelims and Mains test series, Ekadasa Sadhana mock examinations, and structured question papers with detailed answer reviews."
+        },
+        '/resources/upsc-syllabus': {
+          title: "UPSC CSE Syllabus Breakdown | Akella Raghavendra's e-Gurukulam for IAS",
+          description: "Detailed UPSC Civil Services Examination syllabus breakdown covering Prelims and Mains (General Studies I–IV, Essay, and Optionals) with topic analysis."
+        },
+        '/resources/pyqs': {
+          title: "UPSC Previous Year Questions (PYQs) | Akella Raghavendra's e-Gurukulam for IAS",
+          description: "Authentic archive of UPSC Civil Services Examination previous year question papers (PYQs) categorized by year, stage (Prelims/Mains), and subject."
+        },
+        '/apply': {
+          title: "Contact | Akella Raghavendra's e-Gurukulam for IAS",
+          description: "Connect with Akella Raghavendra's e-Gurukulam for IAS. Book a personal mentorship appointment, enquire about admissions, or visit our Hyderabad center."
+        }
       };
-      
-      const newTitle = titles[normalizedPath] || 'Page Not Found | e-Gurukulam for IAS';
-      document.title = newTitle;
+
+      const seoData = routeSEO[normalizedPath] || {
+        title: "Page Not Found | Akella Raghavendra's e-Gurukulam for IAS",
+        description: "The requested page could not be found on Akella Raghavendra's e-Gurukulam for IAS website."
+      };
+
+      document.title = seoData.title;
+
+      const canonicalTarget = ROUTE_REDIRECTS[normalizedPath] || normalizedPath;
+      const canonicalHref = canonicalTarget === '/' 
+        ? 'https://egurukulamforias.com/' 
+        : `https://egurukulamforias.com${canonicalTarget}`;
 
       let canonical = document.querySelector('link[rel="canonical"]');
       if (!canonical) {
@@ -186,36 +256,41 @@ export default function App() {
         canonical.setAttribute('rel', 'canonical');
         document.head.appendChild(canonical);
       }
-      const canonicalHref = normalizedPath === '/' 
-        ? 'https://egurukulamforias.com/' 
-        : `https://egurukulamforias.com${normalizedPath}`;
       canonical.setAttribute('href', canonicalHref);
 
-      let metaDesc = document.querySelector('meta[name="description"]');
-      if (metaDesc) {
-        if (normalizedPath === '/') {
-          metaDesc.setAttribute('content', 'Prepare for UPSC Civil Services with Akella Raghavendra Sir through focused mentorship, practical strategy, current affairs, study resources, and disciplined preparation.');
-        } else {
-          metaDesc.setAttribute('content', 'e-Gurukulam for IAS - Premium UPSC Civil Services Examination mentoring, daily editorial current affairs analysis, comprehensive syllabus breakdown, and categorized PYQs.');
+      const updateTag = (selector, attr, key, content) => {
+        let el = document.querySelector(selector);
+        if (!el) {
+          el = document.createElement('meta');
+          el.setAttribute(attr, key);
+          document.head.appendChild(el);
         }
-      }
+        el.setAttribute('content', content);
+      };
 
-      if (normalizedPath === '/') {
-        let ogTitle = document.querySelector('meta[property="og:title"]');
-        if (ogTitle) ogTitle.setAttribute('content', "Akella Raghavendra's e-Gurukulam For IAS");
-        let ogDesc = document.querySelector('meta[property="og:description"]');
-        if (ogDesc) ogDesc.setAttribute('content', 'Prepare for UPSC Civil Services with Akella Raghavendra Sir through focused mentorship, practical strategy, current affairs, study resources, and disciplined preparation.');
-        let twTitle = document.querySelector('meta[name="twitter:title"]');
-        if (twTitle) twTitle.setAttribute('content', "Akella Raghavendra's e-Gurukulam For IAS");
-        let twDesc = document.querySelector('meta[name="twitter:description"]');
-        if (twDesc) twDesc.setAttribute('content', 'Prepare for UPSC Civil Services with Akella Raghavendra Sir through focused mentorship, practical strategy, current affairs, study resources, and disciplined preparation.');
-      }
+      updateTag('meta[name="description"]', 'name', 'description', seoData.description);
+      updateTag('meta[property="og:title"]', 'property', 'og:title', seoData.title);
+      updateTag('meta[property="og:description"]', 'property', 'og:description', seoData.description);
+      updateTag('meta[property="og:url"]', 'property', 'og:url', canonicalHref);
+      updateTag('meta[name="twitter:title"]', 'name', 'twitter:title', seoData.title);
+      updateTag('meta[name="twitter:description"]', 'name', 'twitter:description', seoData.description);
     }
   }, [currentPath]);
 
-  // SPA Route Tracking for Google Analytics 4 (GA4 Measurement ID: G-T5W96019N1)
+  // Authoritative SPA Route Tracking for Google Analytics 4 (GA4 Measurement ID: G-T5W96019N1)
   useEffect(() => {
-    if (typeof window !== 'undefined' && typeof window.gtag === 'function') {
+    if (typeof window === 'undefined') return;
+
+    // Strict domain guard: only track official production hostnames (excludes localhost, 127.0.0.1, LAN IPs, and Vercel preview URLs)
+    const hostname = window.location.hostname.toLowerCase();
+    const isProduction = hostname === 'egurukulamforias.com' || hostname === 'www.egurukulamforias.com';
+    if (!isProduction) return;
+
+    // Strict deduplication: prevent duplicate pageviews on React.StrictMode dev remount or redundant component re-renders
+    if (lastTrackedPathRef.current === currentPath) return;
+    lastTrackedPathRef.current = currentPath;
+
+    if (typeof window.gtag === 'function') {
       window.gtag('config', 'G-T5W96019N1', {
         page_path: currentPath,
         page_location: window.location.href,
@@ -359,7 +434,9 @@ export default function App() {
         return <AboutPage navigate={navigate} />;
       case '/programs':
       case '/courses':
+        return <ProgramsPage navigate={navigate} />;
       case '/mentorship':
+        return <ProgramsPage navigate={navigate} />;
       case '/ias-with-life':
         return <ProgramsPage navigate={navigate} />;
       case '/test-series':
@@ -375,8 +452,9 @@ export default function App() {
         return <ResourcesPage navigate={navigate} />;
       case '/contact':
       case '/connect':
-      case '/apply':
       case '/admission':
+        return <ConnectPage navigate={navigate} />;
+      case '/apply':
         return <ConnectPage navigate={navigate} />;
       default:
         return <NotFoundPage navigate={navigate} />;

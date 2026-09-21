@@ -642,7 +642,6 @@ export function generateSitemapEntries(data) {
     { path: '/programs', priority: '0.8', changefreq: 'weekly', lastmod: todayYMD },
     { path: '/test-series', priority: '0.8', changefreq: 'weekly', lastmod: todayYMD },
     { path: '/about', priority: '0.8', changefreq: 'weekly', lastmod: todayYMD },
-    { path: '/connect', priority: '0.8', changefreq: 'weekly', lastmod: todayYMD },
     { path: '/contact', priority: '0.8', changefreq: 'weekly', lastmod: todayYMD },
     { path: '/resources', priority: '0.8', changefreq: 'weekly', lastmod: todayYMD },
     { path: '/resources/upsc-syllabus', priority: '0.8', changefreq: 'daily', lastmod: todayYMD },

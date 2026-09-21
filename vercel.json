@@ -1,5 +1,62 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "redirects": [
+    {
+      "source": "/blog",
+      "destination": "/current-affairs",
+      "permanent": true
+    },
+    {
+      "source": "/blog/:slug*",
+      "destination": "/current-affairs/:slug*",
+      "permanent": true
+    },
+    {
+      "source": "/insights",
+      "destination": "/current-affairs",
+      "permanent": true
+    },
+    {
+      "source": "/journal",
+      "destination": "/current-affairs",
+      "permanent": true
+    },
+    {
+      "source": "/connect",
+      "destination": "/contact",
+      "permanent": true
+    },
+    {
+      "source": "/courses",
+      "destination": "/programs",
+      "permanent": true
+    },
+    {
+      "source": "/home",
+      "destination": "/",
+      "permanent": true
+    },
+    {
+      "source": "/philosophy",
+      "destination": "/about",
+      "permanent": true
+    },
+    {
+      "source": "/sadhana",
+      "destination": "/test-series",
+      "permanent": true
+    },
+    {
+      "source": "/repository",
+      "destination": "/resources",
+      "permanent": true
+    },
+    {
+      "source": "/admission",
+      "destination": "/contact",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     {
       "source": "/sitemap.xml",
