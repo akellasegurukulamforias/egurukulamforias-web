@@ -1,67 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  X, 
-  CheckCircle2, 
-  Send,
-  ArrowRight,
-  Loader2
-} from 'lucide-react';
-import { isValidPhone, isValidEmail } from '../utils/sanitize';
+import { ArrowRight } from 'lucide-react';
 
 export default function IASWithLifeSection({ navigate }) {
-  // Modal State
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isSubmitted, setIsSubmitted] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
   // Time of Day Progress (0.00 = Morning, 1.00 = Quiet Night)
   // Derived strictly from native browser vertical page scroll
   const [dayProgress, setDayProgress] = useState(0);
 
-  const formMountedAt = useRef(Date.now());
-
-  // Form State
-  const [formData, setFormData] = useState({
-    fullName: '',
-    email: '',
-    phone: '',
-    category: 'Managing Both',
-    stage: 'Preparing',
-    user_organization_code: ''
-  });
-  const [honeypot, setHoneypot] = useState('');
-  const [validationError, setValidationError] = useState('');
-
   const sectionRef = useRef(null);
-
-  const isMountedRef = useRef(true);
-
-  useEffect(() => {
-    isMountedRef.current = true;
-    return () => {
-      isMountedRef.current = false;
-    };
-  }, []);
-
-  // Lock body scroll and listen for Escape when interest modal is open
-  useEffect(() => {
-    if (!isModalOpen) return;
-
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape') {
-        handleResetModal();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.body.style.overflow = prevOverflow || '';
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [isModalOpen]);
 
   // ====================================================================
   // NATIVE BROWSER VERTICAL SCROLL AS SINGLE SOURCE OF TRUTH
@@ -91,93 +36,6 @@ export default function IASWithLifeSection({ navigate }) {
       window.removeEventListener('scroll', handleScroll);
     };
   }, []);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    // 1. Strict Validation Rules (Mobile Number & Email Address)
-    const contactNumber = (formData.phone || '').trim();
-    if (!/^[6-9]\d{9}$/.test(contactNumber)) {
-      alert("Please enter a valid 10-digit Indian mobile number.");
-      setValidationError("⚠️ Please enter a valid 10-digit Indian mobile number.");
-      return;
-    }
-    if (!isValidEmail(formData.email)) {
-      setValidationError("⚠️ Please enter a valid email address.");
-      return;
-    }
-    setValidationError('');
-
-    // 2. Anti-Spam Honeypot Verification (Silently simulate success for the bot without writing to backend)
-    if (
-      (formData.user_organization_code && formData.user_organization_code.trim() !== '') ||
-      (honeypot && honeypot.trim() !== '')
-    ) {
-      setIsSubmitted(true);
-      return;
-    }
-
-    // 3. 3-Second Fill Timer Defense
-    const elapsed_ms = Date.now() - formMountedAt.current;
-    if (elapsed_ms < 3000) {
-      alert("Please take a moment to review your details before submitting.");
-      setValidationError("⚠️ Please take a moment to review your details before submitting.");
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    const payload = {
-      formType: "IAS_WITH_LIFE",
-      fullName: formData.fullName,
-      email: formData.email,
-      whatsapp: contactNumber,
-      profileType: formData.category,
-      preparationStage: formData.stage,
-      user_organization_code: formData.user_organization_code || '',
-      elapsed_ms: elapsed_ms,
-      hp_website_check: honeypot
-    };
-
-    try {
-      await fetch(
-        "https://script.google.com/macros/s/AKfycbxbjFRyxiRgeNtUoivxdhxRqxlTlZiES5hhrkgaXkWUz_JfOIwO6fxHj2zsP6jK_ic1/exec",
-        {
-          method: "POST",
-          headers: { "Content-Type": "text/plain;charset=utf-8" },
-          body: JSON.stringify(payload)
-        }
-      );
-      if (isMountedRef.current) {
-        setIsSubmitted(true);
-      }
-    } catch (err) {
-      console.error("IAS WITH LIFE Interest List submission error:", err);
-      // Fallback: show success confirmation screen so user experience remains seamless
-      if (isMountedRef.current) {
-        setIsSubmitted(true);
-      }
-    } finally {
-      if (isMountedRef.current) {
-        setIsSubmitting(false);
-      }
-    }
-  };
-
-  const handleResetModal = () => {
-    setIsModalOpen(false);
-    setIsSubmitted(false);
-    setHoneypot('');
-    setValidationError('');
-    setFormData({
-      fullName: '',
-      email: '',
-      phone: '',
-      category: 'Managing Both',
-      stage: 'Preparing',
-      user_organization_code: ''
-    });
-  };
 
   // Environment Lighting Phases based on dayProgress (0.0 to 1.0)
   const isEveningPhase = dayProgress >= 0.48;
@@ -437,7 +295,13 @@ export default function IASWithLifeSection({ navigate }) {
               <div className="pt-2 flex flex-col items-center justify-center gap-2.5 relative z-30 pointer-events-auto">
                 <button
                   type="button"
-                  onClick={() => setIsModalOpen(true)}
+                  onClick={() => {
+                    if (typeof navigate === 'function') {
+                      navigate('/contact');
+                    } else {
+                      window.location.href = '/contact';
+                    }
+                  }}
                   className="btn-terracotta-pill text-xs sm:text-sm py-4 px-8 font-serif font-bold shadow-xl hover:shadow-2xl transition-all inline-flex items-center gap-3 cursor-pointer"
                 >
                   <span>JOIN THE INTEREST LIST</span>
@@ -455,215 +319,6 @@ export default function IASWithLifeSection({ navigate }) {
         </div>
 
       </div>
-
-      {/* ==================================================================== */}
-      {/* INTEREST REGISTRATION MODAL DRAWER */}
-      {/* ==================================================================== */}
-      {isModalOpen && (
-        <div 
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/70 backdrop-blur-xs transition-opacity animate-fade-in text-[#221814]"
-          onClick={handleResetModal}
-        >
-          <div 
-            className="relative w-full max-w-lg bg-[#FAF6EE] text-[#221814] rounded-3xl shadow-2xl border-2 border-[#8C3A27]/40 p-6 sm:p-8 overflow-hidden text-left"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Close Button */}
-            <button 
-              type="button"
-              onClick={handleResetModal}
-              className="absolute top-5 right-5 p-2 rounded-full bg-[#8C3A27]/10 hover:bg-[#8C3A27]/20 text-[#8C3A27] transition-colors cursor-pointer"
-              aria-label="Close modal"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            {!isSubmitted ? (
-              <div className="space-y-6">
-                
-                {/* Modal Title & Subtitle */}
-                <div className="space-y-1.5 pr-8">
-                  <span className="text-[11px] font-mono font-bold uppercase tracking-widest text-[#8C3A27]">
-                    IAS | WITH LIFE
-                  </span>
-                  <h3 className="font-serif-header text-2xl sm:text-3xl font-extrabold text-[#221814] leading-tight">
-                    JOIN THE INTEREST LIST
-                  </h3>
-                  <p className="text-xs sm:text-sm font-serif italic text-[#5C4028] font-bold">
-                    Be the first to know when the program launches.
-                  </p>
-                </div>
-
-                {/* Form Fields */}
-                <form onSubmit={handleSubmit} className="space-y-4 text-xs font-sans">
-                  
-                  {/* Lightweight Zero-Dependency Bot Defense Honeypot Field */}
-                  <input
-                    type="text"
-                    name="user_organization_code"
-                    value={formData.user_organization_code || ''}
-                    onChange={(e) => setFormData(prev => ({ ...prev, user_organization_code: e.target.value }))}
-                    tabIndex={-1}
-                    autoComplete="off"
-                    style={{ position: 'absolute', opacity: 0, zIndex: -1, pointerEvents: 'none', left: '-9999px' }}
-                  />
-
-                  {/* Honeypot field - hidden from humans, traps automated bots */}
-                  <div style={{ display: 'none', position: 'absolute', left: '-9999px' }} aria-hidden="true">
-                    <input
-                      type="text"
-                      name="hp_website_check"
-                      tabIndex="-1"
-                      autoComplete="off"
-                      value={honeypot}
-                      onChange={(e) => setHoneypot(e.target.value)}
-                    />
-                  </div>
-
-                  {/* Full Name */}
-                  <div className="space-y-1">
-                    <label className="font-serif font-bold text-[#221814] block">Full Name *</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. Ananya Sharma"
-                      value={formData.fullName}
-                      onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                      className="w-full px-4 py-3 rounded-xl bg-[#FFFDF8] border border-[#D5C3B0] text-[#221814] focus:outline-none focus:border-[#8C3A27] font-medium"
-                    />
-                  </div>
-
-                  {/* Email Address */}
-                  <div className="space-y-1">
-                    <label className="font-serif font-bold text-[#221814] block">Email Address *</label>
-                    <input
-                      type="email"
-                      required
-                      placeholder="ananya@example.com"
-                      value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      className="w-full px-4 py-3 rounded-xl bg-[#FFFDF8] border border-[#D5C3B0] text-[#221814] focus:outline-none focus:border-[#8C3A27] font-medium"
-                    />
-                  </div>
-
-                  {/* WhatsApp / Contact Number */}
-                  <div className="space-y-1">
-                    <label className="font-serif font-bold text-[#221814] block">WhatsApp / Contact Number *</label>
-                    <input
-                      type="tel"
-                      required
-                      placeholder="+91 98765 43210"
-                      value={formData.phone}
-                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                      className="w-full px-4 py-3 rounded-xl bg-[#FFFDF8] border border-[#D5C3B0] text-[#221814] focus:outline-none focus:border-[#8C3A27] font-medium"
-                    />
-                  </div>
-
-                  {/* I am a: Select */}
-                  <div className="space-y-1">
-                    <label className="font-serif font-bold text-[#221814] block">I am a:</label>
-                    <select
-                      value={formData.category}
-                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                      className="w-full px-4 py-3 rounded-xl bg-[#FFFDF8] border border-[#D5C3B0] text-[#221814] focus:outline-none focus:border-[#8C3A27] font-medium"
-                    >
-                      <option value="Homemaker">Homemaker</option>
-                      <option value="Working Professional">Working Professional</option>
-                      <option value="Managing Both">Managing Both (Home &amp; Career)</option>
-                      <option value="Other">Other Aspirant</option>
-                    </select>
-                  </div>
-
-                  {/* Preparation Stage */}
-                  <div className="space-y-1">
-                    <label className="font-serif font-bold text-[#221814] block">Current Preparation Stage:</label>
-                    <select
-                      value={formData.stage}
-                      onChange={(e) => setFormData({ ...formData, stage: e.target.value })}
-                      className="w-full px-4 py-3 rounded-xl bg-[#FFFDF8] border border-[#D5C3B0] text-[#221814] focus:outline-none focus:border-[#8C3A27] font-medium"
-                    >
-                      <option value="Just Exploring">Just Exploring</option>
-                      <option value="Beginner">Beginner</option>
-                      <option value="Preparing">Active Preparation</option>
-                      <option value="Already Attempted UPSC">Already Attempted UPSC</option>
-                      <option value="Returning to Preparation">Returning to Preparation</option>
-                    </select>
-                  </div>
-
-                  {/* On-Screen Validation Alert Popup / Banner */}
-                  {validationError && (
-                    <div 
-                      role="alert" 
-                      className="p-4 border-2 border-amber-600 bg-amber-50 rounded-xl text-amber-950 font-bold text-xs flex items-center justify-between shadow-md animate-fade-in my-2"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="text-base shrink-0">⚠️</span>
-                        <span>{validationError.replace('⚠️ ', '')}</span>
-                      </div>
-                      <button 
-                        type="button" 
-                        onClick={() => setValidationError('')} 
-                        className="text-amber-900 hover:text-black font-extrabold px-2 py-1 cursor-pointer text-sm shrink-0"
-                        aria-label="Dismiss error"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Submit Button */}
-                  <div className="pt-3">
-                    <button
-                      type="submit"
-                      disabled={isSubmitting}
-                      className="btn-terracotta-pill text-xs py-3.5 px-6 font-serif font-bold shadow-md hover:shadow-lg transition-all w-full flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-                    >
-                      {isSubmitting ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          <span>SUBMITTING...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Send className="w-3.5 h-3.5" />
-                          <span>JOIN THE INTEREST LIST →</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-
-                </form>
-              </div>
-            ) : (
-              /* Success Confirmation Screen */
-              <div className="text-center py-8 space-y-4">
-                <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto border border-emerald-300 font-sans font-bold">
-                  <CheckCircle2 className="w-8 h-8" />
-                </div>
-
-                <h3 className="font-serif-header text-3xl font-extrabold text-[#221814]">
-                  YOU'RE ON THE LIST.
-                </h3>
-
-                <p className="font-serif italic text-sm text-[#5C4028] font-bold max-w-sm mx-auto">
-                  We'll let you know when the program launches.
-                </p>
-
-                <div className="pt-4">
-                  <button
-                    type="button"
-                    onClick={handleResetModal}
-                    className="btn-terracotta-outline-pill text-xs py-3 px-8 font-bold cursor-pointer"
-                  >
-                    Close Window
-                  </button>
-                </div>
-              </div>
-            )}
-
-          </div>
-        </div>
-      )}
 
     </section>
   );

@@ -84,10 +84,42 @@ function doPost(e) {
     }
 
     // ========================================================================
+    // LAYER 2B: REPLAY & DUPLICATE SUBMISSION THROTTLE (CacheService)
+    // ========================================================================
+    try {
+      var cache = CacheService.getScriptCache();
+      var throttleKey = 'sub_rate_' + cleanPhone;
+      if (cleanPhone && cache.get(throttleKey)) {
+        Logger.log('[Security] Rapid duplicate submission throttled: ' + cleanPhone);
+        return jsonResponse({
+          status: "error",
+          message: "A submission was recently received. Please wait a moment before trying again."
+        });
+      }
+      if (cleanPhone) {
+        cache.put(throttleKey, '1', 5); // 5-second cooldown
+      }
+    } catch (cacheErr) {
+      Logger.log('[Cache Warning] CacheService unavailable: ' + cacheErr.toString());
+    }
+
+    // ========================================================================
+    // LAYER 3B: EMAIL VALIDATION
+    // ========================================================================
+    var email = String(rawData.email || '').trim();
+    if (!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email)) {
+      Logger.log('[Security] Invalid email rejected: ' + email);
+      return jsonResponse({
+        status: "error",
+        message: "Invalid email address. Please enter a valid email."
+      });
+    }
+
+    // ========================================================================
     // LAYER 4: NAME & ADDRESS GIBBERISH VALIDATION
     // ========================================================================
     var fullName = String(rawData.fullName || rawData.name || '').trim();
-    if (isGibberishText(fullName, 3)) {
+    if (!fullName || isGibberishText(fullName, 3)) {
       Logger.log('[Security] Gibberish Full Name rejected: ' + fullName);
       return jsonResponse({
         status: "error",
@@ -96,7 +128,7 @@ function doPost(e) {
     }
 
     var address = String(rawData.address || rawData.city || rawData.currentAddress || '').trim();
-    if (address && isGibberishText(address, 3)) {
+    if (!address || isGibberishText(address, 3)) {
       Logger.log('[Security] Gibberish Address rejected: ' + address);
       return jsonResponse({
         status: "error",
@@ -123,11 +155,28 @@ function doPost(e) {
     // LAYER 6: DATA PERSISTENCE & EMAIL DISPATCH
     // ========================================================================
     var formType = String(rawData.formType || 'admissions').toLowerCase();
-    var email = String(rawData.email || '').trim();
     var program = String(rawData.program || 'Mentorship programs').trim();
     var prepStage = String(rawData.prepStage || 'Not Started').trim();
     var message = String(rawData.message || rawData.statement || '').trim();
     var timestamp = new Date();
+
+    // Mandatory message check
+    if (!message) {
+      return jsonResponse({
+        status: "error",
+        message: "Message / Query is required."
+      });
+    }
+
+    // Formula injection sanitization for spreadsheets
+    function sanitizeForSpreadsheet(val) {
+      if (val === null || val === undefined) return '';
+      var str = String(val).trim();
+      if (/^[=\+\-@\t\r]/.test(str)) {
+        return "'" + str;
+      }
+      return str;
+    }
 
     // 1. Append to Google Sheet
     try {
@@ -140,7 +189,7 @@ function doPost(e) {
         if (formType === 'appointment') {
           sheet.appendRow([
             'Timestamp', 'Full Name', 'Contact Number', 'Email Address', 
-            'Address/City', 'Prep Stage', 'Education', 'Appointment Date', 
+            'Address/City', 'Source', 'Background', 'Looking For', 'Appointment Date', 
             'Time Slot', 'Session Mode', 'Message / Query'
           ]);
         } else {
@@ -153,16 +202,37 @@ function doPost(e) {
       }
 
       if (formType === 'appointment') {
-        var apptDate = String(rawData.appointmentDate || '').trim();
-        var apptTime = String(rawData.timeSlot || rawData.appointmentTime || '').trim();
-        var apptMode = String(rawData.mode || rawData.appointmentMode || '').trim();
-        var education = String(rawData.education || '').trim();
+        var source = sanitizeForSpreadsheet(rawData.source || '');
+        var background = sanitizeForSpreadsheet(rawData.background || '');
+        var lookingFor = sanitizeForSpreadsheet(rawData.lookingFor || '');
+        var apptDate = sanitizeForSpreadsheet(rawData.appointmentDate || '');
+        var apptTime = sanitizeForSpreadsheet(rawData.timeSlot || rawData.appointmentTime || '');
+        var apptMode = sanitizeForSpreadsheet(rawData.appointmentMode || rawData.mode || '');
+        
         sheet.appendRow([
-          timestamp, fullName, cleanPhone, email, address, prepStage, education, apptDate, apptTime, apptMode, message
+          timestamp, 
+          sanitizeForSpreadsheet(fullName), 
+          cleanPhone, 
+          sanitizeForSpreadsheet(email), 
+          sanitizeForSpreadsheet(address), 
+          source, 
+          background, 
+          lookingFor, 
+          apptDate, 
+          apptTime, 
+          apptMode, 
+          sanitizeForSpreadsheet(message)
         ]);
       } else {
         sheet.appendRow([
-          timestamp, fullName, cleanPhone, email, address, program, prepStage, message
+          timestamp, 
+          sanitizeForSpreadsheet(fullName), 
+          cleanPhone, 
+          sanitizeForSpreadsheet(email), 
+          sanitizeForSpreadsheet(address), 
+          sanitizeForSpreadsheet(program), 
+          sanitizeForSpreadsheet(prepStage), 
+          sanitizeForSpreadsheet(message)
         ]);
       }
     } catch (sheetErr) {

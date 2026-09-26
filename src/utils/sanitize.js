@@ -11,10 +11,10 @@
 export function sanitizeInput(input) {
   if (typeof input !== 'string') return input;
   
-  return input
+  let sanitized = input
     // Remove raw HTML tags
     .replace(/<[^>]*>?/gm, '')
-    // Escape quotes and dangerous characters
+    // Escape quotes and dangerous script vectors
     .replace(/javascript:/gi, '')
     .replace(/data:/gi, '')
     .replace(/vbscript:/gi, '')
@@ -22,6 +22,14 @@ export function sanitizeInput(input) {
     .replace(/onerror=/gi, '')
     .replace(/\0/g, '')
     .trim();
+
+  // Spreadsheet formula injection defense:
+  // If string starts with =, +, -, @, \t, or \r, prefix with a single quote '
+  if (/^[=\+\-@\t\r]/.test(sanitized)) {
+    sanitized = "'" + sanitized;
+  }
+
+  return sanitized;
 }
 
 /**
@@ -94,11 +102,17 @@ export function isValidPhone(phone) {
  * Valid format and rejects dot-stuffed spam addresses (< 4 dots before @).
  */
 export function isValidEmail(email) {
-  if (!email) return false;
-  const trimmed = String(email).trim();
+  if (!email || typeof email !== 'string') return false;
+  const trimmed = email.trim();
+  if (trimmed.startsWith('.') || trimmed.endsWith('.')) return false;
+  const parts = trimmed.split('@');
+  if (parts.length !== 2) return false;
+  const [user, domain] = parts;
+  if (!user || !domain) return false;
+  if (domain.startsWith('.') || domain.endsWith('.') || !domain.includes('.')) return false;
+  
   const formatValid = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(trimmed);
-  const usernamePart = trimmed.split('@')[0] || '';
-  const dotCount = (usernamePart.match(/\./g) || []).length;
+  const dotCount = (user.match(/\./g) || []).length;
   return formatValid && dotCount < 4;
 }
 

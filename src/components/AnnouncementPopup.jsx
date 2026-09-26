@@ -124,7 +124,7 @@ export default function AnnouncementPopup({
       }
     };
 
-    const timer = setTimeout(checkAndShow, 2000);
+    const timer = setTimeout(checkAndShow, 10000);
     const interval = setInterval(checkAndShow, 5 * 60 * 1000);
 
     return () => {
