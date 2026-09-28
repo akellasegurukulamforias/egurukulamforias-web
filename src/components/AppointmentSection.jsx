@@ -326,11 +326,8 @@ export function AppointmentSection() {
     p => p.isMulti && p.platform === expandedPlatform
   );
 
-  // DEPLOYED GOOGLE APPS SCRIPT WEB APP ENDPOINT
-  const GOOGLE_SCRIPT_URL = 
-    (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_APPS_SCRIPT_URL) ||
-    (typeof process !== 'undefined' && process.env && process.env.NEXT_PUBLIC_APPS_SCRIPT_URL) ||
-    "https://script.google.com/macros/s/AKfycbyguM0mckOxzopums1PpqqBJ1m7IebaaQuVmw88XbtxKmFa7S3ET55fTJyCsolha7xo/exec";
+  // ACTIVE PRODUCTION GOOGLE APPS SCRIPT WEB APP ENDPOINT
+  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyguM0mckOxzopums1PpqqBJ1m7IebaaQuVmw88XbtxKmFa7S3ET55fTJyCsolha7xo/exec";
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -514,7 +511,7 @@ export function AppointmentSection() {
     });
 
     try {
-      await fetch(GOOGLE_SCRIPT_URL, {
+      await fetch(SCRIPT_URL, {
         method: "POST",
         mode: "no-cors",
         headers: { "Content-Type": "application/json" },
