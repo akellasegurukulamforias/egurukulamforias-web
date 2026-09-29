@@ -36,6 +36,7 @@ import {
   getCachedCMSData,
   isCMSNetworkFetched,
   fetchCMSData,
+  fetchResourceDetail,
   LOCAL_STORAGE_KEY
 } from '../services/cmsService';
 import { sortCurrentAffairsByDate, formatDisplayDate, parseDateToTimestamp } from '../utils/dateUtils';
@@ -660,6 +661,26 @@ function getImmediateResource({ slug, propResource, initialResource, item }) {
   return null;
 }
 
+function hasFullContent(item) {
+  if (!item || typeof item !== 'object') return false;
+  const content = 
+    item.Full_Content || 
+    item.full_content || 
+    item.Article_HTML || 
+    item.article_html || 
+    item.HTML_Content || 
+    item.html_content || 
+    item.Content_HTML || 
+    item.content_html || 
+    item.HTML || 
+    item.html || 
+    item.Content || 
+    item.content || 
+    item.Article || 
+    item.article;
+  return Boolean(content && typeof content === 'string' && content.trim().length > 0);
+}
+
 export default function ResourceDetailPage({ slug: propSlug, folder, year, stage, stream, navigate, article: propArticle, initialArticle, item }) {
   const { data, loading: cmsLoading, isFetched: cmsFetched } = useCMSData();
 
@@ -674,8 +695,9 @@ export default function ResourceDetailPage({ slug: propSlug, folder, year, stage
     return getImmediateResource({ slug: targetSlug, propResource: propArticle || initialArticle || item });
   }, [targetSlug, propArticle, initialArticle, item]);
 
-  // Single authoritative state: resolved resource + not found flag + retrying flag
+  // Single authoritative state: resolved resource + not found flag + detail loading state + retrying flag
   const [article, setArticle] = useState(immediateResource);
+  const [isDetailLoading, setIsDetailLoading] = useState(() => !hasFullContent(immediateResource));
   const [isNotFound, setIsNotFound] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
   const resource = article;
@@ -691,94 +713,97 @@ export default function ResourceDetailPage({ slug: propSlug, folder, year, stage
   // Single authoritative resolver effect with live fetch fallback safeguard
   useEffect(() => {
     let isMounted = true;
+    let isAborted = false;
 
     async function resolveTargetResource() {
       if (!targetSlug) {
-        if (isMounted) setIsNotFound(true);
+        if (isMounted) {
+          setIsNotFound(true);
+          setIsDetailLoading(false);
+        }
         return;
       }
 
-      // 1. If we already have the matching resource in state, preserve it (never nullify!)
-      if (article && matchResourceInList([article], targetSlug)) {
+      // 1. If we already have the matching resource in state AND it has full content, preserve it
+      if (article && matchResourceInList([article], targetSlug) && hasFullContent(article)) {
+        if (isMounted) {
+          setIsNotFound(false);
+          setIsDetailLoading(false);
+        }
         return;
       }
 
-      // 2. Check cached resources (0ms check)
-      const cached = getCachedResources();
-      if (cached.length > 0) {
-        const cachedMatch = matchResourceInList(cached, targetSlug);
-        if (cachedMatch) {
-          if (isMounted) {
-            setArticle(cachedMatch);
-            setIsNotFound(false);
+      // 2. Immediate metadata resolution (0ms render of header, banner, date, summary)
+      let currentRes = (article && matchResourceInList([article], targetSlug)) ? article : null;
+
+      if (!currentRes) {
+        const cached = getCachedResources();
+        if (cached.length > 0) {
+          const cachedMatch = matchResourceInList(cached, targetSlug);
+          if (cachedMatch) {
+            currentRes = cachedMatch;
+            if (isMounted) {
+              setArticle(cachedMatch);
+              setIsNotFound(false);
+            }
           }
-          return;
         }
       }
 
-      // 3. Match against CMS collection (sortedResources from useCMSData)
-      if (sortedResources.length > 0) {
+      if (!currentRes && sortedResources.length > 0) {
         const found = matchResourceInList(sortedResources, targetSlug);
         if (found) {
+          currentRes = found;
           if (isMounted) {
             setArticle(found);
             setIsNotFound(false);
           }
-          return;
         }
+      }
 
-        // If not found in current collection but live network fetch is still pending, keep waiting in loading state
-        if (!isCMSNetworkFetched() || cmsLoading || !cmsFetched) {
-          return;
-        }
-
-        // Live network fetch has completed, but resource wasn't found in sortedResources.
-        // Attempt a direct fetch safeguard to be 100% sure before marking not-found
-        try {
-          const freshData = await fetchCMSData(true);
-          const liveList = (freshData && Array.isArray(freshData.resources))
-            ? freshData.resources.filter(isItemActive)
-            : [];
-          const match = matchResourceInList(liveList, targetSlug);
-          if (match && isMounted) {
-            setArticle(match);
-            setIsNotFound(false);
-            return;
-          }
-        } catch (err) {
-          console.warn('[CMS Sync] Direct fetch safeguard encountered error:', err);
-        }
-
+      // If currentRes already has full content, complete loading
+      if (currentRes && hasFullContent(currentRes)) {
         if (isMounted) {
-          setIsNotFound(true);
+          setIsNotFound(false);
+          setIsDetailLoading(false);
         }
         return;
       }
 
-      // 4. If sortedResources is currently empty:
-      // While useCMSData is still loading / not fetched / network pending, keep loading!
-      if (cmsLoading || !cmsFetched || !isCMSNetworkFetched()) {
-        return;
-      }
+      // 3. Independent detail JSON fetch (/data/resources/[slug].json)
+      if (isMounted) setIsDetailLoading(true);
 
-      // 5. If live CMS fetch completed with zero items, attempt direct fetch as safeguard
+      const slugToFetch = (currentRes && (currentRes.slug || currentRes.Slug))
+        ? (currentRes.slug || currentRes.Slug)
+        : targetSlug;
+
       try {
-        const freshData = await fetchCMSData(true);
-        const liveList = (freshData && Array.isArray(freshData.resources))
-          ? freshData.resources.filter(isItemActive)
-          : [];
-        const match = matchResourceInList(liveList, targetSlug);
-        if (match && isMounted) {
-          setArticle(match);
+        const detailItem = await fetchResourceDetail(slugToFetch);
+        if (isAborted || !isMounted) return;
+
+        if (detailItem) {
+          setArticle(prev => {
+            return prev && matchResourceInList([prev], targetSlug)
+              ? { ...prev, ...detailItem }
+              : detailItem;
+          });
           setIsNotFound(false);
+          setIsDetailLoading(false);
           return;
         }
       } catch (err) {
-        console.warn('[CMS Sync] Direct fetch safeguard encountered error:', err);
+        console.warn('[ResourceDetail] Detail JSON fetch failed:', err);
       }
 
+      // 4. Fallback if detail fetch didn't return
       if (isMounted) {
-        setIsNotFound(true);
+        setIsDetailLoading(false);
+        if (!currentRes) {
+          if (!isCMSNetworkFetched() || cmsLoading || !cmsFetched) {
+            return;
+          }
+          setIsNotFound(true);
+        }
       }
     }
 
@@ -786,8 +811,9 @@ export default function ResourceDetailPage({ slug: propSlug, folder, year, stage
 
     return () => {
       isMounted = false;
+      isAborted = true;
     };
-  }, [targetSlug, sortedResources, cmsFetched, cmsLoading, article]);
+  }, [targetSlug, sortedResources, cmsFetched, cmsLoading]);
 
   // Resilient article index matching
   const currentIndex = useMemo(() => {
@@ -809,7 +835,15 @@ export default function ResourceDetailPage({ slug: propSlug, folder, year, stage
   const handleManualRetry = async () => {
     setIsRetrying(true);
     setIsNotFound(false);
+    setIsDetailLoading(true);
     try {
+      const detailItem = await fetchResourceDetail(targetSlug);
+      if (detailItem) {
+        setArticle(prev => ({ ...prev, ...detailItem }));
+        setIsNotFound(false);
+        setIsDetailLoading(false);
+        return;
+      }
       const freshData = await fetchCMSData(true);
       const liveList = (freshData && Array.isArray(freshData.resources))
         ? freshData.resources.filter(isItemActive)
@@ -826,6 +860,7 @@ export default function ResourceDetailPage({ slug: propSlug, folder, year, stage
       setIsNotFound(true);
     } finally {
       setIsRetrying(false);
+      setIsDetailLoading(false);
     }
   };
 
@@ -1862,12 +1897,32 @@ export default function ResourceDetailPage({ slug: propSlug, folder, year, stage
                     </React.Fragment>
                   );
                 })
-              ) : (
+              ) : isDetailLoading ? (
+                <div className="p-6 sm:p-10 space-y-6 animate-pulse">
+                  <div className="h-6 w-32 bg-[#D5C3B0]/30 rounded-md"></div>
+                  <div className="h-4 w-full bg-[#D5C3B0]/20 rounded"></div>
+                  <div className="h-4 w-11/12 bg-[#D5C3B0]/20 rounded"></div>
+                  <div className="h-4 w-4/5 bg-[#D5C3B0]/20 rounded"></div>
+                  <div className="h-6 w-32 bg-[#D5C3B0]/30 rounded-md mt-8"></div>
+                  <div className="h-4 w-full bg-[#D5C3B0]/20 rounded"></div>
+                  <div className="h-4 w-5/6 bg-[#D5C3B0]/20 rounded"></div>
+                </div>
+              ) : fullContentHtml ? (
                 <div 
                   className="p-6 sm:p-10 doc-article-content editorial-article-body prose prose-stone max-w-none text-stone-800 text-base md:text-lg leading-relaxed font-sans select-text my-4"
                   dangerouslySetInnerHTML={{ __html: fullContentHtml }} 
                   onClick={handleContentClick}
                 />
+              ) : (
+                <div className="p-8 text-center space-y-3 bg-[#FAF6EE]">
+                  <ShieldAlert className="w-10 h-10 text-[#8C3A27] mx-auto opacity-80" />
+                  <h3 className="font-serif-header text-xl font-bold text-[#221814]">
+                    Questions Content Finalizing
+                  </h3>
+                  <p className="text-xs sm:text-sm font-serif italic text-[#5C4028] font-semibold">
+                    Questions for this examination paper are currently being updated by our faculty.
+                  </p>
+                </div>
               )}
             </div>
 
@@ -1887,8 +1942,8 @@ export default function ResourceDetailPage({ slug: propSlug, folder, year, stage
           </div>
 
           {/* 5. BOTTOM NAVIGATION (RETURN TO PAPERS + NEXT QUESTION PAPER) */}
-          <div className="bg-[#FAF6EE] p-5 sm:p-6 rounded-3xl border border-[#D5C3B0] shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-3 w-full sm:w-auto">
+          <div className="bg-[#FAF6EE] p-5 sm:p-6 rounded-3xl border border-[#D5C3B0] shadow-sm flex flex-wrap items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center gap-3 min-w-0 w-full sm:w-auto">
               <button
                 type="button"
                 onClick={() => navigate(backToStageUrl)}
@@ -1900,7 +1955,7 @@ export default function ResourceDetailPage({ slug: propSlug, folder, year, stage
               <button
                 type="button"
                 onClick={() => navigate('/resources/pyqs')}
-                className="hidden md:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0]/60 hover:border-[#8C3A27] transition-all cursor-pointer text-xs font-serif font-bold text-[#7A6B5D] hover:text-[#8C3A27]"
+                className="hidden md:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0]/60 hover:border-[#8C3A27] transition-all cursor-pointer text-xs font-serif font-bold text-[#7A6B5D] hover:text-[#8C3A27] shrink-0"
               >
                 <span>All PYQ Years</span>
               </button>
@@ -1909,10 +1964,10 @@ export default function ResourceDetailPage({ slug: propSlug, folder, year, stage
                 <button
                   type="button"
                   onClick={() => navigateToResource(prevArticle)}
-                  className="hidden md:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0]/60 hover:border-[#8C3A27] transition-all group cursor-pointer text-xs font-serif font-bold text-[#221814] hover:text-[#8C3A27]"
+                  className="hidden md:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0]/60 hover:border-[#8C3A27] transition-all group cursor-pointer text-xs font-serif font-bold text-[#221814] hover:text-[#8C3A27] shrink-0"
                   title={prevArticle.Title || prevArticle.title}
                 >
-                  <ChevronLeft className="w-4 h-4 text-[#8C3A27] group-hover:-translate-x-0.5 transition-transform" />
+                  <ChevronLeft className="w-4 h-4 text-[#8C3A27] group-hover:-translate-x-0.5 transition-transform shrink-0" />
                   <span>Previous Paper</span>
                 </button>
               )}
@@ -1922,13 +1977,13 @@ export default function ResourceDetailPage({ slug: propSlug, folder, year, stage
               <button
                 type="button"
                 onClick={() => navigateToResource(nextArticle)}
-                className="flex items-center justify-end text-right gap-3 p-3 sm:p-3.5 px-5 rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0]/60 hover:border-[#8C3A27] transition-all group cursor-pointer w-full sm:w-auto max-w-md shadow-2xs hover:shadow-xs sm:ml-auto"
+                className="flex items-center justify-end text-right gap-3 p-3 sm:p-3.5 px-5 rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0]/60 hover:border-[#8C3A27] transition-all group cursor-pointer w-full sm:w-auto min-w-0 max-w-full sm:max-w-[320px] shadow-2xs hover:shadow-xs ml-auto"
               >
-                <div className="space-y-0.5">
+                <div className="space-y-0.5 min-w-0 overflow-hidden text-right">
                   <span className="text-[10px] font-mono uppercase font-bold text-[#8C3A27] tracking-wider block">
                     NEXT QUESTION PAPER
                   </span>
-                  <p className="text-xs sm:text-sm font-serif font-bold text-[#221814] line-clamp-1 group-hover:text-[#8C3A27] transition-colors">
+                  <p className="text-xs sm:text-sm font-serif font-bold text-[#221814] truncate break-words group-hover:text-[#8C3A27] transition-colors">
                     {nextArticle.Title || nextArticle.title}
                   </p>
                 </div>
@@ -2030,6 +2085,15 @@ export default function ResourceDetailPage({ slug: propSlug, folder, year, stage
             dangerouslySetInnerHTML={{ __html: fullContentHtml }} 
             onClick={handleContentClick}
           />
+        ) : isDetailLoading ? (
+          <div className="py-8 space-y-4 animate-pulse">
+            <div className="h-4 w-full bg-[#D5C3B0]/20 rounded"></div>
+            <div className="h-4 w-11/12 bg-[#D5C3B0]/20 rounded"></div>
+            <div className="h-4 w-4/5 bg-[#D5C3B0]/20 rounded"></div>
+            <div className="h-48 w-full bg-[#D5C3B0]/15 rounded-2xl my-6"></div>
+            <div className="h-4 w-full bg-[#D5C3B0]/20 rounded"></div>
+            <div className="h-4 w-5/6 bg-[#D5C3B0]/20 rounded"></div>
+          </div>
         ) : (
           <div className="py-12 text-center space-y-3 bg-[#FAF6EE] p-8 rounded-3xl border border-[#D5C3B0]">
             <ShieldAlert className="w-10 h-10 text-[#8C3A27] mx-auto opacity-80" />
@@ -2043,10 +2107,10 @@ export default function ResourceDetailPage({ slug: propSlug, folder, year, stage
         )}
 
         {/* 6. BOTTOM NAVIGATION (ALL RESOURCES + READ NEXT) */}
-        <div className="bg-[#FAF6EE] p-5 sm:p-6 rounded-3xl border border-[#D5C3B0] shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="bg-[#FAF6EE] p-5 sm:p-6 rounded-3xl border border-[#D5C3B0] shadow-sm flex flex-wrap items-center justify-between gap-4">
           
           {/* Left: Return Buttons */}
-          <div className="flex items-center gap-3 w-full sm:w-auto">
+          <div className="flex flex-wrap items-center gap-3 min-w-0 w-full sm:w-auto">
             <button
               type="button"
               onClick={() => navigate(isSyllabus ? '/resources/upsc-syllabus' : '/resources')}
@@ -2059,7 +2123,7 @@ export default function ResourceDetailPage({ slug: propSlug, folder, year, stage
               <button
                 type="button"
                 onClick={() => navigate('/resources')}
-                className="hidden lg:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0]/60 hover:border-[#8C3A27] transition-all cursor-pointer text-xs font-serif font-bold text-[#7A6B5D] hover:text-[#8C3A27]"
+                className="hidden lg:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0]/60 hover:border-[#8C3A27] transition-all cursor-pointer text-xs font-serif font-bold text-[#7A6B5D] hover:text-[#8C3A27] shrink-0"
               >
                 <span>All Resources</span>
               </button>
@@ -2069,10 +2133,10 @@ export default function ResourceDetailPage({ slug: propSlug, folder, year, stage
               <button
                 type="button"
                 onClick={() => navigateToResource(prevArticle)}
-                className="hidden md:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0]/60 hover:border-[#8C3A27] transition-all group cursor-pointer text-xs font-serif font-bold text-[#221814] hover:text-[#8C3A27]"
+                className="hidden md:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0]/60 hover:border-[#8C3A27] transition-all group cursor-pointer text-xs font-serif font-bold text-[#221814] hover:text-[#8C3A27] shrink-0"
                 title={prevArticle?.Title || prevArticle?.title || 'Previous Resource'}
               >
-                <ChevronLeft className="w-4 h-4 text-[#8C3A27] group-hover:-translate-x-0.5 transition-transform" />
+                <ChevronLeft className="w-4 h-4 text-[#8C3A27] group-hover:-translate-x-0.5 transition-transform shrink-0" />
                 <span>Previous</span>
               </button>
             )}
@@ -2083,13 +2147,13 @@ export default function ResourceDetailPage({ slug: propSlug, folder, year, stage
             <button
               type="button"
               onClick={() => navigateToResource(nextArticle)}
-              className="flex items-center justify-end text-right gap-3 p-3 sm:p-3.5 px-5 rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0]/60 hover:border-[#8C3A27] transition-all group cursor-pointer w-full sm:w-auto max-w-md shadow-2xs hover:shadow-xs sm:ml-auto"
+              className="flex items-center justify-end text-right gap-3 p-3 sm:p-3.5 px-5 rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0]/60 hover:border-[#8C3A27] transition-all group cursor-pointer w-full sm:w-auto min-w-0 max-w-full sm:max-w-[320px] shadow-2xs hover:shadow-xs ml-auto"
             >
-              <div className="space-y-0.5">
+              <div className="space-y-0.5 min-w-0 overflow-hidden text-right">
                 <span className="text-[10px] font-mono uppercase font-bold text-[#8C3A27] tracking-wider block">
                   READ NEXT
                 </span>
-                <p className="text-xs sm:text-sm font-serif font-bold text-[#221814] line-clamp-1 group-hover:text-[#8C3A27] transition-colors">
+                <p className="text-xs sm:text-sm font-serif font-bold text-[#221814] truncate break-words group-hover:text-[#8C3A27] transition-colors">
                   {nextArticle?.Title || nextArticle?.title || 'Next Resource'}
                 </p>
               </div>

@@ -474,6 +474,18 @@ export async function fetchCMSData(forceRevalidate = false, bypassCache = false,
 
       // 4. Process Current Affairs list
       let currentAffairsList = sortCurrentAffairsByDate(Array.isArray(caData) ? caData : []);
+      // Preserve any previously loaded full articles from memory
+      if (cachedCMSData?.currentAffairs) {
+        for (const prevArt of cachedCMSData.currentAffairs) {
+          if (prevArt?.Full_Content || prevArt?.full_content) {
+            const pSlug = (prevArt.slug || prevArt.Slug || '').toLowerCase();
+            const idx = currentAffairsList.findIndex(a => (a.slug || a.Slug || '').toLowerCase() === pSlug);
+            if (idx !== -1) {
+              currentAffairsList[idx] = { ...currentAffairsList[idx], ...prevArt };
+            }
+          }
+        }
+      }
       if (detailItem && isArticleTarget) {
         const cleanSlug = targetSlug.trim().toLowerCase();
         const idx = currentAffairsList.findIndex(a => {
@@ -489,6 +501,18 @@ export async function fetchCMSData(forceRevalidate = false, bypassCache = false,
 
       // 5. Process Resources list
       let resourcesList = sortCurrentAffairsByDate(Array.isArray(resData) ? resData : []);
+      // Preserve any previously loaded full resources from memory
+      if (cachedCMSData?.resources) {
+        for (const prevRes of cachedCMSData.resources) {
+          if (prevRes?.Full_Content || prevRes?.full_content) {
+            const pSlug = (prevRes.slug || prevRes.Slug || '').toLowerCase();
+            const idx = resourcesList.findIndex(r => (r.slug || r.Slug || '').toLowerCase() === pSlug);
+            if (idx !== -1) {
+              resourcesList[idx] = { ...resourcesList[idx], ...prevRes };
+            }
+          }
+        }
+      }
       if (detailItem && !isArticleTarget) {
         const cleanSlug = targetSlug.trim().toLowerCase();
         const idx = resourcesList.findIndex(r => {
@@ -602,13 +626,36 @@ export function clearCMSCache() {
  */
 export async function fetchArticleDetail(slug) {
   if (!slug) return null;
-  const cleanSlug = encodeURIComponent(String(slug).trim().toLowerCase());
+  let rawSlug = String(slug).trim().toLowerCase();
   try {
-    const res = await fetch(`/data/articles/${cleanSlug}.json`);
+    rawSlug = decodeURIComponent(rawSlug);
+  } catch (e) {}
+
+  let canonicalSlug = rawSlug;
+  if (cachedCMSData?.currentAffairs) {
+    const found = cachedCMSData.currentAffairs.find(a => {
+      const s = String(a.slug || a.Slug || '').trim().toLowerCase();
+      if (!s) return false;
+      return s === rawSlug || s.replace(/[^a-z0-9]/g, '') === rawSlug.replace(/[^a-z0-9]/g, '');
+    });
+    if (found && (found.slug || found.Slug)) {
+      canonicalSlug = String(found.slug || found.Slug).trim().toLowerCase();
+    }
+  }
+
+  try {
+    const encoded = encodeURIComponent(canonicalSlug);
+    let res = await fetch(`/data/articles/${encoded}.json`);
+    if (!res.ok && canonicalSlug !== rawSlug) {
+      res = await fetch(`/data/articles/${encodeURIComponent(rawSlug)}.json`);
+    }
     if (res.ok) {
       const art = await res.json();
       if (cachedCMSData?.currentAffairs) {
-        const idx = cachedCMSData.currentAffairs.findIndex(a => (a.slug || a.Slug || '').toLowerCase() === cleanSlug.toLowerCase());
+        const idx = cachedCMSData.currentAffairs.findIndex(a => {
+          const s = String(a.slug || a.Slug || '').trim().toLowerCase();
+          return s === canonicalSlug || s === rawSlug;
+        });
         if (idx !== -1) {
           cachedCMSData.currentAffairs[idx] = { ...cachedCMSData.currentAffairs[idx], ...art };
         } else {
@@ -621,7 +668,7 @@ export async function fetchArticleDetail(slug) {
       return art;
     }
   } catch (err) {
-    console.warn(`[CMS] Failed to fetch article detail for ${cleanSlug}:`, err);
+    console.warn(`[CMS] Failed to fetch article detail for ${canonicalSlug}:`, err);
   }
   return null;
 }
@@ -631,13 +678,36 @@ export async function fetchArticleDetail(slug) {
  */
 export async function fetchResourceDetail(slug) {
   if (!slug) return null;
-  const cleanSlug = encodeURIComponent(String(slug).trim().toLowerCase());
+  let rawSlug = String(slug).trim().toLowerCase();
   try {
-    const res = await fetch(`/data/resources/${cleanSlug}.json`);
+    rawSlug = decodeURIComponent(rawSlug);
+  } catch (e) {}
+
+  let canonicalSlug = rawSlug;
+  if (cachedCMSData?.resources) {
+    const found = cachedCMSData.resources.find(r => {
+      const s = String(r.slug || r.Slug || '').trim().toLowerCase();
+      if (!s) return false;
+      return s === rawSlug || s.replace(/[^a-z0-9]/g, '') === rawSlug.replace(/[^a-z0-9]/g, '');
+    });
+    if (found && (found.slug || found.Slug)) {
+      canonicalSlug = String(found.slug || found.Slug).trim().toLowerCase();
+    }
+  }
+
+  try {
+    const encoded = encodeURIComponent(canonicalSlug);
+    let res = await fetch(`/data/resources/${encoded}.json`);
+    if (!res.ok && canonicalSlug !== rawSlug) {
+      res = await fetch(`/data/resources/${encodeURIComponent(rawSlug)}.json`);
+    }
     if (res.ok) {
       const item = await res.json();
       if (cachedCMSData?.resources) {
-        const idx = cachedCMSData.resources.findIndex(r => (r.slug || r.Slug || '').toLowerCase() === cleanSlug.toLowerCase());
+        const idx = cachedCMSData.resources.findIndex(r => {
+          const s = String(r.slug || r.Slug || '').trim().toLowerCase();
+          return s === canonicalSlug || s === rawSlug;
+        });
         if (idx !== -1) {
           cachedCMSData.resources[idx] = { ...cachedCMSData.resources[idx], ...item };
         } else {
@@ -650,7 +720,7 @@ export async function fetchResourceDetail(slug) {
       return item;
     }
   } catch (err) {
-    console.warn(`[CMS] Failed to fetch resource detail for ${cleanSlug}:`, err);
+    console.warn(`[CMS] Failed to fetch resource detail for ${canonicalSlug}:`, err);
   }
   return null;
 }

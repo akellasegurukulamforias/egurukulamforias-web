@@ -11,7 +11,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { useCMSData } from '../hooks/useCMSData';
-import { getCachedCMSData, LOCAL_STORAGE_KEY, formatDateToYMD, isCMSNetworkFetched, forceRefreshCMSData, fetchCMSData } from '../services/cmsService';
+import { getCachedCMSData, LOCAL_STORAGE_KEY, formatDateToYMD, isCMSNetworkFetched, forceRefreshCMSData, fetchCMSData, fetchArticleDetail } from '../services/cmsService';
 import { sortCurrentAffairsByDate, formatDisplayDate } from '../utils/dateUtils';
 import { 
   createSlug, 
@@ -345,6 +345,26 @@ function estimateReadingTime(content) {
   }
 }
 
+function hasFullContent(item) {
+  if (!item || typeof item !== 'object') return false;
+  const content = 
+    item.Full_Content || 
+    item.full_content || 
+    item.Article_HTML || 
+    item.article_html || 
+    item.HTML_Content || 
+    item.html_content || 
+    item.Content_HTML || 
+    item.content_html || 
+    item.HTML || 
+    item.html || 
+    item.Content || 
+    item.content || 
+    item.Article || 
+    item.article;
+  return Boolean(content && typeof content === 'string' && content.trim().length > 0);
+}
+
 export default function CurrentAffairsDetailPage({ slug: propSlug, id: propId, navigate, article: propArticle, initialArticle, item }) {
   const { data, loading: cmsLoading, isFetched: cmsFetched } = useCMSData();
 
@@ -358,8 +378,9 @@ export default function CurrentAffairsDetailPage({ slug: propSlug, id: propId, n
     return getImmediateArticle({ slug: targetSlug, propArticle, initialArticle, item });
   }, [targetSlug, propArticle, initialArticle, item]);
 
-  // Single authoritative state: resolved article + not found flag
+  // Single authoritative state: resolved article + not found flag + detail loading state
   const [article, setArticle] = useState(immediateArticle);
+  const [isDetailLoading, setIsDetailLoading] = useState(() => !hasFullContent(immediateArticle));
   const [isNotFound, setIsNotFound] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
 
@@ -378,106 +399,97 @@ export default function CurrentAffairsDetailPage({ slug: propSlug, id: propId, n
   // Single authoritative resolver effect
   useEffect(() => {
     let isMounted = true;
+    let isAborted = false;
 
     async function resolveTargetArticle() {
       if (!targetSlug) {
-        if (isMounted) setIsNotFound(true);
+        if (isMounted) {
+          setIsNotFound(true);
+          setIsDetailLoading(false);
+        }
         return;
       }
 
-      // 1. If we already have the matching article in state, preserve it (never nullify!)
-      if (article && matchArticleInList([article], targetSlug)) {
+      // 1. If we already have the matching article in state AND it has full content, preserve it
+      if (article && matchArticleInList([article], targetSlug) && hasFullContent(article)) {
+        if (isMounted) {
+          setIsNotFound(false);
+          setIsDetailLoading(false);
+        }
         return;
       }
 
-      // 2. Check cached articles (0ms check)
-      const cached = getCachedArticles();
-      if (cached.length > 0) {
-        const cachedMatch = matchArticleInList(cached, targetSlug);
-        if (cachedMatch) {
-          if (isMounted) {
-            setArticle(cachedMatch);
-            setIsNotFound(false);
+      // 2. Check cached articles / metadata for instant 0ms header/banner display
+      let currentArt = (article && matchArticleInList([article], targetSlug)) ? article : null;
+
+      if (!currentArt) {
+        const cached = getCachedArticles();
+        if (cached.length > 0) {
+          const cachedMatch = matchArticleInList(cached, targetSlug);
+          if (cachedMatch) {
+            currentArt = cachedMatch;
+            if (isMounted) {
+              setArticle(cachedMatch);
+              setIsNotFound(false);
+            }
           }
-          return;
         }
       }
 
-      // 3. Match against CMS collection (sortedArticles from useCMSData)
-      if (sortedArticles.length > 0) {
-        console.log('[CurrentAffairsDetail] targetSlug:', targetSlug);
-        console.log('[CurrentAffairsDetail] CMS articles count:', sortedArticles.length);
-        console.log(
-          '[CurrentAffairsDetail] CMS slugs:',
-          sortedArticles.map(a => ({
-            slug: a.slug,
-            Slug: a.Slug,
-            title: a.title,
-            Title: a.Title,
-            id: a.id,
-            Id: a.Id
-          }))
-        );
-
+      if (!currentArt && sortedArticles.length > 0) {
         const found = matchArticleInList(sortedArticles, targetSlug);
-        console.log('[CurrentAffairsDetail] Matched result:', found ? (found.Title || found.title || found.slug) : null);
-
         if (found) {
+          currentArt = found;
           if (isMounted) {
             setArticle(found);
             setIsNotFound(false);
           }
-          return;
         }
+      }
 
-        // If not found in current collection but live network fetch is still pending, keep waiting in loading state
-        if (!isCMSNetworkFetched() || cmsLoading || !cmsFetched) {
-          return;
-        }
-
-        // Live network fetch has completed, but article wasn't found in sortedArticles.
-        // Attempt a direct fetch safeguard to be 100% sure before marking not-found
-        try {
-          const freshData = await fetchCMSData(true);
-          const liveList = (freshData && (freshData.currentAffairs || freshData.articles)) || [];
-          const match = matchArticleInList(liveList, targetSlug);
-          if (match && isMounted) {
-            setArticle(match);
-            setIsNotFound(false);
-            return;
-          }
-        } catch (err) {
-          console.warn('[CMS Sync] Direct fetch safeguard encountered error:', err);
-        }
-
+      // If currentArt already has full content, complete loading
+      if (currentArt && hasFullContent(currentArt)) {
         if (isMounted) {
-          setIsNotFound(true);
+          setIsNotFound(false);
+          setIsDetailLoading(false);
         }
         return;
       }
 
-      // 4. If sortedArticles is currently empty:
-      // While useCMSData is still loading / not fetched / network pending, keep loading!
-      if (cmsLoading || !cmsFetched || !isCMSNetworkFetched()) {
-        return;
-      }
+      // 3. Independent detail JSON fetch (/data/articles/[slug].json)
+      if (isMounted) setIsDetailLoading(true);
 
-      // 5. If live CMS fetch completed with zero items, attempt direct fetch as safeguard
+      const slugToFetch = (currentArt && (currentArt.slug || currentArt.Slug))
+        ? (currentArt.slug || currentArt.Slug)
+        : targetSlug;
+
       try {
-        const freshData = await fetchCMSData(true);
-        const liveList = (freshData && (freshData.currentAffairs || freshData.articles)) || [];
-        const match = matchArticleInList(liveList, targetSlug);
-        if (match && isMounted) {
-          setArticle(match);
+        const detailItem = await fetchArticleDetail(slugToFetch);
+        if (isAborted || !isMounted) return;
+
+        if (detailItem) {
+          setArticle(prev => {
+            return prev && matchArticleInList([prev], targetSlug)
+              ? { ...prev, ...detailItem }
+              : detailItem;
+          });
           setIsNotFound(false);
+          setIsDetailLoading(false);
           return;
         }
       } catch (err) {
-        console.warn('[CMS Sync] Direct fetch safeguard encountered error:', err);
+        console.warn('[CurrentAffairsDetail] Detail JSON fetch failed:', err);
       }
 
+      // 4. Fallback if detail fetch didn't return
       if (isMounted) {
-        setIsNotFound(true);
+        setIsDetailLoading(false);
+        if (!currentArt) {
+          if (!isCMSNetworkFetched() || cmsLoading || !cmsFetched) {
+            return;
+          }
+          setIsNotFound(true);
+        }
       }
     }
 
@@ -485,8 +497,9 @@ export default function CurrentAffairsDetailPage({ slug: propSlug, id: propId, n
 
     return () => {
       isMounted = false;
+      isAborted = true;
     };
-  }, [targetSlug, sortedArticles, cmsFetched, cmsLoading, article]);
+  }, [targetSlug, sortedArticles, cmsFetched, cmsLoading]);
 
   // Resilient article index matching
   const currentIndex = useMemo(() => {
@@ -512,7 +525,15 @@ export default function CurrentAffairsDetailPage({ slug: propSlug, id: propId, n
   const handleManualRetry = async () => {
     setIsRetrying(true);
     setIsNotFound(false);
+    setIsDetailLoading(true);
     try {
+      const detailItem = await fetchArticleDetail(targetSlug);
+      if (detailItem) {
+        setArticle(prev => ({ ...prev, ...detailItem }));
+        setIsNotFound(false);
+        setIsDetailLoading(false);
+        return;
+      }
       const freshData = await fetchCMSData(true);
       const liveList = (freshData && (freshData.currentAffairs || freshData.articles)) || [];
       const match = matchArticleInList(liveList, targetSlug);
@@ -527,6 +548,7 @@ export default function CurrentAffairsDetailPage({ slug: propSlug, id: propId, n
       setIsNotFound(true);
     } finally {
       setIsRetrying(false);
+      setIsDetailLoading(false);
     }
   };
 
@@ -1184,6 +1206,15 @@ export default function CurrentAffairsDetailPage({ slug: propSlug, id: propId, n
             dangerouslySetInnerHTML={{ __html: fullContentHtml }} 
             onClick={handleContentClick}
           />
+        ) : isDetailLoading ? (
+          <div className="py-8 space-y-4 animate-pulse">
+            <div className="h-4 w-full bg-[#D5C3B0]/20 rounded"></div>
+            <div className="h-4 w-11/12 bg-[#D5C3B0]/20 rounded"></div>
+            <div className="h-4 w-4/5 bg-[#D5C3B0]/20 rounded"></div>
+            <div className="h-48 w-full bg-[#D5C3B0]/15 rounded-2xl my-6"></div>
+            <div className="h-4 w-full bg-[#D5C3B0]/20 rounded"></div>
+            <div className="h-4 w-5/6 bg-[#D5C3B0]/20 rounded"></div>
+          </div>
         ) : (
           <div className="py-12 text-center space-y-3 bg-[#FAF6EE] p-8 rounded-3xl border border-[#D5C3B0]">
             <ShieldAlert className="w-10 h-10 text-[#8C3A27] mx-auto opacity-80" />
@@ -1197,10 +1228,10 @@ export default function CurrentAffairsDetailPage({ slug: propSlug, id: propId, n
         )}
 
         {/* 6. BOTTOM NAVIGATION (SINGLE LINE: ALL CURRENT AFFAIRS + READ NEXT) */}
-        <div className="bg-[#FAF6EE] p-5 sm:p-6 rounded-3xl border border-[#D5C3B0] shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="bg-[#FAF6EE] p-5 sm:p-6 rounded-3xl border border-[#D5C3B0] shadow-sm flex flex-wrap items-center justify-between gap-4">
           
           {/* Left: All Daily Current Affairs Return Button */}
-          <div className="flex items-center gap-3 w-full sm:w-auto">
+          <div className="flex flex-wrap items-center gap-3 min-w-0 w-full sm:w-auto">
             <Link
               to="/current-affairs"
               navigate={navigate}
@@ -1214,10 +1245,10 @@ export default function CurrentAffairsDetailPage({ slug: propSlug, id: propId, n
                 to={`/current-affairs/${encodeURIComponent(safeDecode(prevArticle.Slug || prevArticle.slug || createSlug(prevArticle.Title || prevArticle.title)))}`}
                 state={{ article: prevArticle }}
                 navigate={navigate}
-                className="hidden md:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0]/60 hover:border-[#8C3A27] transition-all group cursor-pointer text-xs font-serif font-bold text-[#221814] hover:text-[#8C3A27] no-underline"
+                className="hidden md:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0]/60 hover:border-[#8C3A27] transition-all group cursor-pointer text-xs font-serif font-bold text-[#221814] hover:text-[#8C3A27] no-underline shrink-0"
                 title={prevArticle?.Title || prevArticle?.title || 'Previous Dispatch'}
               >
-                <ChevronLeft className="w-4 h-4 text-[#8C3A27] group-hover:-translate-x-0.5 transition-transform" />
+                <ChevronLeft className="w-4 h-4 text-[#8C3A27] group-hover:-translate-x-0.5 transition-transform shrink-0" />
                 <span>Previous</span>
               </Link>
             )}
@@ -1229,13 +1260,13 @@ export default function CurrentAffairsDetailPage({ slug: propSlug, id: propId, n
               to={`/current-affairs/${encodeURIComponent(safeDecode(nextArticle.Slug || nextArticle.slug || createSlug(nextArticle.Title || nextArticle.title)))}`}
               state={{ article: nextArticle }}
               navigate={navigate}
-              className="flex items-center justify-end text-right gap-3 p-3 sm:p-3.5 px-5 rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0]/60 hover:border-[#8C3A27] transition-all group cursor-pointer w-full sm:w-auto max-w-md shadow-2xs hover:shadow-xs sm:ml-auto no-underline"
+              className="flex items-center justify-end text-right gap-3 p-3 sm:p-3.5 px-5 rounded-2xl bg-[#FFFDF8] border border-[#D5C3B0]/60 hover:border-[#8C3A27] transition-all group cursor-pointer w-full sm:w-auto min-w-0 max-w-full sm:max-w-[320px] shadow-2xs hover:shadow-xs ml-auto no-underline"
             >
-              <div className="space-y-0.5">
+              <div className="space-y-0.5 min-w-0 overflow-hidden text-right">
                 <span className="text-[10px] font-mono uppercase font-bold text-[#8C3A27] tracking-wider block">
                   READ NEXT
                 </span>
-                <p className="text-xs sm:text-sm font-serif font-bold text-[#221814] line-clamp-1 group-hover:text-[#8C3A27] transition-colors">
+                <p className="text-xs sm:text-sm font-serif font-bold text-[#221814] truncate break-words group-hover:text-[#8C3A27] transition-colors">
                   {nextArticle?.Title || nextArticle?.title || 'Next Dispatch'}
                 </p>
               </div>
