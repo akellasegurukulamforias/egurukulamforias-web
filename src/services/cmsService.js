@@ -421,127 +421,143 @@ export async function fetchCMSData(forceRevalidate = false, bypassCache = false,
   }
 
   const runFetch = async () => {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 25000);
-
     try {
-      let endpointUrl = CMS_API_ENDPOINT;
-      const queryParts = [];
-      if (shouldBypass) {
-        queryParts.push(`t=${Date.now()}`);
-        queryParts.push('nocache=true');
-      }
-      if (slug) {
-        queryParts.push(`slug=${encodeURIComponent(slug)}`);
-      }
-      if (queryParts.length > 0) {
-        const separator = endpointUrl.includes('?') ? '&' : '?';
-        endpointUrl += separator + queryParts.join('&');
+      // 1. Fetch core static CDN JSON feeds in parallel for zero latency
+      const [globalRes, caRes, resRes] = await Promise.all([
+        fetch('/data/global.json'),
+        fetch('/data/ca-meta.json'),
+        fetch('/data/resources-meta.json')
+      ]);
+
+      if (!globalRes.ok || !caRes.ok || !resRes.ok) {
+        throw new Error(`Static CDN Error: global(${globalRes.status}), ca(${caRes.status}), res(${resRes.status})`);
       }
 
-      const response = await fetch(endpointUrl, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json'
-        },
-        signal: controller.signal
-      });
-      clearTimeout(timeoutId);
+      const [globalData, caData, resData] = await Promise.all([
+        globalRes.json(),
+        caRes.json(),
+        resRes.json()
+      ]);
 
-      if (!response.ok) {
-        throw new Error(`CMS HTTP Error: ${response.status}`);
+      // 2. Identify active target slug from argument or browser route
+      let targetSlug = slug;
+      let isArticleTarget = true;
+      if (!targetSlug && typeof window !== 'undefined' && window.location?.pathname) {
+        const path = window.location.pathname.toLowerCase();
+        const caMatch = path.match(/^\/current-affairs\/([^\/\?#]+)/);
+        const resMatch = path.match(/^\/resources\/(?:upsc-syllabus\/|pyqs\/(?:\d{4}\/)?(?:prelims|mains)\/)?([^\/\?#]+)/);
+        if (caMatch) {
+          targetSlug = decodeURIComponent(caMatch[1]);
+          isArticleTarget = true;
+        } else if (resMatch) {
+          targetSlug = decodeURIComponent(resMatch[1]);
+          isArticleTarget = false;
+        }
       }
 
-      const text = await response.text();
-      let rawData;
-      try {
-        rawData = JSON.parse(text);
-      } catch (e) {
-        console.error("Failed to parse response as JSON:", text.slice(0, 200));
-        throw new Error("Invalid data format received from data source.");
+      // 3. If on/navigating to a detail page, fetch the single static detail JSON
+      let detailItem = null;
+      if (targetSlug) {
+        const cleanSlug = targetSlug.trim().toLowerCase();
+        const detailUrl = isArticleTarget
+          ? `/data/articles/${encodeURIComponent(cleanSlug)}.json`
+          : `/data/resources/${encodeURIComponent(cleanSlug)}.json`;
+        try {
+          const detailRes = await fetch(detailUrl);
+          if (detailRes.ok) {
+            detailItem = await detailRes.json();
+          }
+        } catch (e) {
+          console.warn(`[CMS] Static detail fetch failed for ${cleanSlug}:`, e);
+        }
       }
 
-      if (!rawData || typeof rawData !== 'object') {
-        throw new Error("Invalid data format received from data source: payload is not an object.");
-      }
-
-      const rawSocial = Array.isArray(rawData.socialPlatforms)
-        ? rawData.socialPlatforms
-        : Array.isArray(rawData.social_platforms)
-          ? rawData.social_platforms
-          : Array.isArray(rawData.social)
-            ? rawData.social
-            : [];
-
-      // Filter and sanitize active platforms and active sub-channels
-      const socialPlatforms = rawSocial
-        .filter(isItemActive)
-        .map(item => {
-          const rawChannels = Array.isArray(item.channels) 
-            ? item.channels 
-            : Array.isArray(item.branches) 
-              ? item.branches 
-              : Array.isArray(item.links) 
-                ? item.links 
-                : [];
-
-          const activeChannels = rawChannels.filter(isItemActive);
-
-          return {
-            ...item,
-            channels: activeChannels
-          };
+      // 4. Process Current Affairs list
+      let currentAffairsList = sortCurrentAffairsByDate(Array.isArray(caData) ? caData : []);
+      if (detailItem && isArticleTarget) {
+        const cleanSlug = targetSlug.trim().toLowerCase();
+        const idx = currentAffairsList.findIndex(a => {
+          const aSlug = (a.slug || a.Slug || '').toLowerCase();
+          return aSlug === cleanSlug;
         });
-      
-      // Standardize & fallback defaults
+        if (idx !== -1) {
+          currentAffairsList[idx] = { ...currentAffairsList[idx], ...detailItem };
+        } else {
+          currentAffairsList.unshift(detailItem);
+        }
+      }
+
+      // 5. Process Resources list
+      let resourcesList = sortCurrentAffairsByDate(Array.isArray(resData) ? resData : []);
+      if (detailItem && !isArticleTarget) {
+        const cleanSlug = targetSlug.trim().toLowerCase();
+        const idx = resourcesList.findIndex(r => {
+          const rSlug = (r.slug || r.Slug || '').toLowerCase();
+          return rSlug === cleanSlug;
+        });
+        if (idx !== -1) {
+          resourcesList[idx] = { ...resourcesList[idx], ...detailItem };
+        } else {
+          resourcesList.unshift(detailItem);
+        }
+      }
+
+      // 6. Assemble complete standardized CMS payload
       const freshData = {
-        activePopup: rawData.activePopup && typeof rawData.activePopup === 'object' ? rawData.activePopup : null,
-        liveTicker: Array.isArray(rawData.liveTicker) ? rawData.liveTicker : [],
-        currentAffairs: sortCurrentAffairsByDate(Array.isArray(rawData.currentAffairs) ? rawData.currentAffairs : []),
-        resources: sortCurrentAffairsByDate(Array.isArray(rawData.resources) ? rawData.resources : []),
-        socialPlatforms,
-        testSeries: Array.isArray(rawData.testSeries) 
-          ? rawData.testSeries 
-          : Array.isArray(rawData.test_series) 
-            ? rawData.test_series 
-            : Array.isArray(rawData.testseries)
-              ? rawData.testseries
-              : []
+        activePopup: globalData?.activePopup || null,
+        liveTicker: Array.isArray(globalData?.liveTicker) ? globalData.liveTicker : [],
+        currentAffairs: currentAffairsList,
+        resources: resourcesList,
+        socialPlatforms: Array.isArray(globalData?.socialPlatforms) ? globalData.socialPlatforms : [],
+        testSeries: Array.isArray(globalData?.testSeries) ? globalData.testSeries : []
       };
 
       cachedCMSData = freshData;
 
-      // Save to localStorage for 0ms instant renders on future visits with quota pruning
+      // Save to localStorage for 0ms instant initial render on subsequent visits
       try {
         localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(freshData));
       } catch (err) {
-        console.warn('Initial save to localStorage failed, attempting quota-safe pruning:', err);
-        try {
-          // Prune older article full-text content, keeping full content for top 30 dispatches
-          const prunedCA = (freshData.currentAffairs || []).map((item, idx) => {
-            if (idx < 30) return item;
-            const { Full_Content, full_content, Article_HTML, article_html, Content, content, ...rest } = item;
-            return rest;
-          });
-          const prunedData = {
-            ...freshData,
-            currentAffairs: prunedCA
-          };
-          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(prunedData));
-        } catch (retryErr) {
-          console.warn('Quota-safe pruned save to localStorage also failed:', retryErr);
-        }
+        console.warn('Initial save to localStorage failed:', err);
       }
 
       cmsNetworkFetched = true;
       return freshData;
-    } catch (error) {
-      clearTimeout(timeoutId);
-      console.warn('Google Sheet CMS revalidation error, returning cached/fallback structure:', error);
-      cmsNetworkFetched = true;
-      const staleData = getCachedCMSData();
-      if (staleData) return staleData;
+    } catch (staticError) {
+      console.warn('Static CDN fetch error, falling back if needed:', staticError);
 
+      // Check stale localStorage data
+      const staleData = getCachedCMSData();
+      if (staleData) {
+        cmsNetworkFetched = true;
+        return staleData;
+      }
+
+      // Offline / error fallback to Apps Script only if static files could not be reached
+      try {
+        const response = await fetch(CMS_API_ENDPOINT, {
+          method: 'GET',
+          headers: { 'Accept': 'application/json' }
+        });
+        if (response.ok) {
+          const rawData = await response.json();
+          const fallbackData = {
+            activePopup: rawData.activePopup && typeof rawData.activePopup === 'object' ? rawData.activePopup : null,
+            liveTicker: Array.isArray(rawData.liveTicker) ? rawData.liveTicker : [],
+            currentAffairs: sortCurrentAffairsByDate(Array.isArray(rawData.currentAffairs) ? rawData.currentAffairs : []),
+            resources: sortCurrentAffairsByDate(Array.isArray(rawData.resources) ? rawData.resources : []),
+            socialPlatforms: Array.isArray(rawData.socialPlatforms) ? rawData.socialPlatforms : [],
+            testSeries: Array.isArray(rawData.testSeries) ? rawData.testSeries : []
+          };
+          cachedCMSData = fallbackData;
+          cmsNetworkFetched = true;
+          return fallbackData;
+        }
+      } catch (appsScriptErr) {
+        console.warn('Fallback Apps Script also unavailable:', appsScriptErr);
+      }
+
+      cmsNetworkFetched = true;
       return {
         activePopup: null,
         liveTicker: [],
@@ -579,6 +595,88 @@ export function clearCMSCache() {
   } catch (err) {
     // ignore
   }
+}
+
+/**
+ * Fetch full article detail JSON from static CDN
+ */
+export async function fetchArticleDetail(slug) {
+  if (!slug) return null;
+  const cleanSlug = encodeURIComponent(String(slug).trim().toLowerCase());
+  try {
+    const res = await fetch(`/data/articles/${cleanSlug}.json`);
+    if (res.ok) {
+      const art = await res.json();
+      if (cachedCMSData?.currentAffairs) {
+        const idx = cachedCMSData.currentAffairs.findIndex(a => (a.slug || a.Slug || '').toLowerCase() === cleanSlug.toLowerCase());
+        if (idx !== -1) {
+          cachedCMSData.currentAffairs[idx] = { ...cachedCMSData.currentAffairs[idx], ...art };
+        } else {
+          cachedCMSData.currentAffairs.unshift(art);
+        }
+        try {
+          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(cachedCMSData));
+        } catch (e) {}
+      }
+      return art;
+    }
+  } catch (err) {
+    console.warn(`[CMS] Failed to fetch article detail for ${cleanSlug}:`, err);
+  }
+  return null;
+}
+
+/**
+ * Fetch full resource detail JSON from static CDN
+ */
+export async function fetchResourceDetail(slug) {
+  if (!slug) return null;
+  const cleanSlug = encodeURIComponent(String(slug).trim().toLowerCase());
+  try {
+    const res = await fetch(`/data/resources/${cleanSlug}.json`);
+    if (res.ok) {
+      const item = await res.json();
+      if (cachedCMSData?.resources) {
+        const idx = cachedCMSData.resources.findIndex(r => (r.slug || r.Slug || '').toLowerCase() === cleanSlug.toLowerCase());
+        if (idx !== -1) {
+          cachedCMSData.resources[idx] = { ...cachedCMSData.resources[idx], ...item };
+        } else {
+          cachedCMSData.resources.unshift(item);
+        }
+        try {
+          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(cachedCMSData));
+        } catch (e) {}
+      }
+      return item;
+    }
+  } catch (err) {
+    console.warn(`[CMS] Failed to fetch resource detail for ${cleanSlug}:`, err);
+  }
+  return null;
+}
+
+// Client-side route synchronization for instant detail loading
+if (typeof window !== 'undefined') {
+  const syncRouteDetail = () => {
+    const path = window.location.pathname.toLowerCase();
+    const caMatch = path.match(/^\/current-affairs\/([^\/\?#]+)/);
+    const resMatch = path.match(/^\/resources\/(?:upsc-syllabus\/|pyqs\/(?:\d{4}\/)?(?:prelims|mains)\/)?([^\/\?#]+)/);
+    if (caMatch) {
+      fetchArticleDetail(decodeURIComponent(caMatch[1]));
+    } else if (resMatch) {
+      fetchResourceDetail(decodeURIComponent(resMatch[1]));
+    }
+  };
+  window.addEventListener('popstate', syncRouteDetail);
+  try {
+    const origPush = window.history.pushState;
+    if (origPush) {
+      window.history.pushState = function(...args) {
+        origPush.apply(this, args);
+        syncRouteDetail();
+      };
+    }
+  } catch (e) {}
 }
 
 // Base website URL for canonical sitemap generation

@@ -1,0 +1,179 @@
+{
+  "activePopup": {
+    "Headline": "APPSC Group 1 Mains Paper III - Law",
+    "Link": "",
+    "Active": true,
+    "Date": "19/09/2026",
+    "Poster_Image_Link": "https://drive.google.com/thumbnail?id=1bwBLiEMc7mrWVsNV8py5g-tCPFHSGEfp&sz=w1200"
+  },
+  "liveTicker": [
+    {
+      "Headline": "IAS One Year Course with Installments",
+      "Link": "",
+      "Active": true,
+      "Date": "19/09/2026",
+      "Poster_Image_Link": "https://drive.google.com/thumbnail?id=1HNYxTWLeQuU7RtcB4qpYea4VFhggh8KN&sz=w1200"
+    },
+    {
+      "Headline": "APPSC Group 1 Mains Paper III - Ethics",
+      "Link": "",
+      "Active": true,
+      "Date": "19/09/2026",
+      "Poster_Image_Link": "https://drive.google.com/thumbnail?id=1BlPdwEngTEMCa3jth_fVpQXM0tK97G2R&sz=w1200"
+    },
+    {
+      "Headline": "APPSC Group 1 Mains Paper III - Constitution",
+      "Link": "",
+      "Active": true,
+      "Date": "19/09/2026",
+      "Poster_Image_Link": "https://drive.google.com/thumbnail?id=1bwBLiEMc7mrWVsNV8py5g-tCPFHSGEfp&sz=w1200"
+    },
+    {
+      "Headline": "APPSC Group 1 Mains Paper III - Law",
+      "Link": "",
+      "Active": true,
+      "Date": "19/09/2026",
+      "Poster_Image_Link": "https://drive.google.com/thumbnail?id=1bwBLiEMc7mrWVsNV8py5g-tCPFHSGEfp&sz=w1200"
+    }
+  ],
+  "socialPlatforms": [
+    {
+      "platform": "WhatsApp",
+      "order": 1,
+      "isDirect": true,
+      "directUrl": "https://whatsapp.com/channel/0029VbB3qcSE50UaECuWi520",
+      "channels": [
+        {
+          "name": "e-Gurukulam For IAS",
+          "url": "https://whatsapp.com/channel/0029VbB3qcSE50UaECuWi520"
+        }
+      ]
+    },
+    {
+      "platform": "YouTube",
+      "order": 2,
+      "isDirect": false,
+      "directUrl": "https://www.youtube.com/@e-GurukulamforIAS",
+      "channels": [
+        {
+          "name": "e-Gurukulam for IAS",
+          "url": "https://www.youtube.com/@e-GurukulamforIAS"
+        },
+        {
+          "name": "IAS For ALL",
+          "url": "https://www.youtube.com/@IASForAll"
+        },
+        {
+          "name": "Akella Raghavendra Foundation",
+          "url": "https://www.youtube.com/@AkellaRaghavendraFoundation"
+        }
+      ]
+    },
+    {
+      "platform": "Telegram",
+      "order": 3,
+      "isDirect": true,
+      "directUrl": "https://t.me/egurukulamforias",
+      "channels": [
+        {
+          "name": "e-Gurukulam For IAS",
+          "url": "https://t.me/egurukulamforias"
+        }
+      ]
+    },
+    {
+      "platform": "Instagram",
+      "order": 4,
+      "isDirect": false,
+      "directUrl": "https://www.instagram.com/egurukulamforias/",
+      "channels": [
+        {
+          "name": "e-Gurukulam For IAS",
+          "url": "https://www.instagram.com/egurukulamforias/"
+        },
+        {
+          "name": "IAS Akella Raghavendra",
+          "url": "https://www.instagram.com/ias_akellaraghavendra/"
+        },
+        {
+          "name": "Akella Raghavendra Offical",
+          "url": "https://www.instagram.com/akellaraghavendra_official/"
+        }
+      ]
+    },
+    {
+      "platform": "Facebook",
+      "order": 5,
+      "isDirect": false,
+      "directUrl": "https://www.facebook.com/AkellaRaghavendraa/",
+      "channels": [
+        {
+          "name": "Akella Raghavendra",
+          "url": "https://www.facebook.com/AkellaRaghavendraa/"
+        },
+        {
+          "name": "IAS Mentoring",
+          "url": "https://www.facebook.com/profile.php?id=61570902514505"
+        },
+        {
+          "name": "Akella Raghavendra Foundation",
+          "url": "https://www.facebook.com/AkellaRaghavendraFoundation/"
+        },
+        {
+          "name": "Akella Raghavendra Official",
+          "url": "https://www.facebook.com/akella.raghavendra.authorised/"
+        }
+      ]
+    },
+    {
+      "platform": "Twitter_X",
+      "order": 6,
+      "isDirect": true,
+      "directUrl": "https://x.com/egurukulamf1674",
+      "channels": [
+        {
+          "name": "e-Gurukulam For IAS",
+          "url": "https://x.com/egurukulamf1674"
+        }
+      ]
+    },
+    {
+      "platform": "LinkedIn",
+      "order": 7,
+      "isDirect": false,
+      "directUrl": "https://www.linkedin.com/in/akella-raghavendra/",
+      "channels": [
+        {
+          "name": "Akella Raghavendra",
+          "url": "https://www.linkedin.com/in/akella-raghavendra/"
+        },
+        {
+          "name": "e-Gurukulam For IAS",
+          "url": "https://www.linkedin.com/company/e-gurukulamforias/"
+        }
+      ]
+    },
+    {
+      "platform": "PlayStore_Apps",
+      "order": 8,
+      "isDirect": false,
+      "directUrl": "https://play.google.com/store/apps/details?id=co.shield.smpqz&hl=en_IN",
+      "channels": [
+        {
+          "name": "Akella Raghavendra's e-Gurukulam For IAS",
+          "url": "https://play.google.com/store/apps/details?id=co.shield.smpqz&hl=en_IN"
+        },
+        {
+          "name": "Young India Program",
+          "url": "https://play.google.com/store/apps/details?id=co.arya.amita"
+        },
+        {
+          "name": "Andhra Telangana Enrich Exams",
+          "url": "https://play.google.com/store/apps/details?id=co.martin.hezjo"
+        }
+      ]
+    }
+  ],
+  "testSeries": [],
+  "syncedAt": "2026-09-29T19:34:54.303Z"
+}

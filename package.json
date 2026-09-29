@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "prebuild": "node scripts/generate-favicons.js",
+    "prebuild": "node scripts/generate-favicons.js && node scripts/sync-cms.js",
     "build": "node scripts/sync-courses.cjs && node scripts/sync-free-tests.cjs && vite build && node scripts/prepare-template.js",
     "preview": "vite preview",
     "favicons": "node scripts/generate-favicons.js",
