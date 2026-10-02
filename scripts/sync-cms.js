@@ -75,14 +75,20 @@ function sanitizeSocialPlatforms(rawSocial) {
     });
 }
 
-async function fetchLiveCMS() {
-  console.log(`[sync-cms] Fetching live CMS data from Google Apps Script endpoint:`);
-  console.log(`[sync-cms] ${CMS_API_ENDPOINT}`);
+const FETCH_TIMEOUT_MS = 60000; // 60s per attempt to handle Apps Script cold starts
+const MAX_FETCH_ATTEMPTS = 3;   // 3 attempts total with progressive backoff
+const RETRY_BACKOFF_MS = [3000, 5000]; // Delays between retries
+
+async function attemptLiveCMSFetch(attemptNumber, totalAttempts) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => {
+    controller.abort(new Error(`Timeout of ${FETCH_TIMEOUT_MS / 1000}s exceeded while waiting for Apps Script response`));
+  }, FETCH_TIMEOUT_MS);
+
+  console.log(`[sync-cms] [Attempt ${attemptNumber}/${totalAttempts}] Fetching live CMS from Apps Script endpoint (timeout: ${FETCH_TIMEOUT_MS / 1000}s)...`);
+  const startTime = Date.now();
 
   try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 20000);
-
     const response = await fetch(CMS_API_ENDPOINT, {
       method: 'GET',
       headers: {
@@ -91,37 +97,82 @@ async function fetchLiveCMS() {
       redirect: 'follow',
       signal: controller.signal
     });
-    clearTimeout(timeoutId);
 
-    if (response.ok) {
-      const text = await response.text();
-      if (text.startsWith('{')) {
-        const parsed = JSON.parse(text);
-        if (Array.isArray(parsed.currentAffairs) && parsed.currentAffairs.length > 0) {
-          console.log(`[sync-cms] Successfully retrieved fresh live data from Apps Script.`);
-          // Save updated snapshot for offline dev reliability
-          try {
-            fs.writeFileSync(SNAPSHOT_PATH, JSON.stringify(parsed, null, 2), 'utf8');
-          } catch (e) {}
-          return parsed;
-        }
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status} ${response.statusText}`);
+    }
+
+    const text = await response.text();
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+
+    if (!text || !text.trim().startsWith('{')) {
+      throw new Error(`Endpoint returned non-JSON payload: ${text.slice(0, 100)}...`);
+    }
+
+    const parsed = JSON.parse(text);
+    if (!Array.isArray(parsed.currentAffairs) || parsed.currentAffairs.length === 0) {
+      throw new Error('Response JSON missing or empty currentAffairs array');
+    }
+
+    console.log(`[sync-cms] [Attempt ${attemptNumber}/${totalAttempts}] Successfully retrieved fresh live data from Apps Script in ${elapsed}s.`);
+    return parsed;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+async function fetchLiveCMS() {
+  console.log(`[sync-cms] Target Google Apps Script CMS endpoint:`);
+  console.log(`[sync-cms] ${CMS_API_ENDPOINT}`);
+
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= MAX_FETCH_ATTEMPTS; attempt++) {
+    try {
+      const data = await attemptLiveCMSFetch(attempt, MAX_FETCH_ATTEMPTS);
+      // Save updated snapshot for offline dev reliability / reference
+      try {
+        fs.writeFileSync(SNAPSHOT_PATH, JSON.stringify(data, null, 2), 'utf8');
+        console.log(`[sync-cms] Updated local snapshot at ${path.basename(SNAPSHOT_PATH)}`);
+      } catch (e) {
+        console.warn(`[sync-cms] Could not update local snapshot: ${e.message}`);
+      }
+      return data;
+    } catch (err) {
+      lastError = err;
+      const errorMsg = err.name === 'AbortError' || err.message.includes('aborted') || err.message.includes('Timeout')
+        ? `Request timed out after ${FETCH_TIMEOUT_MS / 1000}s (Google Apps Script cold start / network delay)`
+        : err.message;
+
+      console.warn(`[sync-cms] [Attempt ${attempt}/${MAX_FETCH_ATTEMPTS}] Fetch failed: ${errorMsg}`);
+
+      if (attempt < MAX_FETCH_ATTEMPTS) {
+        const delay = RETRY_BACKOFF_MS[attempt - 1] || 3000;
+        console.log(`[sync-cms] Retrying in ${delay / 1000}s (Google container should now be warmed)...`);
+        await new Promise(res => setTimeout(res, delay));
       }
     }
-    console.warn(`[sync-cms] Live endpoint returned non-JSON or status ${response.status}. Checking snapshot fallback...`);
-  } catch (err) {
-    console.warn(`[sync-cms] Live endpoint fetch failed (${err.message}). Checking snapshot fallback...`);
   }
 
-  // Fallback to validated production snapshot
-  if (fs.existsSync(SNAPSHOT_PATH)) {
-    console.log(`[sync-cms] Loading verified CMS snapshot from ${SNAPSHOT_PATH}...`);
+  // If all attempts failed:
+  // Build must NEVER silently deploy stale snapshot data during deployment.
+  const isCI = Boolean(process.env.VERCEL || process.env.CI || process.env.NODE_ENV === 'production');
+  const allowSnapshotExplicit = Boolean(process.env.ALLOW_CMS_SNAPSHOT === 'true');
+
+  if (!isCI && allowSnapshotExplicit && fs.existsSync(SNAPSHOT_PATH)) {
+    console.warn(`[sync-cms] WARNING: All live attempts failed. ALLOW_CMS_SNAPSHOT=true is set; falling back to local snapshot.`);
     const raw = fs.readFileSync(SNAPSHOT_PATH, 'utf8');
     const parsed = JSON.parse(raw);
     console.log(`[sync-cms] Loaded snapshot with ${parsed.currentAffairs?.length || 0} Current Affairs and ${parsed.resources?.length || 0} Resources.`);
     return parsed;
   }
 
-  throw new Error('[sync-cms] Fatal: Could not fetch live CMS and no snapshot found.');
+  // Fail clearly with explicit instructions to prevent publishing stale content
+  throw new Error(
+    `[sync-cms] FATAL: Could not fetch live CMS data from Google Apps Script after ${MAX_FETCH_ATTEMPTS} attempts.\n` +
+    `Last error: ${lastError ? lastError.message : 'Unknown'}\n` +
+    `Build aborted to prevent silently deploying stale CMS data. Ensure the Google Sheet / Apps Script endpoint is accessible.`
+  );
 }
 
 async function main() {

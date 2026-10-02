@@ -1,7 +1,37 @@
 [
   {
+    "Date": "02/10/2026",
+    "Title": "UPSC at 100: A Century of Public Service and Nation-Building",
+    "Category": "UPSC",
+    "Banner_Image": "https://drive.google.com/thumbnail?id=1AR7kB3o5RVBp3Htt19fJ_Yu1qKUZcjok&sz=w1200",
+    "Short_Summary": "The article traces the 100-year institutional journey of the UPSC, from its establishment in 1926 to its present status as an independent constitutional body.\nIt highlights the Commission’s role in recruitment, examinations, government advice and public-service administration, and its contribution to nation-building over a century.\n",
+    "Active": true,
+    "slug": "upsc-at-100-a-century-of-public-service-and-nation-building",
+    "Slug": "upsc-at-100-a-century-of-public-service-and-nation-building"
+  },
+  {
+    "Date": "01/10/2026",
+    "Title": "Nerve Agents",
+    "Category": "GS Paper III – Science & Technology, Internal Security, Disaster Management\r",
+    "Banner_Image": "https://drive.google.com/thumbnail?id=1Atuv8j0hef8p9pd09pSBmaVcSkGEQ0Ic&sz=w1200",
+    "Short_Summary": "Nerve agents are highly toxic chemical warfare agents that disrupt the nervous system by interfering with acetylcholine regulation. The article examines their mechanism, major types, health effects, international controls and challenges in preventing chemical-weapons misuse.",
+    "Active": true,
+    "slug": "nerve-agents",
+    "Slug": "nerve-agents"
+  },
+  {
+    "Date": "30/09/2026",
+    "Title": "AI-NOMICS",
+    "Category": "GS Paper III – Science & Technology, Economy, Internal Security",
+    "Banner_Image": "https://drive.google.com/thumbnail?id=1b2Cg54O9ss36E4Shmgs7hbDYF_HVEpcY&sz=w1200",
+    "Short_Summary": "The article explores how AI is transforming economic activity through tokenisation, AI-driven productivity, digital finance and emerging business models. It examines the growing economic significance of AI, including its impact on markets, jobs, investment, innovation and financial systems.\r\n",
+    "Active": true,
+    "slug": "ai-nomics",
+    "Slug": "ai-nomics"
+  },
+  {
     "Date": "29/09/2026",
-    "Title": "Beyond the Label: Food Safety, Celebrity Endorsements and the Fight for Consumer Health\r",
+    "Title": "Beyond the Label: Food Safety, Celebrity Endorsements and the Fight for Consumer Health",
     "Category": "GS Paper II: Governance\r\nGS Paper III: Economy\r\nGS Paper IV: Ethics\r",
     "Banner_Image": "https://drive.google.com/thumbnail?id=1bRPcdbB7DkWI-J7HCo7t-0NPlTXbgwgr&sz=w1200",
     "Short_Summary": "The article examines how food labels, misleading advertisements and celebrity endorsements influence consumer choices and public health. It highlights the role of food-safety regulation and accountability in protecting consumers.\r",
@@ -11,7 +41,7 @@
   },
   {
     "Date": "28/09/2026",
-    "Title": "Elephant Deaths\n",
+    "Title": "Elephant Deaths",
     "Category": "GS Paper III – Environment and Ecology\r",
     "Banner_Image": "https://drive.google.com/thumbnail?id=1OCbVGP6BYXc7Qn881aIyAeAZMg2PfxWt&sz=w1200",
     "Short_Summary": "Human–elephant conflict in Kerala is intensifying due to habitat intrusion, crop raiding and human-induced threats such as electrocution and explosives. The article examines elephant mortality hotspots and highlights the need for effective wildlife conservation and conflict mitigation measures.\r",
@@ -31,7 +61,7 @@
   },
   {
     "Date": "27/09/2026",
-    "Title": "THE ARCTIC RACE\r",
+    "Title": "THE ARCTIC RACE",
     "Category": "GS Paper II – International Relations\r\nGS Paper III – Internal Security\r",
     "Banner_Image": "https://drive.google.com/thumbnail?id=1YpkKHzMBVF8DTcnRhaBYQHJKN0u2VzT3&sz=w1200",
     "Short_Summary": "The article explores the growing strategic importance of Greenland in the Arctic and the United States’ expanding interest in the region. It examines the geopolitical, security, economic and resource dimensions shaping the evolving US–Greenland relationship.\r",
@@ -41,7 +71,7 @@
   },
   {
     "Date": "26/09/2026",
-    "Title": "The Houthis and the Red Sea Crisis: Regional Conflict, Maritime Security and Implications for India \r",
+    "Title": "The Houthis and the Red Sea Crisis: Regional Conflict, Maritime Security and Implications for India",
     "Category": "GS Paper II – International Relations, Internal Security \r\nGS Paper III – Indian Economy \r",
     "Banner_Image": "https://drive.google.com/thumbnail?id=1tuOMRqo1aTN45HbeKq18EW7zUhuHy9C6&sz=w1200",
     "Short_Summary": "The article examines the Houthis’ role in the Yemen conflict, their attacks on Red Sea shipping and the resulting regional security challenges. It also explores the implications for India’s maritime security, international trade routes, energy supplies and strategic interests.\r\n",
@@ -181,7 +211,7 @@
   },
   {
     "Date": "10/09/2026",
-    "Title": " “Bridging the Gap: Infrastructure, Human Rights and Last-Mile Governance”\r",
+    "Title": "“Bridging the Gap: Infrastructure, Human Rights and Last-Mile Governance”",
     "Category": "GS-II: Governance, Human Rights, Child Rights, Right to Education, Accountability\nGS-III: Infrastructure\n",
     "Banner_Image": "https://drive.google.com/thumbnail?id=1PMDeMZKEse5yHZ1Op8YuCqcJ120HWt69&sz=w1200",
     "Short_Summary": "This article highlights the NHRC’s intervention over school children risking their lives to cross an unfinished bridge, exposing critical gaps in infrastructure and last-mile governance.\r\nIt examines issues of human rights, child safety, access to education, and accountability in public infrastructure development\r\n",
@@ -241,7 +271,7 @@
   },
   {
     "Date": "05/09/2026",
-    "Title": "Rising Dam Levels Across India ",
+    "Title": "Rising Dam Levels Across India",
     "Category": "GS I - Geography | GS II - Governance | GS III - Environment",
     "Banner_Image": "https://drive.google.com/thumbnail?id=14Ykp4WDyKbZy3GtNrVT0L4dwYgcU5BOc&sz=w1200",
     "Short_Summary": "India’s reservoir storage shows regional gains despite deficient monsoon rainfall, highlighting water availability, irrigation needs, regional disparities, and the importance of sustainable reservoir management.",
