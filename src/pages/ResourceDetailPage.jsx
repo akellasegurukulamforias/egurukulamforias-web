@@ -208,9 +208,257 @@ function formatAnswerContent(rawAnswer) {
 }
 
 /**
+ * Strips word count and marks badge instructions from question prompt body
+ * (e.g. (Answer in 150 words), | 10 Marks, (12.5 Marks), (Answer in 150 words each) :)
+ * Ensuring this metadata strictly stays in the top-right badges.
+ */
+function stripBadgeText(str) {
+  if (!str) return '';
+  let s = str;
+  // 1. Strip (Answer in \d+ words.*?) with optional trailing marks or colon
+  s = s.replace(/\(?\s*Answer\s+in\s+\d{2,4}(?:\s*[-–—to]\s*\d{2,4})?\s*words?(?:\s+each)?\s*[\)\:\.\-]*\s*(?:\|\s*\d+(?:\.\d+)?\s*marks?)?/gi, '');
+  // 2. Strip generic (Answer in ...)
+  s = s.replace(/\(?\s*Answer\s+in\s+[^\)]*?\)?\s*(?::|-|—)?/gi, '');
+  // 3. Strip | \d+ Marks or ( \d+ Marks ) or standalone Marks token (supports decimals like 12.5 Marks)
+  s = s.replace(/\|\s*\d+(?:\.\d+)?\s*Marks\b/gi, '');
+  s = s.replace(/[\(\[]\s*\d+(?:\.\d+)?\s*Marks?\b\s*[\)\]]/gi, '');
+  // 4. Strip trailing Answer label if leftover at prompt end
+  s = s.replace(/(?:<strong>|<b>)?\s*Answer\s*:\s*(?:<\/strong>|<\/b>)?\s*$/i, '');
+  // 5. Strip trailing | or : or - at end of block
+  s = s.replace(/[\s\|:\-–—]+$/, '');
+  return s;
+}
+
+/**
+ * Universal Subquestion Marker Removal Helper:
+ * Strips the recognized structural subquestion marker from the beginning of prompt text.
+ * E.g., for subLetter 'a', strips leading '(a)', 'a)', '(a).', 'a.', 'Q1 (a)', etc.
+ * Preserves quotes (", “, «) and substantive question prose.
+ */
+function stripLeadingSubMarker(text, subLetter) {
+  if (!text || !subLetter) return text;
+  let s = text.trim();
+
+  // 1. Strip leading Q prefix if still present: e.g. "Q1.", "Q1 (a).", "Q1:"
+  s = s.replace(/^Q\s*\d+[\.\:\)]?\s*/i, '').trim();
+
+  // 2. Strip leading punctuation / colon / dash that might precede the marker (e.g. ": (a)")
+  s = s.replace(/^[\s:\-–—\.]+/g, '').trim();
+
+  // 3. Strip leading structural marker matching subLetter:
+  const escaped = subLetter.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const markerRegex = new RegExp(`^(?:\\(${escaped}\\)|${escaped}\\)|(?<![a-zA-Z0-9])${escaped}\\.)\\s*[\\.:\\-–—]?\\s*`, 'i');
+  s = s.replace(markerRegex, '').trim();
+
+  // 4. Fallback for any standard structural paren marker matching subLetter
+  s = s.replace(new RegExp(`^\\(${escaped}\\)\\.?\\s*`, 'i'), '').trim();
+
+  // 5. Strip any leftover punctuation after marker removal (e.g. dot or colon before quote or word)
+  s = s.replace(/^[\s:\-–—\.]+(?=["“«A-Za-z0-9])/, '').trim();
+
+  return s;
+}
+
+/**
+ * Formats question prompt text:
+ * - Standard questions render as a single continuous paragraph with standard line height:
+ *   <p class="font-sans text-stone-800 text-[17px] md:text-lg leading-relaxed font-normal">{promptText}</p>
+ * - Questions with explicit sub-points ((a), (b), (i), (ii), 1., 2.) segregate intro, indented clauses, and conclusion.
+ */
+function cleanAndFormatPrompt(rawPrompt, options = {}) {
+  if (!rawPrompt || typeof rawPrompt !== 'string') return { promptHtml: '', text: '', hasClauses: false };
+
+  const { isSubQuestionBOrC = false, parentIntro = '', isCaseStudy: forcedCaseStudy = false, subLetter = null } = options;
+
+  let cleaned = rawPrompt;
+
+  // 1. Cut off footer boilerplate / CTA / download notices
+  const footerCtaRegex = /(?:👉|📌|\b(?:Click\s+(?:the\s+)?(?:link\s+)?(?:below|here)|Download\s+(?:the\s+)?(?:complete\s+)?(?:Question\s+Paper|PDF)|General\s+Studies\s*[-–—]?\s*Paper|GS\s*[-–—]?\s*Paper)\b|<a\s+[^>]*href)/i;
+  const ctaMatch = cleaned.search(footerCtaRegex);
+  if (ctaMatch !== -1) {
+    cleaned = cleaned.substring(0, ctaMatch);
+  }
+
+  // 2. Remove embedded section header line
+  cleaned = cleaned.replace(/(?:<(?:p|div|h\d)[^>]*>|^)\s*(?:<strong>|<b>|<span[^>]*>)?\s*SECTION\s*[-–—:]?\s*[A-Z][^<]*(?:<\/strong>|<\/b>|<\/span>)?(?:\s*<\/(?:p|div|h\d)>|$)\s*/gi, '');
+
+  // 3. Remove leading question identifier prefix from start of prompt
+  let isCaseStudy = forcedCaseStudy;
+  cleaned = cleaned.replace(/<(?:p|div|li)[^>]*>\s*(?:<strong>|<b>|<span[^>]*>)?\s*Q\s*(\d+)(?:(?:\s*\.|\.)?\s*\(([a-zA-Z])\)|[\.:\)])\s*[\.:\)]?\s*(?:Case\s+Study\s*:?\s*)?/i, (match) => {
+    if (/case\s+study/i.test(match)) {
+      isCaseStudy = true;
+    }
+    return '';
+  });
+
+  // 4. Strip leaking badge text
+  cleaned = stripBadgeText(cleaned);
+  cleaned = cleaned.replace(/<div[^>]*style=["'][^"']*height[^"']*["'][^>]*>\s*<\/div>/gi, '');
+  cleaned = cleaned.replace(/<p[^>]*>\s*(?:&nbsp;|<br\s*\/?>|\s)*<\/p>/gi, '');
+
+  // Clean plain text into single continuous string without artificial line-break splits
+  let plainTextFull = cleaned
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/\s+([\.\?\,!])/g, '$1')
+    .replace(/(?:Answer\s*:?\s*|SECTION\s*[-–—:]?\s*[A-Z][^\n]*)$/gi, '')
+    .replace(/[\s\-_•|~:]+$/, '')
+    .trim();
+
+  // If this is sub-question (b) or (c), make sure any leftover parent intro is stripped
+  if (isSubQuestionBOrC && parentIntro) {
+    plainTextFull = plainTextFull.replace(parentIntro, '').trim();
+    plainTextFull = plainTextFull.replace(/^[\s:\.\-]+/, '').trim();
+  }
+
+  // If this question card is an identified subquestion (e.g. Q1 (a)), strip its structural marker from prompt
+  if (subLetter) {
+    plainTextFull = stripLeadingSubMarker(plainTextFull, subLetter);
+  }
+
+  // 5. Intelligent Sub-Clause / Sub-Point Segregation
+  const clausePattern = /(?:^|\s)(?:\(([a-dA-D]|\d+|[ivxIVX]{1,5})\)|(?<![a-zA-Z0-9])([a-dA-D]|\d+|[ivxIVX]{1,5})\)|(?<![a-zA-Z0-9])([1-9])\.)\s+/g;
+  const matches = [...plainTextFull.matchAll(clausePattern)];
+
+  let isSubPointList = false;
+  if (matches.length >= 2) {
+    const m1 = (matches[0][1] || matches[0][2] || matches[0][3] || '').toLowerCase();
+    const m2 = (matches[1][1] || matches[1][2] || matches[1][3] || '').toLowerCase();
+    if ((m1 === 'a' && m2 === 'b') || (m1 === '1' && m2 === '2') || (m1 === 'i' && m2 === 'ii')) {
+      isSubPointList = true;
+    }
+  }
+
+  if (isSubPointList) {
+    const firstIdx = matches[0].index;
+    const introText = plainTextFull.substring(0, firstIdx).trim();
+    const clauses = [];
+    let concludingText = '';
+
+    for (let i = 0; i < matches.length; i++) {
+      const start = matches[i].index;
+      const end = (i + 1 < matches.length) ? matches[i + 1].index : plainTextFull.length;
+      let clauseContent = plainTextFull.substring(start, end).trim();
+
+      if (i === matches.length - 1) {
+        const qSentenceMatch = clauseContent.match(/(?:\.|\!|\?)\s+([A-Z][^\.\!\?]*?(?:\?|discuss|explain|examine|elucidate|comment|evaluate|which|how|what)[^<]*)$/i);
+        if (qSentenceMatch) {
+          const splitIdx = clauseContent.lastIndexOf(qSentenceMatch[1]);
+          concludingText = clauseContent.substring(splitIdx).trim();
+          clauseContent = clauseContent.substring(0, splitIdx).trim();
+        }
+      }
+      clauses.push(clauseContent);
+    }
+
+    const htmlParts = [];
+    if (isCaseStudy) {
+      htmlParts.push('<p class="font-bold text-[#6C1D18] mb-1 flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-[#8C3A27]"></span><span>Case Study Scenario:</span></p>');
+    }
+    if (introText) {
+      htmlParts.push(`<p class="font-sans text-stone-800 text-[17px] md:text-lg leading-relaxed font-normal mb-2">${introText}</p>`);
+    }
+    clauses.forEach(cl => {
+      htmlParts.push(`<div class="pl-4 py-0.5 text-stone-800 font-sans text-[17px] md:text-lg leading-relaxed">${cl}</div>`);
+    });
+    if (concludingText) {
+      htmlParts.push(`<p class="font-sans text-stone-800 text-[17px] md:text-lg leading-relaxed font-normal mt-2">${concludingText}</p>`);
+    }
+
+    return {
+      promptHtml: htmlParts.join('\n'),
+      text: plainTextFull,
+      hasClauses: true
+    };
+  }
+
+  // STANDARD QUESTION: Single continuous paragraph with standard line height
+  let html = '';
+  if (isCaseStudy) {
+    html = `<p class="font-bold text-[#6C1D18] mb-1 flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-[#8C3A27]"></span><span>Case Study Scenario:</span></p>\n`;
+  }
+  html += `<p class="font-sans text-stone-800 text-[17px] md:text-lg leading-relaxed font-normal">${plainTextFull}</p>`;
+
+  return {
+    promptHtml: html,
+    text: plainTextFull,
+    hasClauses: false
+  };
+}
+
+/**
  * Robust parser for UPSC Previous Year Question Papers
  * Extracts structured questions, mark limits, word limits, model answers, and original PDF download links.
- * Accommodates GS Papers 1-4 & Essay Papers (Section dividers, 4-digit word counts, 3-digit marks, sub-questions, and Case Studies).
+ * Accommodates GS Papers 1-4 & Essay Papers (Section dividers, word counts, marks, sub-questions, and Case Studies).
+ */
+// Essay paper parser supporting Section A (Topics 1-4) and Section B (Topics 5-8)
+function parseEssayPaper(rawHtml, downloadLink) {
+  const topicRegex = /(?:<p[^>]*>|^)\s*(?:<strong>|<b>)?\s*([1-8])\.\s+([^<]+)/gi;
+  const matches = [...rawHtml.matchAll(topicRegex)];
+
+  const questions = matches.map((m, idx) => {
+    const topicNum = parseInt(m[1], 10);
+    const topicText = m[2].replace(/<[^>]*>/g, '').trim();
+
+    return {
+      qNum: topicNum,
+      subLetter: null,
+      displayNum: `Topic ${topicNum}`,
+      idKey: `${topicNum}`,
+      sectionHeader: topicNum === 1 ? 'SECTION - A' : (topicNum === 5 ? 'SECTION - B' : null),
+      sectionInstructions: topicNum === 1 ? 'Write one essay from Section A in about 1000-1200 words' : (topicNum === 5 ? 'Write one essay from Section B in about 1000-1200 words' : null),
+      index: idx + 1,
+      text: `${topicNum}. ${topicText}`,
+      promptHtml: `<p class="font-sans text-stone-800 text-[17px] md:text-lg leading-relaxed font-normal">${topicText}</p>`,
+      modelAnswer: null,
+      marks: '125',
+      words: '1000-1200'
+    };
+  });
+
+  return { questions, downloadLink };
+}
+
+// Section extraction helper
+function extractSection(textBlock) {
+  if (!textBlock) return null;
+  const sectionHeaderRegex = /(?:<(?:p|div|h\d)[^>]*>|^)\s*(?:<strong>|<b>|<span[^>]*>)?\s*(SECTION\s*[-–—:]?\s*[A-Z](?:\s*[-–—:]\s*[^<\n]+)?)\s*(?:<\/strong>|<\/b>|<\/span>)?(?:\s*<\/(?:p|div|h\d)>|$)/im;
+  const sMatch = textBlock.match(sectionHeaderRegex);
+  if (!sMatch) return null;
+  const header = sMatch[1].trim();
+  const withoutHeader = textBlock.replace(sMatch[0], '');
+  const cleanInstructions = withoutHeader
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/[\s\-_•|~]+$/, '')
+    .trim();
+  return {
+    sectionHeader: header,
+    sectionInstructions: cleanInstructions.length > 5 ? cleanInstructions : null
+  };
+}
+
+// Helper to split chunk into prompt and answer
+function splitPromptAndAnswer(chunkText) {
+  const answerDelimiterRegex = /(?:<(?:p|div)[^>]*>\s*(?:<strong>|<b>|<span[^>]*>)?\s*(?:Model\s+Answer|Answer|Solution|Explanation|Approach|Synopsis)\s*(?::|-|—)?\s*(?:<\/strong>|<\/b>|<\/span>)?\s*<\/(?:p|div)>|<blockquote[^>]*>)/i;
+  const ansMatch = chunkText.match(answerDelimiterRegex);
+  let promptPart = chunkText;
+  let answerPart = null;
+  if (ansMatch) {
+    promptPart = chunkText.substring(0, ansMatch.index);
+    answerPart = chunkText.substring(ansMatch.index + ansMatch[0].length);
+    if (/blockquote/i.test(ansMatch[0])) {
+      answerPart = answerPart.replace(/<\/blockquote>/i, '');
+    }
+  }
+  return { promptPart, answerPart };
+}
+
+/**
+ * Universal Parser for UPSC Previous Year Question Papers
+ * Robustly parses GS Papers 1-4 & Essay Papers without fragile delimiter dependencies.
+ * Accommodates independent quotation subquestions, sibling questions sharing numbers,
+ * case studies with sub-tasks, and internal clause segregation.
  */
 function parsePYQQuestions(rawHtml) {
   if (!rawHtml || typeof rawHtml !== 'string') return { questions: [], downloadLink: null };
@@ -222,59 +470,165 @@ function parsePYQQuestions(rawHtml) {
     downloadLink = linkMatch[1];
   }
 
-  // 2. Question identifier regex supporting sub-letters: e.g. Q1 (a), Q1. (a), Q8 (c), Q5 (e), Q7, 12.
-  const qHeaderRegex = /(?:<p[^>]*>|<div[^>]*>|<li[^>]*>|^)\s*(?:<strong>|<b>|<span[^>]*>)?\s*Q?(\d+)(?:(?:\s*\.|\.)?\s*\(([a-zA-Z])\)|[\.:\)])\s*[\.:\)]?/im;
-  const globalQHeaderRegex = /<(?:p|div|li)[^>]*>\s*(?:<strong>|<b>|<span[^>]*>)?\s*Q?(\d+)(?:(?:\s*\.|\.)?\s*\(([a-zA-Z])\)|[\.:\)])\s*[\.:\)]?/gi;
+  // 2. Detect Essay papers with Section A / B topic numbers (1. to 8.)
+  const isEssayPaper = /SECTION\s*[-–—:]?\s*[AB]/i.test(rawHtml) && 
+                       !/Q\s*\d+/i.test(rawHtml) && 
+                       /(?:<p[^>]*>|^)\s*(?:<strong>|<b>)?\s*[1-8]\.\s+/i.test(rawHtml);
 
-  // Section divider regex: e.g. "SECTION - A", "SECTION - B", "SECTION A", "SECTION B"
-  const sectionHeaderRegex = /(?:<(?:p|div|h\d)[^>]*>|^)\s*(?:<strong>|<b>|<span[^>]*>)?\s*(SECTION\s*[-–—:]?\s*[A-Z](?:\s*[-–—:]\s*[^<\n]+)?)\s*(?:<\/strong>|<\/b>|<\/span>)?(?:\s*<\/(?:p|div|h\d)>|$)/im;
+  if (isEssayPaper) {
+    return parseEssayPaper(rawHtml, downloadLink);
+  }
 
-  const extractSection = (textBlock) => {
-    if (!textBlock) return null;
-    const sMatch = textBlock.match(sectionHeaderRegex);
-    if (!sMatch) return null;
-    const header = sMatch[1].trim();
-    const withoutHeader = textBlock.replace(sMatch[0], '');
-    const cleanInstructions = withoutHeader
-      .replace(/<[^>]*>/g, ' ')
-      .replace(/\s+/g, ' ')
-      .replace(/[\s\-_•|~]+$/, '')
-      .trim();
-    return {
-      sectionHeader: header,
-      sectionInstructions: cleanInstructions.length > 5 ? cleanInstructions : null
-    };
-  };
-
-  // Universal Question Delimiter: Horizontal Rule (---, ***, ___ or <hr>)
+  // 3. Question chunking with delimiter & structural anchor awareness
   const hrDelimiterRegex = /(?:<p[^>]*>\s*(?:---|–—|—|\*\*\*|___)\s*<\/p>|<hr[^>]*>)/i;
-  const hrChunks = rawHtml.split(hrDelimiterRegex).map(c => c.trim()).filter(c => c.length > 10);
+  const initialChunks = rawHtml.split(hrDelimiterRegex).map(c => c.trim()).filter(c => c.length > 10);
 
-  let rawQuestionChunks = [];
+  // Split any chunk that contains subsequent Q anchor
+  const hrChunks = [];
+  const subQRegex = /(?:<(?:p|div|h\d)[^>]*>)\s*(?:<strong>|<b>|<span[^>]*>)?\s*(?:SECTION\s*[-–—:]?\s*[A-Z][^<]*\s*(?:<\/strong>|<\/b>|<\/span>)?\s*<\/(?:p|div|h\d)>\s*)?Q\s*(\d+)(?:(?:\s*\.|\.)?\s*\(([a-zA-Z])\)|[\.:\)])/gi;
+
+  for (const chunk of initialChunks) {
+    const allMatches = [...chunk.matchAll(subQRegex)];
+    let lastIdx = 0;
+    if (allMatches.length > 0) {
+      for (const m of allMatches) {
+        if (m.index > 40) {
+          const piece1 = chunk.substring(lastIdx, m.index).trim();
+          if (piece1.length > 10) hrChunks.push(piece1);
+          lastIdx = m.index;
+        }
+      }
+    }
+    const remainder = chunk.substring(lastIdx).trim();
+    if (remainder.length > 10) hrChunks.push(remainder);
+  }
+
+  const qHeaderRegex = /(?:<p[^>]*>|<div[^>]*>|<li[^>]*>|^)\s*(?:<strong>|<b>|<span[^>]*>)?\s*Q\s*(\d+)(?:(?:\s*\.|\.)?\s*\(([a-zA-Z])\)|[\.:\)])\s*[\.:\)]?/im;
+
+  const rawQuestionItems = [];
   let pendingSection = null;
+  let lastQNum = null;
 
-  if (hrChunks.length >= 2) {
-    // Delimited by universal horizontal rule (---)
-    for (let i = 0; i < hrChunks.length; i++) {
-      const chunk = hrChunks[i];
-      const match = chunk.match(qHeaderRegex);
+  for (let i = 0; i < hrChunks.length; i++) {
+    const chunk = hrChunks[i];
+    const match = chunk.match(qHeaderRegex);
 
-      if (match) {
-        const qIndex = match.index || 0;
-        const preQuestionBlock = chunk.substring(0, qIndex);
-        const embeddedSection = extractSection(preQuestionBlock);
-        const sectionToUse = embeddedSection || pendingSection;
-        pendingSection = null;
+    if (match) {
+      const qIndex = match.index || 0;
+      const preQuestionBlock = chunk.substring(0, qIndex);
+      const embeddedSection = extractSection(preQuestionBlock);
+      const sectionToUse = embeddedSection || pendingSection;
+      pendingSection = null;
 
-        rawQuestionChunks.push({
-          qNum: parseInt(match[1], 10),
-          subLetter: match[2] ? match[2].toLowerCase() : null,
+      const qNum = parseInt(match[1], 10);
+      let initialSubLetter = match[2] ? match[2].toLowerCase() : null;
+      lastQNum = qNum;
+
+      const chunkBody = chunk.substring(qIndex);
+      const cleanBodyText = chunkBody.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+
+      // Check if chunk is a legacy delimited question starting with (a) followed by (b) in next chunk
+      let legacyParentIntro = null;
+      if (!initialSubLetter) {
+        const hasWordsEach = /\b(?:words|marks)\s+each\b/i.test(cleanBodyText) || /\b(?:what|mean)\s+to\s+you\b/i.test(cleanBodyText);
+        const nextClean = (i + 1 < hrChunks.length) ? hrChunks[i + 1].replace(/<[^>]*>/g, ' ').trim() : '';
+        const nextChunkIsB = /^\(b\)[\.\:\)]?/i.test(nextClean);
+        const sm = chunkBody.match(/(?:<p[^>]*>|<div[^>]*>|<br\s*\/?>|^|\s)\s*(?:<strong>|<b>|<span[^>]*>)?\s*\(([a-dA-D])\)[\.\:\)]?/i);
+        if (sm && sm[1].toLowerCase() === 'a' && (hasWordsEach || nextChunkIsB)) {
+          initialSubLetter = 'a';
+          // Extract lead-in parent context before (a)
+          const introPart = chunkBody.substring(0, sm.index).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+          const cleanIntro = introPart.replace(/^Q\s*\d+[\.\:\)]?\s*/i, '').replace(/\(?\s*Answer\s+in[^\)]*each[^\)]*\)?\s*:?/gi, '').trim();
+          if (cleanIntro.length > 5) {
+            legacyParentIntro = cleanIntro;
+          }
+        }
+      }
+
+      // Check if chunk contains multiple subparts that should be independent questions (e.g. (a), (b), (c))
+      const subpartPattern = /(?:^|\n|<p[^>]*>|<div[^>]*>|<br\s*\/?>|\.\s+)\s*(?:<strong>|<b>|<span[^>]*>)?\s*(?:Q\s*\d+[\.\s]*)?\(([a-dA-D])\)[\.\:\)]?\s*(?:<\/strong>|<\/b>|<\/span>)?/gi;
+      const subMatches = [...chunkBody.matchAll(subpartPattern)];
+
+      const isCaseStudy = /case\s+study/i.test(chunkBody) || (qNum >= 7 && cleanBodyText.length > 350 && !/quotations?/i.test(cleanBodyText));
+
+      // Determine if these subparts are independent questions
+      let isIndependentSubparts = false;
+      if (subMatches.length >= 2 && !isCaseStudy) {
+        const marksCount = (cleanBodyText.match(/(\d+(?:\.\d+)?)\s*Marks/gi) || []).length;
+        const hasWordsEach = /(?:words|marks)\s+each/i.test(cleanBodyText);
+        const hasSiblingQ = /^Q\s*\d+[\.\s]*\([a-zA-Z]\)/i.test(cleanBodyText);
+
+        if (marksCount >= 2 || hasWordsEach || hasSiblingQ) {
+          isIndependentSubparts = true;
+        }
+      }
+
+      if (isIndependentSubparts) {
+        // Split chunk into independent subquestions!
+        const introEndIdx = subMatches[0].index;
+        let parentIntroText = chunkBody.substring(0, introEndIdx).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+        parentIntroText = parentIntroText.replace(/^Q\s*\d+[\.\:\)]?\s*/i, '').trim();
+        parentIntroText = parentIntroText.replace(/\(?\s*Answer\s+in[^\)]*each[^\)]*\)?\s*:?/gi, '').trim();
+
+        for (let sIdx = 0; sIdx < subMatches.length; sIdx++) {
+          const startIdx = subMatches[sIdx].index;
+          const endIdx = (sIdx + 1 < subMatches.length) ? subMatches[sIdx + 1].index : chunkBody.length;
+          const subChunkSlice = chunkBody.substring(startIdx, endIdx);
+          const subLetter = subMatches[sIdx][1].toLowerCase();
+
+          rawQuestionItems.push({
+            qNum,
+            subLetter,
+            sectionHeader: sIdx === 0 ? (sectionToUse ? sectionToUse.sectionHeader : null) : null,
+            sectionInstructions: sIdx === 0 ? (sectionToUse ? sectionToUse.sectionInstructions : null) : null,
+            rawChunk: subChunkSlice,
+            parentIntro: parentIntroText.length > 5 ? parentIntroText : null,
+            isIndependentSub: true,
+            isSubPartFirst: sIdx === 0
+          });
+        }
+      } else if (legacyParentIntro && initialSubLetter === 'a') {
+        // Legacy delimited Q(a) chunk with parent intro
+        rawQuestionItems.push({
+          qNum,
+          subLetter: 'a',
           sectionHeader: sectionToUse ? sectionToUse.sectionHeader : null,
           sectionInstructions: sectionToUse ? sectionToUse.sectionInstructions : null,
-          rawChunk: chunk.substring(qIndex)
+          rawChunk: chunkBody,
+          parentIntro: legacyParentIntro,
+          isIndependentSub: true,
+          isSubPartFirst: true
         });
       } else {
-        // Non-question chunk: could be standalone section divider or download footer
+        // Single question card (Pattern A, Pattern D, or Case Study Pattern E1)
+        rawQuestionItems.push({
+          qNum,
+          subLetter: initialSubLetter,
+          sectionHeader: sectionToUse ? sectionToUse.sectionHeader : null,
+          sectionInstructions: sectionToUse ? sectionToUse.sectionInstructions : null,
+          rawChunk: chunkBody,
+          parentIntro: null,
+          isIndependentSub: false,
+          isSubPartFirst: false
+        });
+      }
+    } else {
+      // Chunk without Q header: check if it's sub-question (b) or (c) from legacy delimited docs
+      const subLetterMatch = chunk.match(/(?:<p[^>]*>|<div[^>]*>|^)\s*(?:<strong>|<b>|<span[^>]*>)?\s*\(([a-zA-Z])\)[\.\:\)]?/i);
+      if (subLetterMatch && lastQNum) {
+        const subLetter = subLetterMatch[1].toLowerCase();
+        rawQuestionItems.push({
+          qNum: lastQNum,
+          subLetter,
+          sectionHeader: pendingSection ? pendingSection.sectionHeader : null,
+          sectionInstructions: null,
+          rawChunk: chunk,
+          parentIntro: null,
+          isIndependentSub: true,
+          isSubPartFirst: false
+        });
+        pendingSection = null;
+      } else {
         const sec = extractSection(chunk);
         if (sec) {
           pendingSection = sec;
@@ -286,169 +640,117 @@ function parsePYQQuestions(rawHtml) {
     }
   }
 
-  // Fallback: If no horizontal rules found, split using global question boundary regex
-  if (rawQuestionChunks.length === 0) {
-    const pMatches = [...rawHtml.matchAll(globalQHeaderRegex)];
-    if (pMatches.length >= 2) {
-      for (let i = 0; i < pMatches.length; i++) {
-        const start = pMatches[i].index;
-        const end = (i + 1 < pMatches.length) ? pMatches[i + 1].index : rawHtml.length;
-        const rawChunkSlice = rawHtml.substring(start, end);
-        const qNum = parseInt(pMatches[i][1], 10) || (i + 1);
-        const subLetter = pMatches[i][2] ? pMatches[i][2].toLowerCase() : null;
-
-        const preamble = i === 0 ? rawHtml.substring(0, start) : '';
-        const sec = extractSection(preamble) || extractSection(rawChunkSlice);
-
-        rawQuestionChunks.push({
-          qNum,
-          subLetter,
-          sectionHeader: sec ? sec.sectionHeader : null,
-          sectionInstructions: sec ? sec.sectionInstructions : null,
-          rawChunk: rawChunkSlice
-        });
-      }
-    } else {
-      const liMatches = [...rawHtml.matchAll(/<li[^>]*>([\s\S]*?)<\/li>/gi)];
-      if (liMatches.length > 0) {
-        rawQuestionChunks = liMatches.map((m, idx) => ({
-          qNum: idx + 1,
-          subLetter: null,
-          sectionHeader: null,
-          sectionInstructions: null,
-          rawChunk: m[1]
-        }));
-      }
-    }
-  }
-
-  // Helper to parse individual question chunk
-  const parseChunk = ({ qNum, subLetter, sectionHeader, sectionInstructions, rawChunk }, index) => {
-    let questionPrompt = '';
-    let promptHtml = '';
-    let modelAnswer = null;
-
-    // 1. Dynamic Number token: e.g. "Q1 (a)", "Q1 (b)", "Q7", "Q12"
+  // Parse each item into question object
+  const parseItem = (item, index) => {
+    const { qNum, subLetter, sectionHeader, sectionInstructions, rawChunk, parentIntro, isIndependentSub, isSubPartFirst } = item;
     const displayNum = subLetter ? `Q${qNum} (${subLetter})` : `Q${qNum}`;
     const idKey = subLetter ? `${qNum}${subLetter}` : `${qNum}`;
 
-    // 2. Dynamic Word limit: support up to 4 digits & ranges (e.g. 1000-1200 words, 150 words)
+    // Extract word limit
     let words = null;
-    const wordsMatch = rawChunk.match(/\(?\s*(?:Answer in\s+)?(\d{2,4}(?:\s*[-–—to]\s*\d{2,4})?)\s*words?\)?/i);
-    if (wordsMatch) {
-      words = wordsMatch[1].replace(/\s+/g, '');
-    }
-
-    // 3. Dynamic Marks: support up to 3 digits (e.g. 125 Marks, 30 Marks, 20 Marks, 15 Marks, 10 Marks)
-    // Check for explicit overall question marks line first (e.g. "(Answer in 450 words) | 30 Marks" or "| 30 Marks")
-    const overallMarksMatch = rawChunk.match(/(?:\||\bAnswer\s+in[^\)]*\)\s*\|?)\s*(\d{1,3})\s*Marks\b/i);
-    let marks = null;
-    if (overallMarksMatch) {
-      marks = overallMarksMatch[1];
+    const subWordsMatch = rawChunk.match(/\(?\s*Answer\s+in\s+(\d{2,4}(?:\s*[-–—to]\s*\d{2,4})?)\s*words?(?:\s+each)?\)?/i);
+    if (subWordsMatch) {
+      words = subWordsMatch[1].replace(/\s+/g, '');
     } else {
-      const marksMatch = rawChunk.match(/\b(\d{1,3})\s*Marks\b/i);
-      if (marksMatch) {
-        marks = marksMatch[1];
-      } else {
-        const numInParensMatch = rawChunk.match(/(?:[\(\[]\s*(\d{1,2})\s*[\)\]])\s*(?:<\/p>|<\/div>|<br\s*\/?>|$)/i);
-        if (numInParensMatch) {
-          marks = numInParensMatch[1];
-        } else {
-          marks = qNum <= 10 ? '10' : '15';
-        }
+      const wordsMatch = rawChunk.match(/\(?\s*(?:Answer in\s+)?(\d{2,4}(?:\s*[-–—to]\s*\d{2,4})?)\s*words?\)?/i);
+      if (wordsMatch) words = wordsMatch[1].replace(/\s+/g, '');
+    }
+
+    // Extract marks
+    let marks = null;
+    const subMarksMatch = rawChunk.match(/(?:[\(\[]\s*(\d{1,3}(?:\.\d+)?)\s*marks?\b[\)\]])/i);
+    const overallMarksMatch = rawChunk.match(/(?:\||\bAnswer\s+in[^\)]*\)\s*\|?)\s*(\d{1,3}(?:\.\d+)?)\s*Marks\b/i);
+    const marksMatch = rawChunk.match(/\b(\d{1,3}(?:\.\d+)?)\s*Marks\b/i);
+
+    if (subMarksMatch) {
+      marks = subMarksMatch[1];
+    } else if (overallMarksMatch) {
+      marks = overallMarksMatch[1];
+    } else if (marksMatch) {
+      marks = marksMatch[1];
+    } else {
+      marks = qNum <= 10 ? '10' : '15';
+    }
+
+    // Normalization for independent subparts
+    if (isIndependentSub) {
+      if (words === '450' || words === '300') {
+        words = '150';
+      }
+      if (marks === '30') {
+        marks = '10';
       }
     }
 
-    // Delimiter for Answer / Model Answer / Solution / Approach / blockquote
-    const answerDelimiterRegex = /(?:<(?:p|div)[^>]*>\s*(?:<strong>|<b>|<span[^>]*>)?\s*(?:Model\s+Answer|Answer|Solution|Explanation|Approach|Synopsis)\s*(?::|-|—)?\s*(?:<\/strong>|<\/b>|<\/span>)?\s*<\/(?:p|div)>|<blockquote[^>]*>)/i;
-    const ansMatch = rawChunk.match(answerDelimiterRegex);
-
-    let promptPartRaw = rawChunk;
-    let answerPartRaw = null;
-
-    if (ansMatch) {
-      promptPartRaw = rawChunk.substring(0, ansMatch.index);
-      answerPartRaw = rawChunk.substring(ansMatch.index + ansMatch[0].length);
-      if (/blockquote/i.test(ansMatch[0])) {
-        answerPartRaw = answerPartRaw.replace(/<\/blockquote>/i, '');
-      }
+    if (!words) {
+      words = marks === '10' ? '150' : (marks === '15' ? '250' : (marks === '20' ? '250' : (marks === '25' ? '250' : '150')));
     }
 
-    // Sanitize Prompt: Multi-paragraph scenario & case study support
-    const cleanPrompt = (rawPrompt) => {
-      let cleaned = rawPrompt;
+    const { promptPart, answerPart } = splitPromptAndAnswer(rawChunk);
 
-      // Cut off footer boilerplate / CTA / download notices
-      const footerCtaRegex = /(?:👉|📌|\b(?:Click\s+(?:the\s+)?(?:link\s+)?(?:below|here)|Download\s+(?:the\s+)?(?:complete\s+)?(?:Question\s+Paper|PDF)|General\s+Studies\s*[-–—]?\s*Paper|GS\s*[-–—]?\s*Paper)\b|<a\s+[^>]*href)/i;
-      const ctaMatch = cleaned.search(footerCtaRegex);
-      if (ctaMatch !== -1) {
-        cleaned = cleaned.substring(0, ctaMatch);
-      }
-
-      // Remove embedded section header line if present in promptPartRaw
-      cleaned = cleaned.replace(/(?:<(?:p|div|h\d)[^>]*>|^)\s*(?:<strong>|<b>|<span[^>]*>)?\s*SECTION\s*[-–—:]?\s*[A-Z][^<]*(?:<\/strong>|<\/b>|<\/span>)?(?:\s*<\/(?:p|div|h\d)>|$)\s*/gi, '');
-
-      // Remove leading question identifier prefix from start of prompt
-      cleaned = cleaned.replace(/<(?:p|div|li)[^>]*>\s*(?:<strong>|<b>|<span[^>]*>)?\s*Q?(\d+)(?:(?:\s*\.|\.)?\s*\(([a-zA-Z])\)|[\.:\)])\s*[\.:\)]?\s*(?:Case\s+Study\s*:?\s*)?/i, (match) => {
-        if (/case\s+study/i.test(match)) {
-          return '<p class="font-bold text-[#6C1D18] mb-1 flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-[#8C3A27]"></span><span>Case Study Scenario:</span></p><p>';
-        }
-        return '<p>';
-      });
-
-      // Strip word and marks instructions from prompt body (support 4-digit word limits and 3-digit marks)
-      cleaned = cleaned.replace(/\(?\s*(?:Answer in\s+)?\d{2,4}(?:\s*[-–—to]\s*\d{2,4})?\s*words?\)?\s*(?:\||,|-)?\s*(?:\d{1,3}\s*marks?)?/gi, '');
-      cleaned = cleaned.replace(/\(?\s*\d{1,3}\s*Marks\s*\)?/gi, '');
-      cleaned = cleaned.replace(/(?:[\(\[]\s*(?:10|15|20|25|30|125)\s*[\)\]])\s*(?=<\/p>|<\/div>|<br\s*\/?>|$)/gi, '');
-
-      // Clean empty spacing divs and empty paragraph tags
-      cleaned = cleaned.replace(/<div[^>]*style=["'][^"']*height[^"']*["'][^>]*>\s*<\/div>/gi, '');
-      cleaned = cleaned.replace(/<p[^>]*>\s*(?:&nbsp;|<br\s*\/?>|\s)*<\/p>/gi, '');
-
-      // Format sub-questions (a), (b), (c), (d), (e) cleanly with indentations if present
-      cleaned = cleaned.replace(/<p[^>]*>\s*(?:\((?:[a-eA-E])\)|\b[a-eA-E]\.)\s*([\s\S]*?)<\/p>/gi, (m) => {
-        return `<p class="pl-3 sm:pl-4 border-l-2 border-[#8C3A27]/30 py-0.5 my-1 text-[#221814] font-medium">${m.replace(/<\/?p[^>]*>/gi, '')}</p>`;
-      });
-
-      // Extract pure plain-text version for fallback and reading time
-      let plainText = cleaned
+    let promptResult;
+    if (isIndependentSub && parentIntro && isSubPartFirst) {
+      // First quotation card: show parent intro then quotation WITHOUT leaking (a) marker
+      let cText = promptPart
         .replace(/<[^>]*>/g, ' ')
         .replace(/\s+/g, ' ')
-        .replace(/\s+([\.\?\,!])/g, '$1')
-        .replace(/[\s\-_•|~]+$/, '')
+        .replace(/\(?\s*Answer\s+in[^\)]*\)?/gi, '')
+        .replace(/\|\s*\d+(?:\.\d+)?\s*Marks\b/gi, '')
+        .replace(/[\(\[]\s*\d+(?:\.\d+)?\s*Marks?\b\s*[\)\]]/gi, '')
+        .replace(/(?:Answer\s*:?\s*|SECTION\s*[-–—:]?\s*[A-Z][^\n]*)$/gi, '')
         .trim();
 
-      if (plainText && !/[\.\?\!"”’]$/.test(plainText)) {
-        plainText += '.';
-      }
+      cText = cText.replace(/^Q\s*\d+[\.\:\)]?\s*/i, '').trim();
+      if (parentIntro) cText = cText.replace(parentIntro, '').trim();
+      cText = stripLeadingSubMarker(cText, subLetter);
 
-      return {
-        promptHtml: cleaned.trim(),
-        text: plainText
+      const fullPromptText = `${parentIntro} ${cText}`;
+      const html = `<p class="font-sans text-stone-800 text-[17px] md:text-lg leading-relaxed font-normal mb-2">${parentIntro}</p>\n<p class="font-sans text-stone-800 text-[17px] md:text-lg leading-relaxed font-normal">${cText}</p>`;
+      promptResult = {
+        text: fullPromptText,
+        promptHtml: html,
+        hasClauses: true
       };
-    };
+    } else if (isIndependentSub) {
+      // Subsequent quotation card or sibling card: clean prompt without repeating parent intro AND without leaking sub-marker
+      let cText = promptPart
+        .replace(/<[^>]*>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .replace(/\(?\s*Answer\s+in[^\)]*\)?/gi, '')
+        .replace(/\|\s*\d+(?:\.\d+)?\s*Marks\b/gi, '')
+        .replace(/[\(\[]\s*\d+(?:\.\d+)?\s*Marks?\b\s*[\)\]]/gi, '')
+        .replace(/(?:Answer\s*:?\s*|SECTION\s*[-–—:]?\s*[A-Z][^\n]*)$/gi, '')
+        .trim();
 
-    const promptResult = cleanPrompt(promptPartRaw);
-    questionPrompt = promptResult.text;
-    promptHtml = promptResult.promptHtml;
+      if (parentIntro) cText = cText.replace(parentIntro, '').trim();
+      cText = cText.replace(/^Q\s*\d+[\.\:\)]?\s*/i, '').trim();
+      cText = stripLeadingSubMarker(cText, subLetter);
 
-    // Process model answer if present (Empty Answer Rule: hidden unless substantive content exists)
-    if (answerPartRaw) {
+      const fullPromptText = cText;
+      promptResult = {
+        text: fullPromptText,
+        promptHtml: `<p class="font-sans text-stone-800 text-[17px] md:text-lg leading-relaxed font-normal">${fullPromptText}</p>`,
+        hasClauses: false
+      };
+    } else {
+      promptResult = cleanAndFormatPrompt(promptPart, { subLetter });
+    }
+
+    let modelAnswer = null;
+    if (answerPart) {
       const footerCtaRegex = /(?:👉|📌|\b(?:Click\s+(?:the\s+)?(?:link\s+)?(?:below|here)|Download\s+(?:the\s+)?(?:complete\s+)?(?:Question\s+Paper|PDF)|General\s+Studies\s*[-–—]?\s*Paper|GS\s*[-–—]?\s*Paper)\b|<a\s+[^>]*href)/i;
-      const ctaMatch = answerPartRaw.search(footerCtaRegex);
+      let cleanAns = answerPart;
+      const ctaMatch = cleanAns.search(footerCtaRegex);
       if (ctaMatch !== -1) {
-        answerPartRaw = answerPartRaw.substring(0, ctaMatch);
+        cleanAns = cleanAns.substring(0, ctaMatch);
       }
-
-      const cleanAnswerText = answerPartRaw
+      const cleanAnswerText = cleanAns
         .replace(/<[^>]*>/g, '')
         .replace(/[\s\n\r\-•_]/g, '')
         .trim();
-
       const isPlaceholder = /^(?:comingsoon|tbd|tobereleased|tobeupdated|na|n\/a|modelanswerawaited|modelanswerwillbeupdatedsoon)$/i.test(cleanAnswerText);
-
       if (cleanAnswerText.length > 30 && !isPlaceholder) {
-        modelAnswer = formatAnswerContent(answerPartRaw);
+        modelAnswer = formatAnswerContent(cleanAns);
       }
     }
 
@@ -460,15 +762,15 @@ function parsePYQQuestions(rawHtml) {
       sectionHeader,
       sectionInstructions,
       index: index + 1,
-      text: questionPrompt,
-      promptHtml,
+      text: promptResult.text,
+      promptHtml: promptResult.promptHtml,
       modelAnswer,
       marks,
       words
     };
   };
 
-  const parsed = rawQuestionChunks.map(parseChunk);
+  const parsed = rawQuestionItems.map(parseItem);
   return { questions: parsed, downloadLink };
 }
 
@@ -1819,15 +2121,15 @@ export default function ResourceDetailPage({ slug: propSlug, folder, year, stage
                           </div>
                         </div>
 
-                        {/* Question Prompt Body - Multi-paragraph & Case Study scenario support */}
+                        {/* Question Prompt Body - Standard Single Paragraph or Sub-Clause Segregated List */}
                         {q.promptHtml ? (
                           <div 
-                            className="doc-article-content text-[#1C1613] font-serif text-base sm:text-lg leading-relaxed pt-1 select-text space-y-3 [&_p]:mb-3 [&_p]:leading-relaxed [&_strong]:font-bold [&_strong]:text-[#140C08]"
+                            className="font-sans text-stone-800 select-text space-y-1.5 pt-1"
                             dangerouslySetInnerHTML={{ __html: q.promptHtml }}
                             onClick={handleContentClick}
                           />
                         ) : (
-                          <p className="text-[#1C1613] font-serif text-base sm:text-lg leading-relaxed pt-1 select-text">
+                          <p className="font-sans text-stone-800 text-[17px] md:text-lg leading-relaxed font-normal pt-1 select-text">
                             {q.text}
                           </p>
                         )}
