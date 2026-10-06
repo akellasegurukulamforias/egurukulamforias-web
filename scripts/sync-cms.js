@@ -7,6 +7,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { sortCurrentAffairsByDate } from '../src/utils/dateUtils.js';
+import { generateSitemap } from './generate-sitemap.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -284,6 +285,10 @@ async function main() {
     fs.writeFileSync(resourcePath, JSON.stringify(res, null, 2), 'utf8');
   }
   console.log(`[sync-cms] Generated: public/data/resources/[slug].json (${sortedResources.length} detail files, Full_Content retained)`);
+
+  // 6. Generate static public/sitemap.xml reusing the freshly synced CMS data
+  const sitemapResult = generateSitemap({ currentAffairs: sortedAffairs, resources: sortedResources });
+  console.log(`[sync-cms] Generated: public/sitemap.xml (${sitemapResult.totalUrls} URLs)`);
 
   console.log('\n=== Sync Complete ===');
   console.log(`Active Current Affairs: ${sortedAffairs.length}`);

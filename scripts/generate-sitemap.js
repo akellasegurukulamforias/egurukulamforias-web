@@ -1,6 +1,6 @@
 // scripts/generate-sitemap.js
-// Automated Dynamic Sitemap Generator for e-Gurukulam for IAS
-// Fetches published Current Affairs from CMS and combines with core static routes.
+// Automated Static XML Sitemap Generator for e-Gurukulam for IAS
+// Generates public/sitemap.xml from the static CMS dataset without any runtime fetches.
 
 import fs from 'fs';
 import path from 'path';
@@ -10,12 +10,21 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const BASE_URL = 'https://egurukulamforias.com';
-const CMS_API_ENDPOINT = 'https://script.google.com/macros/s/AKfycbyOt8dZ7S9ot1Zy3GyyXgsDTPsrF016odbaXhf9DXXPMllvQzmQvKabubXZFzRra51x/exec';
-// NOTE: Production sitemaps are served dynamically on Vercel via api/sitemap.xml.
-// Never write sitemap.xml to public/ or dist/, because static files shadow Vercel serverless rewrites.
-const PREVIEW_OUTPUT_PATH = path.resolve(__dirname, 'sitemap-preview.xml');
+const OUTPUT_PATH = path.resolve(__dirname, '../public/sitemap.xml');
 
-// Helper to get today's date in YYYY-MM-DD format
+// Core static routes with priorities and change frequencies
+export const STATIC_ROUTES = [
+  { path: '/', priority: '1.0', changefreq: 'daily' },
+  { path: '/current-affairs', priority: '0.9', changefreq: 'daily' },
+  { path: '/programs', priority: '0.8', changefreq: 'weekly' },
+  { path: '/test-series', priority: '0.8', changefreq: 'weekly' },
+  { path: '/about', priority: '0.8', changefreq: 'weekly' },
+  { path: '/contact', priority: '0.8', changefreq: 'weekly' },
+  { path: '/resources', priority: '0.8', changefreq: 'weekly' },
+  { path: '/resources/upsc-syllabus', priority: '0.8', changefreq: 'daily' },
+  { path: '/resources/pyqs', priority: '0.8', changefreq: 'daily' }
+];
+
 function getTodayYMD() {
   const now = new Date();
   const y = now.getFullYear();
@@ -24,24 +33,18 @@ function getTodayYMD() {
   return `${y}-${m}-${d}`;
 }
 
-// Convert various date formats (DD/MM/YYYY, DD-MM-YYYY, YYYY-MM-DD, textual, numeric) into YYYY-MM-DD
 function formatToYMD(dateVal) {
   if (!dateVal) return getTodayYMD();
 
   if (typeof dateVal === 'number' && !isNaN(dateVal)) {
     const parsed = new Date(dateVal);
     if (!isNaN(parsed.getTime())) {
-      const y = parsed.getFullYear();
-      const m = String(parsed.getMonth() + 1).padStart(2, '0');
-      const d = String(parsed.getDate()).padStart(2, '0');
-      return `${y}-${m}-${d}`;
+      return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`;
     }
   }
 
   if (typeof dateVal === 'string') {
     const trimmed = dateVal.trim();
-
-    // 1. Match DD/MM/YYYY, DD-MM-YYYY, or DD.MM.YYYY (e.g. 03/09/2026)
     const dmyMatch = trimmed.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})/);
     if (dmyMatch) {
       const day = String(dmyMatch[1]).padStart(2, '0');
@@ -49,8 +52,6 @@ function formatToYMD(dateVal) {
       const year = dmyMatch[3];
       return `${year}-${month}-${day}`;
     }
-
-    // 2. Match YYYY-MM-DD or YYYY/MM/DD (e.g. 2026-09-03)
     const ymdMatch = trimmed.match(/^(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})/);
     if (ymdMatch) {
       const year = ymdMatch[1];
@@ -58,8 +59,6 @@ function formatToYMD(dateVal) {
       const day = String(ymdMatch[3]).padStart(2, '0');
       return `${year}-${month}-${day}`;
     }
-
-    // 3. Match textual dates (e.g. "13 Aug 2026")
     const parsed = new Date(trimmed);
     if (!isNaN(parsed.getTime())) {
       const y = parsed.getFullYear();
@@ -79,7 +78,6 @@ function formatToYMD(dateVal) {
   return getTodayYMD();
 }
 
-// URL-safe slug creation matching frontend CurrentAffairsReader.jsx
 function createSlug(text) {
   if (!text) return '';
   return text
@@ -89,7 +87,6 @@ function createSlug(text) {
     .replace(/\s+/g, '-');
 }
 
-// XML entity escaping
 function escapeXml(unsafe) {
   return String(unsafe || '')
     .replace(/&/g, '&amp;')
@@ -99,7 +96,6 @@ function escapeXml(unsafe) {
     .replace(/'/g, '&apos;');
 }
 
-// Helper to check active status
 function isItemActive(obj) {
   if (!obj || typeof obj !== 'object') return false;
   if (obj.Active === false || obj.active === false || obj.Is_Active === false || obj.is_active === false) return false;
@@ -108,99 +104,57 @@ function isItemActive(obj) {
   return true;
 }
 
-// Core static routes with priorities and change frequencies
-const STATIC_ROUTES = [
-  {
-    path: '/',
-    priority: '1.0',
-    changefreq: 'daily',
-    lastmod: getTodayYMD()
-  },
-  {
-    path: '/current-affairs',
-    priority: '0.9',
-    changefreq: 'daily',
-    lastmod: getTodayYMD()
-  },
-  {
-    path: '/programs',
-    priority: '0.8',
-    changefreq: 'weekly',
-    lastmod: getTodayYMD()
-  },
-  {
-    path: '/test-series',
-    priority: '0.8',
-    changefreq: 'weekly',
-    lastmod: getTodayYMD()
-  },
-  {
-    path: '/about',
-    priority: '0.8',
-    changefreq: 'weekly',
-    lastmod: getTodayYMD()
-  },
-  {
-    path: '/contact',
-    priority: '0.8',
-    changefreq: 'weekly',
-    lastmod: getTodayYMD()
-  },
-  {
-    path: '/resources',
-    priority: '0.8',
-    changefreq: 'weekly',
-    lastmod: getTodayYMD()
-  },
-  {
-    path: '/resources/upsc-syllabus',
-    priority: '0.8',
-    changefreq: 'daily',
-    lastmod: getTodayYMD()
-  },
-  {
-    path: '/resources/pyqs',
-    priority: '0.8',
-    changefreq: 'daily',
-    lastmod: getTodayYMD()
-  }
-];
+/**
+ * Generates the static public/sitemap.xml file reusing local synced CMS data.
+ * @param {Object} options
+ * @param {Array} [options.currentAffairs] Optional array of active current affairs articles.
+ * @param {Array} [options.resources] Optional array of active resources.
+ * @param {string} [options.outputPath] Optional target path (defaults to public/sitemap.xml).
+ */
+export function generateSitemap(options = {}) {
+  const {
+    outputPath = OUTPUT_PATH
+  } = options;
 
-async function fetchCMSArticlesAndResources() {
-  try {
-    console.log('[Sitemap] Fetching active current affairs and resources from Google Apps Script CMS...');
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 30000);
+  let currentAffairs = options.currentAffairs;
+  let resources = options.resources;
 
-    const response = await fetch(CMS_API_ENDPOINT, {
-      method: 'GET',
-      headers: { 'Accept': 'application/json' },
-      signal: controller.signal
-    });
-    clearTimeout(timeout);
-
-    if (!response.ok) {
-      throw new Error(`HTTP status ${response.status}`);
+  // If not provided in memory, read from local synced files
+  if (!Array.isArray(currentAffairs)) {
+    const caPath = path.resolve(__dirname, '../public/data/ca-meta.json');
+    if (fs.existsSync(caPath)) {
+      try {
+        currentAffairs = JSON.parse(fs.readFileSync(caPath, 'utf8'));
+      } catch (e) {
+        console.warn('[generate-sitemap] Failed to read ca-meta.json:', e.message);
+        currentAffairs = [];
+      }
+    } else {
+      currentAffairs = [];
     }
-
-    const data = await response.json();
-    const rawAffairs = Array.isArray(data.currentAffairs) ? data.currentAffairs : [];
-    const rawResources = Array.isArray(data.resources) ? data.resources : [];
-
-    const activeAffairs = rawAffairs.filter(isItemActive);
-    const activeResources = rawResources.filter(isItemActive);
-
-    console.log(`[Sitemap] Fetched ${activeAffairs.length} active current affairs and ${activeResources.length} active resources from live CMS.`);
-    return { currentAffairs: activeAffairs, resources: activeResources };
-  } catch (err) {
-    console.warn(`[Sitemap] Warning: Could not fetch from live CMS endpoint (${err.message}).`);
-    return { currentAffairs: [], resources: [] };
   }
-}
 
-async function generateSitemap() {
+  if (!Array.isArray(resources)) {
+    const resPath = path.resolve(__dirname, '../public/data/resources-meta.json');
+    if (fs.existsSync(resPath)) {
+      try {
+        resources = JSON.parse(fs.readFileSync(resPath, 'utf8'));
+      } catch (e) {
+        console.warn('[generate-sitemap] Failed to read resources-meta.json:', e.message);
+        resources = [];
+      }
+    } else {
+      resources = [];
+    }
+  }
+
+  const todayYMD = getTodayYMD();
   const seenUrls = new Set();
   const urlEntries = [];
+
+  let staticCount = 0;
+  let articleCount = 0;
+  let resourceCount = 0;
 
   // 1. Process Core Static Routes
   for (const route of STATIC_ROUTES) {
@@ -209,20 +163,17 @@ async function generateSitemap() {
       seenUrls.add(fullUrl);
       urlEntries.push({
         loc: fullUrl,
-        lastmod: route.lastmod,
+        lastmod: todayYMD,
         changefreq: route.changefreq,
         priority: route.priority
       });
+      staticCount++;
     }
   }
 
-  // 2. Fetch and Append Dynamic Current Affairs Articles & Resources
-  const { currentAffairs, resources } = await fetchCMSArticlesAndResources();
-  let articleCount = 0;
-  let resourceCount = 0;
-
-  // Append Current Affairs
-  for (const art of currentAffairs) {
+  // 2. Process Dynamic Current Affairs
+  const activeAffairs = currentAffairs.filter(isItemActive);
+  for (const art of activeAffairs) {
     const title = art.Title || art.title || '';
     const rawSlug = art.slug || art.Slug || createSlug(title);
     if (!rawSlug) continue;
@@ -237,7 +188,7 @@ async function generateSitemap() {
 
       urlEntries.push({
         loc: fullUrl,
-        lastmod: lastmod,
+        lastmod,
         changefreq: 'daily',
         priority: '0.9'
       });
@@ -245,29 +196,29 @@ async function generateSitemap() {
     }
   }
 
-  // Append Resources
-  for (const res of resources) {
-    const title = res.Title || res.title || '';
-    const rawSlug = res.slug || res.Slug || createSlug(title);
+  // 3. Process Dynamic Resources & Syllabus
+  const activeResources = resources.filter(isItemActive);
+  for (const resItem of activeResources) {
+    const title = resItem.Title || resItem.title || '';
+    const rawSlug = resItem.slug || resItem.Slug || createSlug(title);
     if (!rawSlug) continue;
 
     const slug = encodeURIComponent(String(rawSlug).trim().toLowerCase());
     const isPYQ = 
       /previous\s*year\s*questions?|pyqs?|past\s*years?\s*papers?|question\s*paper/i.test(title) || 
-      /previous\s*year\s*questions?|pyqs?|past\s*years?\s*papers?|question\s*paper/i.test(res.Category || res.category || '') || 
-      /previous\s*year\s*questions?|pyqs?|past\s*years?\s*papers?|question\s*paper/i.test(res.Subcategory || res.subcategory || '');
+      /previous\s*year\s*questions?|pyqs?|past\s*years?\s*papers?|question\s*paper/i.test(resItem.Category || resItem.category || '') || 
+      /previous\s*year\s*questions?|pyqs?|past\s*years?\s*papers?|question\s*paper/i.test(resItem.Subcategory || resItem.subcategory || '');
 
     const isSyllabus = 
       /syllabus/i.test(title) || 
-      /syllabus/i.test(res.Category || res.category || '') || 
-      /syllabus/i.test(res.Subcategory || res.subcategory || '');
+      /syllabus/i.test(resItem.Category || resItem.category || '') || 
+      /syllabus/i.test(resItem.Subcategory || resItem.subcategory || '');
 
     let fullUrl = '';
     if (isPYQ) {
-      // Robust year detection matching cmsService.extractPYQYear
       let year = '';
-      if (res.Year || res.year) {
-        const yr = String(res.Year || res.year).trim();
+      if (resItem.Year || resItem.year) {
+        const yr = String(resItem.Year || resItem.year).trim();
         if (/^\d{4}$/.test(yr)) year = yr;
       }
       if (!year) {
@@ -275,20 +226,20 @@ async function generateSitemap() {
         if (titleMatch) year = titleMatch[1];
       }
       if (!year) {
-        const catMatch = String(res.Category || res.category || '').match(/\b(19\d{2}|20\d{2})\b/);
+        const catMatch = String(resItem.Category || resItem.category || '').match(/\b(19\d{2}|20\d{2})\b/);
         if (catMatch) year = catMatch[1];
       }
       if (!year) {
-        const content = String(res.Full_Content || res.full_content || res.Content || res.content || '').slice(0, 400);
+        const content = String(resItem.Full_Content || resItem.full_content || resItem.Content || resItem.content || '').slice(0, 400);
         const contentMatch = content.match(/\b(19\d{2}|20\d{2})\b/);
         if (contentMatch) year = contentMatch[1];
       }
       if (!year) {
-        const dateMatch = String(res.Date || res.date || '').match(/\b(19\d{2}|20\d{2})\b/);
+        const dateMatch = String(resItem.Date || resItem.date || '').match(/\b(19\d{2}|20\d{2})\b/);
         if (dateMatch) year = dateMatch[1];
       }
 
-      const combined = `${title} ${res.Category || ''} ${res.Subcategory || ''} ${res.Tags || ''}`;
+      const combined = `${title} ${resItem.Category || ''} ${resItem.Subcategory || ''} ${resItem.Tags || ''}`;
       let stage = 'mains';
       if (/prelims|preliminary/i.test(combined) || /csat/i.test(combined)) {
         stage = 'prelims';
@@ -300,7 +251,7 @@ async function generateSitemap() {
           seenUrls.add(yearUrl);
           urlEntries.push({
             loc: yearUrl,
-            lastmod: getTodayYMD(),
+            lastmod: todayYMD,
             changefreq: 'daily',
             priority: '0.8'
           });
@@ -311,7 +262,7 @@ async function generateSitemap() {
           seenUrls.add(stageUrl);
           urlEntries.push({
             loc: stageUrl,
-            lastmod: getTodayYMD(),
+            lastmod: todayYMD,
             changefreq: 'daily',
             priority: '0.8'
           });
@@ -323,7 +274,7 @@ async function generateSitemap() {
             seenUrls.add(gsUrl);
             urlEntries.push({
               loc: gsUrl,
-              lastmod: getTodayYMD(),
+              lastmod: todayYMD,
               changefreq: 'daily',
               priority: '0.8'
             });
@@ -342,12 +293,12 @@ async function generateSitemap() {
 
     if (!seenUrls.has(fullUrl)) {
       seenUrls.add(fullUrl);
-      const rawDate = res.Date || res.date || res.Published_Date || res.published_date;
+      const rawDate = resItem.Date || resItem.date || resItem.Published_Date || resItem.published_date;
       const lastmod = formatToYMD(rawDate);
 
       urlEntries.push({
         loc: fullUrl,
-        lastmod: lastmod,
+        lastmod,
         changefreq: 'daily',
         priority: '0.8'
       });
@@ -355,31 +306,47 @@ async function generateSitemap() {
     }
   }
 
-  // 3. Assemble Standard XML
+  // 4. Construct Compliant XML
   const xmlContent = [
     '<?xml version="1.0" encoding="UTF-8"?>',
     '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
-    ...urlEntries.map(entry => {
-      return [
-        '  <url>',
-        `    <loc>${escapeXml(entry.loc)}</loc>`,
-        `    <lastmod>${escapeXml(entry.lastmod)}</lastmod>`,
-        `    <changefreq>${escapeXml(entry.changefreq)}</changefreq>`,
-        `    <priority>${escapeXml(entry.priority)}</priority>`,
-        '  </url>'
-      ].join('\n');
-    }),
+    ...urlEntries.map(entry => [
+      '  <url>',
+      `    <loc>${escapeXml(entry.loc)}</loc>`,
+      `    <lastmod>${escapeXml(entry.lastmod)}</lastmod>`,
+      `    <changefreq>${escapeXml(entry.changefreq)}</changefreq>`,
+      `    <priority>${escapeXml(entry.priority)}</priority>`,
+      '  </url>'
+    ].join('\n')),
     '</urlset>',
     ''
   ].join('\n');
 
-  // 4. Save preview XML to scripts/sitemap-preview.xml (do NOT write to public/ or dist/)
-  fs.writeFileSync(PREVIEW_OUTPUT_PATH, xmlContent, 'utf8');
-  console.log(`[Sitemap Preview] Generated sitemap preview with ${urlEntries.length} total URLs (${STATIC_ROUTES.length} static + ${articleCount} current affairs + ${resourceCount} resources).`);
-  console.log(`[Sitemap Preview] Output saved to: ${PREVIEW_OUTPUT_PATH}`);
+  // Ensure output directory exists and write static sitemap file
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  fs.writeFileSync(outputPath, xmlContent, 'utf8');
+  console.log(`[generate-sitemap] Generated static ${path.relative(path.resolve(__dirname, '..'), outputPath)} with ${urlEntries.length} total URLs (${staticCount} static + ${articleCount} current affairs + ${resourceCount} resources + ${urlEntries.length - staticCount - articleCount - resourceCount} index archives).`);
+
+  return {
+    totalUrls: urlEntries.length,
+    staticCount,
+    articleCount,
+    resourceCount,
+    outputPath
+  };
 }
 
-generateSitemap().catch(err => {
-  console.error('[Sitemap] Critical error generating sitemap:', err);
-  process.exit(1);
-});
+// Auto-run when executed directly via CLI (e.g. `node scripts/generate-sitemap.js`)
+const isDirectExecution = process.argv[1] && (
+  process.argv[1].endsWith('generate-sitemap.js') || 
+  process.argv[1].endsWith('generate-sitemap')
+);
+
+if (isDirectExecution) {
+  try {
+    generateSitemap();
+  } catch (err) {
+    console.error('[generate-sitemap] Critical error generating sitemap:', err);
+    process.exit(1);
+  }
+}
