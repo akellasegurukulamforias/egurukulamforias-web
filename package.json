@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "prebuild": "node scripts/generate-favicons.js && node scripts/sync-cms.js",
-    "build": "node scripts/sync-courses.cjs && node scripts/sync-free-tests.cjs && node scripts/generate-sitemap.js && vite build && node scripts/prepare-template.js",
+    "build": "node scripts/sync-courses.cjs && node scripts/sync-free-tests.cjs && node scripts/generate-sitemap.js && vite build && node scripts/generate-routes-html.js && node scripts/prepare-template.js",
     "preview": "vite preview",
     "favicons": "node scripts/generate-favicons.js",
     "sitemap": "node scripts/generate-sitemap.js",
