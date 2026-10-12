@@ -1,8 +1,58 @@
 [
   {
+    "Date": "11/10/2026",
+    "Title": "El Niño’s Uneven Impact: Why Tamil Nadu’s Monsoon Tells a Different Story",
+    "Category": "GS Paper I – Geography\r\nGS Paper III – Environment, Science & Technology, Disaster Management\r",
+    "Banner_Image": "https://drive.google.com/thumbnail?id=1RR3AhnUBFBWSl5O0HJ2yuLVl1vJggQWA&sz=w1200",
+    "Short_Summary": "Explore why El Niño can weaken India’s southwest monsoon while favouring a different rainfall response in Tamil Nadu during the northeast monsoon.  \r\nUnderstand how ocean warming, coastal currents and atmospheric circulation shape rainfall and flood risks—and why continuous monitoring matters.",
+    "Active": true,
+    "slug": "el-ni-o-s-uneven-impact-why-tamil-nadu-s-monsoon-tells-a-different-story",
+    "Slug": "el-ni-o-s-uneven-impact-why-tamil-nadu-s-monsoon-tells-a-different-story"
+  },
+  {
+    "Date": "10/10/2026",
+    "Title": "Women on the Move: India’s Gender Mobility Gap",
+    "Category": "GS Paper I – Society\r\nGS Paper II - Governance and Social Justice\r\nGS Paper III - Economy and Infrastructure\r",
+    "Banner_Image": "https://drive.google.com/thumbnail?id=1yGJfSlqPOHlWENoxDjk2VUnSHTl_oBZ0&sz=w1200",
+    "Short_Summary": "India’s Household Travel Survey reveals gender gaps in work commutes, transport choices and travel costs across rural and urban areas.  \r\nThe article examines how affordability, safety and connectivity shape women’s mobility and access to employment.",
+    "Active": true,
+    "slug": "women-on-the-move-india-s-gender-mobility-gap",
+    "Slug": "women-on-the-move-india-s-gender-mobility-gap"
+  },
+  {
+    "Date": "09/10/2026",
+    "Title": "CAFE-III Norms 2027–2032: New Fuel Efficiency Rules for Cars, EV Benefits, Emission Targets & Impact on Automakers",
+    "Category": "GS III - Environment and Science and Technology",
+    "Banner_Image": "https://drive.google.com/thumbnail?id=1At7tu3wjj92JSzwZKyxoiHVVOQSz0huF&sz=w1200",
+    "Short_Summary": "CAFE-III norms introduce stricter fuel-efficiency targets, revised weight-based standards, EV and hybrid incentives, tradable credits, and compliance mechanisms to reduce emissions.",
+    "Active": true,
+    "slug": "cafe-iii-norms-2027-2032-new-fuel-efficiency-rules-for-cars-ev-benefits-emission-targets-impact-on-automakers",
+    "Slug": "cafe-iii-norms-2027-2032-new-fuel-efficiency-rules-for-cars-ev-benefits-emission-targets-impact-on-automakers"
+  },
+  {
+    "Date": "08/10/2026",
+    "Title": "Leprosy’s Silent Resurgence: India’s Hidden Health Challenge",
+    "Category": "GS Paper I – Society\r\nGS Paper II – Governance, Social Justice & Health\r\nGS Paper III – Science & Technology\r",
+    "Banner_Image": "https://drive.google.com/thumbnail?id=1G77rYy4FWyYGnCZNIOVpgwbPyA9fJ9lt&sz=w1200",
+    "Short_Summary": "India’s leprosy elimination milestone masks persistent disease burdens, undetected cases and healthcare gaps, particularly in Chhattisgarh.  \r\nThe article highlights the need for early diagnosis, effective treatment and a rights-based approach that addresses stigma and protects dignity.",
+    "Active": true,
+    "slug": "leprosy-s-silent-resurgence-india-s-hidden-health-challenge",
+    "Slug": "leprosy-s-silent-resurgence-india-s-hidden-health-challenge"
+  },
+  {
+    "Date": "07/10/2026",
+    "Title": "Waste to Wealth: Turning Waste into Value",
+    "Category": "GS Paper II – Governance\r\nGS Paper III – Economy, Environment, Agriculture\r",
+    "Banner_Image": "https://drive.google.com/thumbnail?id=1LDRERVlOxJ_mdKGf5McEIsaUiiUxrt2r&sz=w1200",
+    "Short_Summary": "The article explores how waste can be transformed into valuable resources through composting, recycling, reuse and innovative waste-to-wealth initiatives.\r\nIt highlights the circular economy, sustainable livelihoods and community participation in building cleaner, resource-efficient and environmentally sustainable communities.\r\n",
+    "Active": true,
+    "slug": "waste-to-wealth-turning-waste-into-value",
+    "Slug": "waste-to-wealth-turning-waste-into-value"
+  },
+  {
     "Date": "06/10/2026",
     "Title": "India’s Health Transition: Rising Life Expectancy, Persistent Health Gaps and the NCD Burden",
-    "Category": "GS Paper I – Society, Geography\r\nGS Paper II – Social Justice, Governance\r\nGS Paper III – Economy, Science & Technology\r",
+    "Category": "GS Paper I – Society, Geography\nGS Paper II – Social Justice, Governance\nGS Paper III – Economy, Science & Technology\n",
     "Banner_Image": "https://drive.google.com/thumbnail?id=1xkPZVzSaUuoFGKDvKq_uvG4fm234j8BV&sz=w1200",
     "Short_Summary": "India’s health profile is undergoing a major transition, marked by rising life expectancy, persistent regional health inequalities and a growing burden of non-communicable diseases. The article examines changes in life expectancy, HALE, disease patterns and India’s evolving public-health challenges.\r",
     "Active": true,
