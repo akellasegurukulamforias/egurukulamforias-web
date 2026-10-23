@@ -294,8 +294,10 @@ function cleanDocHtml(rawHtml) {
       const isBoldTitle = unbolded.length === 0 && plain.length > 2 && plain.length < 100 && !plain.endsWith('.');
 
       if (isNumberedTitle || isBoldTitle) {
-        // Wrap entire line in <h2> without inner tags to guarantee unified maroon styling
-        return `<h2>${plain}</h2>`;
+        // Strip <strong> / <b> inside newly promoted <h2> to guarantee unified font-serif and maroon styling,
+        // while strictly preserving valid inline HTML, anchor tags (<a href="...">), and styling attributes.
+        const cleanHeading = inner.replace(/<\/?(?:b|strong)[^>]*>/gi, '').trim();
+        return `<h2>${cleanHeading}</h2>`;
       }
 
       return match;

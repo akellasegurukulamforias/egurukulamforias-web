@@ -1,39 +1,18 @@
 {
   "activePopup": {
-    "Headline": "APPSC Group 1 Mains Paper III - Law",
+    "Headline": "APPSC Group 1 Mains Paper III - Constitution",
     "Link": "",
     "Active": true,
-    "Date": "19/09/2026",
-    "Poster_Image_Link": "https://drive.google.com/thumbnail?id=1bwBLiEMc7mrWVsNV8py5g-tCPFHSGEfp&sz=w1200"
+    "Date": "23/10/2026",
+    "Poster_Image_Link": "https://drive.google.com/thumbnail?id=17u6xiJ6_-Qv3PGKmwGAjcqedarptr84z&sz=w1200"
   },
   "liveTicker": [
-    {
-      "Headline": "IAS One Year Course with Installments",
-      "Link": "",
-      "Active": true,
-      "Date": "19/09/2026",
-      "Poster_Image_Link": "https://drive.google.com/thumbnail?id=1HNYxTWLeQuU7RtcB4qpYea4VFhggh8KN&sz=w1200"
-    },
-    {
-      "Headline": "APPSC Group 1 Mains Paper III - Ethics",
-      "Link": "",
-      "Active": true,
-      "Date": "19/09/2026",
-      "Poster_Image_Link": "https://drive.google.com/thumbnail?id=1BlPdwEngTEMCa3jth_fVpQXM0tK97G2R&sz=w1200"
-    },
     {
       "Headline": "APPSC Group 1 Mains Paper III - Constitution",
       "Link": "",
       "Active": true,
-      "Date": "19/09/2026",
-      "Poster_Image_Link": "https://drive.google.com/thumbnail?id=1bwBLiEMc7mrWVsNV8py5g-tCPFHSGEfp&sz=w1200"
-    },
-    {
-      "Headline": "APPSC Group 1 Mains Paper III - Law",
-      "Link": "",
-      "Active": true,
-      "Date": "19/09/2026",
-      "Poster_Image_Link": "https://drive.google.com/thumbnail?id=1bwBLiEMc7mrWVsNV8py5g-tCPFHSGEfp&sz=w1200"
+      "Date": "23/10/2026",
+      "Poster_Image_Link": "https://drive.google.com/thumbnail?id=17u6xiJ6_-Qv3PGKmwGAjcqedarptr84z&sz=w1200"
     }
   ],
   "socialPlatforms": [
@@ -175,5 +154,5 @@
     }
   ],
   "testSeries": [],
-  "syncedAt": "2026-10-12T06:52:37.364Z"
+  "syncedAt": "2026-10-23T07:24:53.629Z"
 }

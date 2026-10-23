@@ -1,5 +1,95 @@
 [
   {
+    "Date": "23/10/2026",
+    "Title": "Solar Surge, Grid Squeeze",
+    "Category": "GS Paper II – Policies and Regulatory Framework\r\nGS Paper III – Environment and Climate Change, Energy Infrastructure, Economy and Electricity Markets\r",
+    "Banner_Image": "https://drive.google.com/thumbnail?id=14yM-_Cm2hC8K6nFPnKMumUn45VvcoC2A&sz=w1200",
+    "Short_Summary": "Understand how India’s rapid solar and renewable energy expansion is straining transmission infrastructure and energy storage systems.\nExplore solutions such as grid modernisation, battery storage and electricity market reforms to ensure reliable, affordable clean power.",
+    "Active": true,
+    "slug": "solar-surge-grid-squeeze",
+    "Slug": "solar-surge-grid-squeeze"
+  },
+  {
+    "Date": "22/10/2026",
+    "Title": "Satellite Broadband: Markets, Security and Space Sustainability",
+    "Category": "GS Paper III: Science and Technology; Internal Security.\r\nGS Paper II: Governance.\r",
+    "Banner_Image": "https://drive.google.com/thumbnail?id=1mLIOoZaPByp4f8p8cmfx_G9WrdPQgLYb&sz=w1200",
+    "Short_Summary": "Explore how satellite broadband is reshaping digital markets while raising challenges of national security and regulatory oversight.  \r\nUnderstand the need to balance affordable connectivity and fair competition with responsible satellite deployment and space sustainability.",
+    "Active": true,
+    "slug": "satellite-broadband-markets-security-and-space-sustainability",
+    "Slug": "satellite-broadband-markets-security-and-space-sustainability"
+  },
+  {
+    "Date": "21/10/2026",
+    "Title": "Satellite Broadband: India’s Digital Frontier",
+    "Category": "GS Paper III: Science and Technology; Internal Security.\r\nGS Paper II: Governance.\r",
+    "Banner_Image": "https://drive.google.com/thumbnail?id=1XhQkzKSujsa6EfEArDa0Q5R7qhKOWf6S&sz=w1200",
+    "Short_Summary": "Explore how satellite broadband can connect remote communities and bridge India’s digital divide.  \r\nUnderstand the affordability, competition and security challenges shaping India’s digital frontier.",
+    "Active": true,
+    "slug": "satellite-broadband-india-s-digital-frontier",
+    "Slug": "satellite-broadband-india-s-digital-frontier"
+  },
+  {
+    "Date": "17/10/2026",
+    "Title": "Jammu and Kashmir’s Statehood Debate: Autonomy, Federalism and Legislative Powers",
+    "Category": "GS Paper II – Polity and Governance\n",
+    "Banner_Image": "https://drive.google.com/thumbnail?id=1PXNI7bBn5xRQeVIZDI3p-HCIa0kUzESt&sz=w1200",
+    "Short_Summary": "Explore Jammu and Kashmir’s statehood demand and its links to autonomy, federalism and constitutional safeguards.\r\nUnderstand the roles of Parliament, the Assembly and the bureaucracy in shaping the debate.",
+    "Active": true,
+    "slug": "jammu-and-kashmir-s-statehood-debate-autonomy-federalism-and-legislative-powers",
+    "Slug": "jammu-and-kashmir-s-statehood-debate-autonomy-federalism-and-legislative-powers"
+  },
+  {
+    "Date": "16/10/2026",
+    "Title": "GOBARdhan: Linking Crop Residue Management with India’s Energy Security",
+    "Category": "GS Paper II: Government policies and implementation; development processes.\r\n GS Paper III: Agriculture, energy security, infrastructure, environmental pollution and biotechnology.\r",
+    "Banner_Image": "https://drive.google.com/thumbnail?id=1wBNjDwzoKJx_eY1VvjH2Q_igK8YbRMih&sz=w1200",
+    "Short_Summary": "GOBARdhan turns agricultural residues and organic waste into compressed biogas, supporting cleaner energy, rural livelihoods and India’s energy security.  \r\nIts success depends on reliable feedstock supply, efficient collection networks and remunerative returns for farmers.",
+    "Active": true,
+    "slug": "gobardhan-linking-crop-residue-management-with-india-s-energy-security",
+    "Slug": "gobardhan-linking-crop-residue-management-with-india-s-energy-security"
+  },
+  {
+    "Date": "15/10/2026",
+    "Title": "Snakebite in India: Common Krait, Rural Vulnerability and Public Health",
+    "Category": "GS Paper II: Public health, healthcare accessibility and vulnerable sections.\r\nGS Paper III: Biodiversity, human–wildlife interactions and science and technology.\r",
+    "Banner_Image": "https://drive.google.com/thumbnail?id=1rgOHs55KYbzHSyjnPctRj6XwbwX7H7Xb&sz=w1200",
+    "Short_Summary": "Common krait bites highlight how sleeping conditions, rural exposure and delayed treatment contribute to India’s snakebite burden.  \r\nCommunity awareness, safer homes and timely access to appropriate healthcare are essential to prevent deaths and disabilities.",
+    "Active": true,
+    "slug": "snakebite-in-india-common-krait-rural-vulnerability-and-public-health",
+    "Slug": "snakebite-in-india-common-krait-rural-vulnerability-and-public-health"
+  },
+  {
+    "Date": "14/10/2026",
+    "Title": "India on the Fast Track: Bridges to High-Speed Rail",
+    "Category": "GS Paper I – Geography\r\nGS Paper II – Governance\r\nGS Paper III – Economy, Infrastructure and Environment\r",
+    "Banner_Image": "https://drive.google.com/thumbnail?id=1WFL3ssXiqhS5Ll4DHtBYqibMqeVgIQQg&sz=w1200",
+    "Short_Summary": "Explore how bridges, expressways and high-speed rail are transforming India’s connectivity and reducing travel time.  \r\nUnderstand their role in logistics efficiency, regional development and economic growth through a UPSC lens.",
+    "Active": true,
+    "slug": "india-on-the-fast-track-bridges-to-high-speed-rail",
+    "Slug": "india-on-the-fast-track-bridges-to-high-speed-rail"
+  },
+  {
+    "Date": "13/10/2026",
+    "Title": "Nobel Prize in Literature: Ancient Voices, Modern Words",
+    "Category": "GS Paper I – Indian Heritage and Culture\r\nEssay\r",
+    "Banner_Image": "https://drive.google.com/thumbnail?id=1LGvO4gjHmnqoGzyXHePNjgwpEeeLJ-i2&sz=w1200",
+    "Short_Summary": "Explore Anne Carson’s fusion of classical literature, translation and modern literary experimentation.  \r\nUnderstand the Literature Nobel’s background, Tagore’s legacy and how literary ideas travel across cultures.",
+    "Active": true,
+    "slug": "nobel-prize-in-literature-ancient-voices-modern-words",
+    "Slug": "nobel-prize-in-literature-ancient-voices-modern-words"
+  },
+  {
+    "Date": "12/10/2026",
+    "Title": "Nobel Insights: From Global Justice to Cosmic Mysteries",
+    "Category": "GS Paper II: International institutions\nGS Paper III: Science and technology\nGS Paper IV: Ethics\n",
+    "Banner_Image": "https://drive.google.com/thumbnail?id=1unYbGZ-WIGdaRp_kPo2vebefCPlnK4uN&sz=w1200",
+    "Short_Summary": "Explore the rule of law, human rights and peace alongside IceCube’s role in uncovering cosmic mysteries through neutrinos.  \r\nConnect international justice and scientific discovery with key concepts for UPSC GS Papers II, III and IV.",
+    "Active": true,
+    "slug": "nobel-insights-from-global-justice-to-cosmic-mysteries",
+    "Slug": "nobel-insights-from-global-justice-to-cosmic-mysteries"
+  },
+  {
     "Date": "11/10/2026",
     "Title": "El Niño’s Uneven Impact: Why Tamil Nadu’s Monsoon Tells a Different Story",
     "Category": "GS Paper I – Geography\r\nGS Paper III – Environment, Science & Technology, Disaster Management\r",
