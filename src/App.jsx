@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
+import { Analytics } from '@vercel/analytics/react';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import AnnouncementPopup from './components/AnnouncementPopup';
@@ -481,6 +482,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen flex flex-col foxing-vignette bg-[#F3EBD9] text-[#2C221E] selection:bg-[#8C3A27] selection:text-[#FCFAF6]">
+      <Analytics />
 
 
       {/* Dynamic Fanned Deck Google Sheet CMS Live Ticker / Announcement Popup Modal */}
