@@ -28,4 +28,5 @@ Thumbs.db
 
 # Scratch / Test Harnesses
 scratch/
+scripts/.pdf-img-cache/
 

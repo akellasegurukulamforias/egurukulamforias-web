@@ -8,6 +8,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { sortCurrentAffairsByDate } from '../src/utils/dateUtils.js';
 import { generateSitemap } from './generate-sitemap.js';
+import { generateCurrentAffairsPdfs } from './generate-pdfs.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -289,6 +290,9 @@ async function main() {
   // 6. Generate static public/sitemap.xml reusing the freshly synced CMS data
   const sitemapResult = generateSitemap({ currentAffairs: sortedAffairs, resources: sortedResources });
   console.log(`[sync-cms] Generated: public/sitemap.xml (${sitemapResult.totalUrls} URLs)`);
+
+  // 7. Generate static Current Affairs PDFs for offline study briefings
+  await generateCurrentAffairsPdfs(sortedAffairs);
 
   console.log('\n=== Sync Complete ===');
   console.log(`Active Current Affairs: ${sortedAffairs.length}`);

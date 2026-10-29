@@ -8,8 +8,10 @@ import {
   ChevronRight, 
   ShieldAlert,
   BookOpen,
-  RefreshCw
+  RefreshCw,
+  Download
 } from 'lucide-react';
+import { cleanDocHtml } from '../utils/cleanDocHtml.js';
 import { useCMSData } from '../hooks/useCMSData';
 import { getCachedCMSData, LOCAL_STORAGE_KEY, formatDateToYMD, isCMSNetworkFetched, forceRefreshCMSData, fetchCMSData, fetchArticleDetail } from '../services/cmsService';
 import { sortCurrentAffairsByDate, formatDisplayDate } from '../utils/dateUtils';
@@ -205,136 +207,6 @@ function getImmediateArticle({ slug, propArticle, initialArticle, item }) {
   return null;
 }
 
-/**
- * Clean and optimize raw HTML for high-fidelity native editorial typography.
- * Strips script/style tags, unwraps Google redirect links, ensures responsive images,
- * demotes misplaced GS Paper headers to body text, and converts section title paragraphs into semantic <h2> tags.
- */
-function cleanDocHtml(rawHtml) {
-  if (!rawHtml || typeof rawHtml !== 'string') return '';
-
-  try {
-    let html = rawHtml;
-
-    // 1. Extract inner body content if a complete HTML page is provided
-    const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
-    if (bodyMatch && bodyMatch[1]) {
-      html = bodyMatch[1];
-    }
-
-    // 2. Strip <style> and <script> blocks, inline event handlers, and javascript: URIs for XSS defense
-    html = html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
-    html = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
-    html = html.replace(/\s+on[a-z]+\s*=\s*(?:'[^']*'|"[^"]*"|[^\s>]+)/gi, '');
-    html = html.replace(/(href|src)\s*=\s*["']\s*javascript:[^"']*["']/gi, '$1="#"');
-
-    // 3. Remove Google's redirection wrappers
-    html = html.replace(/href=["']https:\/\/www\.google\.com\/url\?q=([^&"']+)[^"']*["']/gi, (match, dest) => {
-      try {
-        return `href="${decodeURIComponent(dest)}" target="_blank" rel="noopener noreferrer"`;
-      } catch (e) {
-        return `href="${dest}" target="_blank" rel="noopener noreferrer"`;
-      }
-    });
-
-    // 4. Demote any <h2> (or <h1-h6>) tags containing GS Paper / GS syllabus lines to plain <p>
-    html = html.replace(/<h[1-6][^>]*>([\s\S]*?)<\/h[1-6]>/gi, (match, inner) => {
-      const plain = inner.replace(/<[^>]*>/g, '').trim();
-      if (/^GS\s+(?:Paper\s+)?(?:I|II|III|IV|\d+)/i.test(plain) || /^GS\s+[I|V|X]+/i.test(plain)) {
-        let textOnly = inner.replace(/<div[\s\S]*?<\/div>/gi, '').replace(/<img[\s\S]*?>/gi, '').trim();
-        let extra = '';
-        const divMatch = inner.match(/<div[\s\S]*?<\/div>/gi);
-        if (divMatch) extra += divMatch.join('');
-        const imgMatch = inner.match(/<img[^>]*>/gi);
-        if (imgMatch && !divMatch) extra += imgMatch.join('');
-
-        return `<p class="gs-paper-line">${textOnly}</p>${extra}`;
-      }
-      return match;
-    });
-
-    // 5. Clean existing <h2> tags: strip <strong> / <b> inside existing <h2> so font-serif and maroon color apply cleanly
-    html = html.replace(/<h2([^>]*)>([\s\S]*?)<\/h2>/gi, (match, attrs, inner) => {
-      const cleanInner = inner.replace(/<\/?(?:b|strong)[^>]*>/gi, '').trim();
-      return `<h2${attrs}>${cleanInner}</h2>`;
-    });
-
-    // 6. Convert section title paragraphs to unified <h2> tags:
-    html = html.replace(/<p[^>]*>([\s\S]*?)<\/p>/gi, (match, inner) => {
-      const plain = inner.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
-      if (!plain) return '';
-
-      // NEVER convert bullet points or metadata fields
-      if (/^[·•\-\*]/.test(plain)) return match;
-      if (/^(?:Ministry|Nodal Institution|Introduced|Launched|Purpose|UPSC Linkage|Other Number|Area|Origin|Started):/i.test(plain)) return match;
-
-      // NEVER convert "Also Read" blocks
-      if (/^Also\s+Read/i.test(plain)) return match;
-
-      // NEVER convert GS Paper lines
-      if (/^GS\s+(?:Paper\s+)?(?:I|II|III|IV|\d+)/i.test(plain) || /^GS\s+[I|V|X]+/i.test(plain)) return match;
-
-      // Syllabus Areas heading: always normalize to semantic <h2>
-      if (/^Syllabus\s+areas?:?/i.test(plain) && plain.length < 35) {
-        const colonText = plain.endsWith(':') ? plain : `${plain}:`;
-        return `<h2>${colonText}</h2>`;
-      }
-
-      // Check if paragraph contains <strong> or <b>
-      const hasStrong = /<(?:b|strong)[^>]*>[\s\S]*?<\/(?:b|strong)>/i.test(inner);
-      if (!hasStrong) return match;
-
-      // Numbered section heading (e.g., "1. Major National Helplines in India", "1. 1930 – National Cyber Crime Helpline", "2. 14567 – Elderline")
-      const isNumberedTitle = /^\d+\.\s+[\s\S]+/i.test(plain) && plain.length < 100 && !plain.endsWith('.') && !inner.includes('<br');
-
-      // Fully bold title paragraphs (e.g. "Important Helpline Numbers...", "1098 – CHILDLINE...", "BRICS: India's Vision")
-      const unbolded = inner.replace(/<(?:b|strong)[^>]*>[\s\S]*?<\/(?:b|strong)>/gi, '')
-                            .replace(/<[^>]*>/g, '')
-                            .replace(/[\s\d\.\–\-\:\,\']/g, '');
-      const isBoldTitle = unbolded.length === 0 && plain.length > 2 && plain.length < 100 && !plain.endsWith('.');
-
-      if (isNumberedTitle || isBoldTitle) {
-        // Strip <strong> / <b> inside newly promoted <h2> to guarantee unified font-serif and maroon styling,
-        // while strictly preserving valid inline HTML, anchor tags (<a href="...">), and styling attributes.
-        const cleanHeading = inner.replace(/<\/?(?:b|strong)[^>]*>/gi, '').trim();
-        return `<h2>${cleanHeading}</h2>`;
-      }
-
-      return match;
-    });
-
-    // 7. Ensure all images are responsive, centered, preserve aspect ratio attributes, and load safely
-    html = html.replace(/<img\s+([^>]*?)>/gi, (match, attributes) => {
-      let cleanAttrs = attributes || '';
-      
-      if (!/referrerpolicy/i.test(cleanAttrs)) {
-        cleanAttrs += ' referrerpolicy="no-referrer"';
-      }
-      if (!/loading/i.test(cleanAttrs)) {
-        cleanAttrs += ' loading="lazy"';
-      }
-
-      return `<img ${cleanAttrs} class="max-w-full h-auto rounded-2xl shadow-md my-6 mx-auto block object-contain border border-[#D5C3B0]/40" />`;
-    });
-
-    // 8. Wrap any raw <table> elements with responsive, non-overflowing scroll container
-    html = html.replace(/<table([^>]*)>([\s\S]*?)<\/table>/gi, (match, attrs, inner) => {
-      return `<div class="w-full overflow-x-auto my-6 rounded-xl border border-[#D5C3B0]/40 shadow-2xs"><table${attrs} class="w-full min-w-full border-collapse">${inner}</table></div>`;
-    });
-
-    // 9. Clean empty paragraph tags
-    html = html.replace(/<p[^>]*>\s*(?:&nbsp;|<br\s*\/?>|\s)*<\/p>/gi, '');
-
-    return html;
-  } catch (err) {
-    console.warn("cleanDocHtml parsing encountered an error, falling back to safe content:", err);
-    return String(rawHtml).replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '').replace(/\s+on[a-z]+\s*=\s*(?:'[^']*'|"[^"]*"|[^\s>]+)/gi, '');
-  }
-}
-
-/**
- * Estimate reading time in minutes based on word count
- */
 function estimateReadingTime(content) {
   try {
     if (!content || typeof content !== 'string') return '3 min read';
@@ -1076,6 +948,7 @@ export default function CurrentAffairsDetailPage({ slug: propSlug, id: propId, n
   // ONLY REACHED ONCE ARTICLE IS GUARANTEED TO BE LOADED AND NON-NULL:
   // Extract article fields safely with optional chaining and safe defaults
   const title = article?.Title || article?.title || 'Current Affairs';
+  const articleSlug = article?.Slug || article?.slug || createSlug(title);
   const date = formatDisplayDate(article?.Date || article?.date) || '';
   const category = article?.Category || article?.category || 'General Studies';
   const rawBanner = article?.Banner_Image || article?.banner_image || article?.Banner || article?.banner || article?.Image || article?.image;
@@ -1110,6 +983,7 @@ export default function CurrentAffairsDetailPage({ slug: propSlug, id: propId, n
 
   const fullContentHtml = rawFullContent ? cleanDocHtml(rawFullContent) : '';
   const readingTime = estimateReadingTime(fullContentHtml || shortSummary);
+  const isPdfAvailable = article?.hasPdf !== false && article?.pdfAvailable !== false && !article?.pdfFailed;
 
   const prevArticle = currentIndex > 0 && sortedArticles[currentIndex - 1] ? sortedArticles[currentIndex - 1] : null;
   const nextArticle = currentIndex >= 0 && currentIndex < sortedArticles.length - 1 && sortedArticles[currentIndex + 1] ? sortedArticles[currentIndex + 1] : null;
@@ -1134,7 +1008,20 @@ export default function CurrentAffairsDetailPage({ slug: propSlug, id: propId, n
               <span>Back to Current Affairs</span>
             </button>
 
-            {/* Badges: Category tags & Date */}
+            {/* Download PDF Pill */}
+            {isPdfAvailable && (
+              <div className="flex items-center gap-2">
+                <a
+                  href={`/pdfs/current-affairs/${encodeURIComponent(articleSlug)}.pdf`}
+                  download={`${articleSlug}.pdf`}
+                  className="inline-flex items-center gap-1.5 btn-terracotta-pill text-xs py-1.5 px-3.5 font-serif font-bold cursor-pointer no-underline shadow-xs hover:shadow-sm"
+                  title="Download Study Briefing PDF"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Download PDF</span>
+                </a>
+              </div>
+            )}
             <div className="flex items-center gap-2 text-xs flex-wrap">
               {categoryBadges.map((cat, idx) => (
                 <span key={idx} className="inline-flex items-center gap-1.5 font-mono text-[#8C3A27] font-bold bg-[#8C3A27]/10 px-3 py-1 rounded-md border border-[#8C3A27]/20">
@@ -1226,6 +1113,31 @@ export default function CurrentAffairsDetailPage({ slug: propSlug, id: propId, n
             <p className="text-xs sm:text-sm font-serif italic text-[#5C4028] font-semibold">
               The full analytical briefing for this dispatch is being finalized by our editorial board.
             </p>
+          </div>
+        )}
+
+        {/* PDF DOWNLOAD ACTION CARD */}
+        {isPdfAvailable && (
+          <div className="p-5 sm:p-6 rounded-3xl bg-[#FAF6EE] border border-[#D5C3B0] flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm">
+            <div className="space-y-1 text-center sm:text-left">
+              <div className="flex items-center justify-center sm:justify-start gap-2">
+                <Download className="w-4 h-4 text-[#8C3A27]" />
+                <h3 className="font-serif-header text-base sm:text-lg font-bold text-[#221814]">
+                  Download Complete Study Briefing PDF
+                </h3>
+              </div>
+              <p className="text-xs text-[#5C4028] font-serif italic">
+                Official analysis with syllabus mapping, diagrams, tables, and clickable web references formatted for offline UPSC revision.
+              </p>
+            </div>
+            <a
+              href={`/pdfs/current-affairs/${encodeURIComponent(articleSlug)}.pdf`}
+              download={`${articleSlug}.pdf`}
+              className="btn-terracotta-pill text-xs py-2.5 px-6 font-serif font-bold cursor-pointer inline-flex items-center gap-2 shrink-0 no-underline shadow-xs hover:shadow-sm"
+            >
+              <Download className="w-4 h-4" />
+              <span>Download PDF</span>
+            </a>
           </div>
         )}
 
